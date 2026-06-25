@@ -4,39 +4,37 @@ import csv
 import cv2
 import numpy as np
 
+from config_loader import load_config
+
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
-INPUT_DIR = PROJECT_ROOT / "data" / "working_png"
-OUTPUT_DIR = PROJECT_ROOT / "data" / "processed" / "01_illumination_normalized"
-METADATA_DIR = PROJECT_ROOT / "data" / "metadata"
+CONFIG = load_config()
+
+PATHS_CONFIG = CONFIG["paths"]
+DISPLAY_CONFIG = CONFIG["display"]
+STEP_CONFIG = CONFIG["step_01_illumination_normalization"]
+
+INPUT_DIR = PROJECT_ROOT / PATHS_CONFIG["working_png_dir"]
+OUTPUT_DIR = PROJECT_ROOT / PATHS_CONFIG["processed_dir"] / STEP_CONFIG["output_subdir"]
+METADATA_DIR = PROJECT_ROOT / PATHS_CONFIG["metadata_dir"]
 
 CSV_PATH = METADATA_DIR / "processing_01_illumination_normalization.csv"
 
 
 def normalize_illumination_bgr(image_bgr: np.ndarray) -> np.ndarray:
-    """
-    Normalizuje osvetljenje bez menjanja geometrije slike.
-
-    Koristi LAB color space:
-    - L kanal = osvetljenje
-    - A/B kanali = boja
-
-    CLAHE se primenjuje samo na L kanal, tako da popravljamo kontrast/osvetljenje,
-    ali ne menjamo agresivno boje slike.
-    """
-
     lab = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2LAB)
 
     l_channel, a_channel, b_channel = cv2.split(lab)
 
+    clahe_config = STEP_CONFIG["clahe"]
+
+    clip_limit = float(clahe_config["clip_limit"])
+    tile_grid_size = tuple(clahe_config["tile_grid_size"])
+
     clahe = cv2.createCLAHE(
-        # clipLimit=1.5,
-        # tileGridSize=(8, 8)
-        clipLimit=2.0,
-        tileGridSize=(8, 8)
-        # clipLimit=2.5,
-        # tileGridSize=(8, 8)
+        clipLimit=clip_limit,
+        tileGridSize=tile_grid_size
     )
 
     normalized_l = clahe.apply(l_channel)
@@ -49,8 +47,9 @@ def normalize_illumination_bgr(image_bgr: np.ndarray) -> np.ndarray:
 
     return normalized_bgr
 
+def resize_for_display(image: np.ndarray) -> np.ndarray:
+    max_height = int(DISPLAY_CONFIG["max_height"])
 
-def resize_for_display(image: np.ndarray, max_height: int = 800) -> np.ndarray:
     height, width = image.shape[:2]
 
     if height <= max_height:
@@ -61,7 +60,6 @@ def resize_for_display(image: np.ndarray, max_height: int = 800) -> np.ndarray:
     new_height = int(height * scale)
 
     return cv2.resize(image, (new_width, new_height), interpolation=cv2.INTER_AREA)
-
 
 def make_side_by_side(original: np.ndarray, processed: np.ndarray) -> np.ndarray:
     original_display = resize_for_display(original)
@@ -87,10 +85,13 @@ def make_side_by_side(original: np.ndarray, processed: np.ndarray) -> np.ndarray
 
 
 def collect_images() -> list[Path]:
-    image_paths = []
+    allowed_extensions = {".png", ".jpg", ".jpeg"}
 
-    for extension in ("*.png", "*.PNG", "*.jpg", "*.JPG", "*.jpeg", "*.JPEG"):
-        image_paths.extend(INPUT_DIR.glob(extension))
+    image_paths = [
+        path
+        for path in INPUT_DIR.iterdir()
+        if path.is_file() and path.suffix.lower() in allowed_extensions
+    ]
 
     return sorted(image_paths)
 
@@ -139,6 +140,10 @@ def main() -> None:
     print("  n / SPACE / ENTER  -> next image")
     print("  q / ESC            -> quit")
     print()
+    clahe_config = STEP_CONFIG["clahe"]
+    clip_limit = float(clahe_config["clip_limit"])
+    tile_grid_size = tuple(clahe_config["tile_grid_size"])
+    tile_grid_size_label = f"{tile_grid_size[0]}x{tile_grid_size[1]}"
 
     for index, image_path in enumerate(image_paths, start=1):
         image_bgr = cv2.imread(str(image_path))
@@ -160,26 +165,30 @@ def main() -> None:
             "width": width,
             "height": height,
             "processing_step": "01_illumination_normalization",
-            "method": "LAB_L_channel_CLAHE",
-            "clahe_clip_limit": 2.0,
-            "clahe_tile_grid_size": "8x8",
+            "method":  STEP_CONFIG["method"],
+            "clahe_clip_limit": clip_limit,
+            "clahe_tile_grid_size": tile_grid_size_label,
         })
-
-        comparison = make_side_by_side(image_bgr, normalized_bgr)
-
-        title = f"01 Illumination normalization | {index}/{len(image_paths)} | {image_path.name}"
-
-        cv2.imshow(title, comparison)
 
         print(f"[{index}/{len(image_paths)}] Saved: {output_path.name}")
 
-        key = cv2.waitKey(0) & 0xFF
+        if DISPLAY_CONFIG["show_windows"]:
+            comparison = make_side_by_side(image_bgr, normalized_bgr)
 
-        cv2.destroyWindow(title)
+            title = f"01 Illumination normalization | {index}/{len(image_paths)} | {image_path.name}"
 
-        if key in [ord("q"), 27]:
-            print("Stopped by user.")
-            break
+            cv2.imshow(title, comparison)
+
+            if DISPLAY_CONFIG["wait_between_images"]:
+                key = cv2.waitKey(0) & 0xFF
+            else:
+                key = cv2.waitKey(500) & 0xFF
+
+            cv2.destroyWindow(title)
+
+            if key in [ord("q"), 27]:
+                print("Stopped by user.")
+                break
 
     save_metadata(metadata_rows)
 

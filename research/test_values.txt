@@ -1,0 +1,1 @@
+- za pipeline step 1 najbolji okom vidljiv rezultat dobijam sa tile_grid_size: 4,4 i clip_limit 2.5
