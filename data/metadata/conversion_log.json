@@ -1,0 +1,90 @@
+[
+  {
+    "source_file": "data\\raw_originals\\IMG_0502.HEIC",
+    "output_file": "data\\working_png\\IMG_0502.png",
+    "original_width": 3024,
+    "original_height": 4032,
+    "original_mode": "RGB",
+    "converted_mode": "RGB"
+  },
+  {
+    "source_file": "data\\raw_originals\\IMG_0503.HEIC",
+    "output_file": "data\\working_png\\IMG_0503.png",
+    "original_width": 3024,
+    "original_height": 4032,
+    "original_mode": "RGB",
+    "converted_mode": "RGB"
+  },
+  {
+    "source_file": "data\\raw_originals\\IMG_0504.HEIC",
+    "output_file": "data\\working_png\\IMG_0504.png",
+    "original_width": 3024,
+    "original_height": 4032,
+    "original_mode": "RGB",
+    "converted_mode": "RGB"
+  },
+  {
+    "source_file": "data\\raw_originals\\IMG_0505.HEIC",
+    "output_file": "data\\working_png\\IMG_0505.png",
+    "original_width": 3024,
+    "original_height": 4032,
+    "original_mode": "RGB",
+    "converted_mode": "RGB"
+  },
+  {
+    "source_file": "data\\raw_originals\\IMG_0506.HEIC",
+    "output_file": "data\\working_png\\IMG_0506.png",
+    "original_width": 3024,
+    "original_height": 4032,
+    "original_mode": "RGB",
+    "converted_mode": "RGB"
+  },
+  {
+    "source_file": "data\\raw_originals\\IMG_0507.HEIC",
+    "output_file": "data\\working_png\\IMG_0507.png",
+    "original_width": 3024,
+    "original_height": 4032,
+    "original_mode": "RGB",
+    "converted_mode": "RGB"
+  },
+  {
+    "source_file": "data\\raw_originals\\IMG_0508.HEIC",
+    "output_file": "data\\working_png\\IMG_0508.png",
+    "original_width": 3024,
+    "original_height": 4032,
+    "original_mode": "RGB",
+    "converted_mode": "RGB"
+  },
+  {
+    "source_file": "data\\raw_originals\\IMG_0509.HEIC",
+    "output_file": "data\\working_png\\IMG_0509.png",
+    "original_width": 3024,
+    "original_height": 4032,
+    "original_mode": "RGB",
+    "converted_mode": "RGB"
+  },
+  {
+    "source_file": "data\\raw_originals\\IMG_0510.HEIC",
+    "output_file": "data\\working_png\\IMG_0510.png",
+    "original_width": 3024,
+    "original_height": 4032,
+    "original_mode": "RGB",
+    "converted_mode": "RGB"
+  },
+  {
+    "source_file": "data\\raw_originals\\IMG_0511.HEIC",
+    "output_file": "data\\working_png\\IMG_0511.png",
+    "original_width": 3024,
+    "original_height": 4032,
+    "original_mode": "RGB",
+    "converted_mode": "RGB"
+  },
+  {
+    "source_file": "data\\raw_originals\\IMG_0512.HEIC",
+    "output_file": "data\\working_png\\IMG_0512.png",
+    "original_width": 3024,
+    "original_height": 4032,
+    "original_mode": "RGB",
+    "converted_mode": "RGB"
+  }
+]
