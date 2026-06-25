@@ -56,3 +56,44 @@ Konacni Bilateral parameteri:
 diameter = 7
 sigma_color = 50
 sigma_space = 50
+
+STEP 3 - EDGE DETECTION
+
+legenda:
+ 0-lose 
+ 1-ok
+ 2-dobro
+ 3-super
+note: tek sam na 505(pri sredini) poocela da gledam, osim te vertikalne linije, i horizontlanu koja je kraj stola koja ce mi biti super za odredjivanje ugla
+    takodje ocenjivanje je nazalost uglavnom u poredjenju 6 slika trenutnih eventualno raspon strana napred strana nazad
+
+IMAGE,"30,100,3,false","30,100,3,true","30,100,5,false","30,100,5,true","30,150,3,false","30,150,3,true","30,150,5,false","30,150,5,true","30,200,3,false","30,200,3,true","30,200,5,false","30,200,5,true","30,250,3,false","30,250,3,true","30,250,5,false","30,250,5,true","50,100,3,false","50,100,3,true","50,100,5,false","50,100,5,true","50,150,3,false","50,150,3,true","50,150,5,false","50,150,5,true","50,200,3,false","50,200,3,true","50,200,5,false","50,200,5,true","50,250,3,false","50,250,3,true","50,250,5,false","50,250,5,true","75,100,3,false","75,100,3,true","75,100,5,false","75,100,5,true","75,150,3,false","75,150,3,true","75,150,5,false","75,150,5,true","75,200,3,false","75,200,3,true","75,200,5,false","75,200,5,true","75,250,3,false","75,250,3,true","75,250,5,false","75,250,5,true","100,150,3,false","100,150,3,true","100,150,5,false","100,150,5,true","100,200,3,false","100,200,3,true","100,200,5,false","100,200,5,true","100,250,3,false","100,250,3,true","100,250,5,false","100,250,5,true"
+502,  3,3,1,0,1,1,  0,0,0.5,1,0,0,  2,3,0,1,3+,3+,  0,0,3+,3,0,0,  1,2,0,0,1,2,  0,0,3+,3+,1,1,  3+,3+,0,0,0.5,0.5,  0,0,1,1,0,0,  3+,3,0,0,1,1,  0,0,1,1,0,0
+503,  3+,3+,1,1,3+,3+  0.5,0.5,3,3,0,0,  3+,2,0,0,3+,3+,  0,0,3+,3,1,0.5,  3,2,1,0,3,2,  0,0,3+,3+,0,0,  2,1,1,0,2,1,  0,0,1,1,0,0,  2.5,2.5,0,0,2,1,  0,0,1.5,1,0,0
+504,  3+,3+,2,2,3+,3+,  1,1,3+,3,1,1,  3,2,1,1,3+,3+,  1.5,1.5,3+,3+,1,2,  3,3,1,1,2,1,  0,0,3+,3+,0.5,1,  3+,3+,1,0,3+,3,  0,0,3,1,0,0,  3,2,1,0,3+,2,  0,0,2,0,0,0
+505,  3,3,0,0,2,1,  0,0,2,0,0,0,  1,0,0,0,2,2,  0,0,1,1,0,0,  1,0,0,0,0,0,  0,0,2,2,0,0,  2,1,0,0,0,0,  0,0,0,0,0,0,  0.5,0.5,0,0,0,0,  0,0,0,0,0,0
+506,  2,2.5,0,0,1,1,  0,0,1,0.5,0,0,  1,1,0,0,2,2,  0,0,2.5,2,0,0,  2,2,0,0,1.5,1,  0,0,3,2.5,0,0,  1,1,0,0,1,1,  0,0,1,0.5,0,0,  2,2,0,0,1,1,  0,0,1,0,0,0
+507,  2.5,3,0,0,2,3,  0,0,3,2,0,0,  3,2,0,0,3,3,  0,0,2,2.5,0,0,  3,1.5,0,0,1,0.5,  0,0,2.5,3+,0,0,  3,2,0,0,2,1,  0,0,2,0,0,0,  2,1.5,0,0,1,1,  0,0,0.5,0,0,0
+508,  3,3,0,0,3,2,  0,0,2.5,1.5,0,0,  1.5,1,0,0,3,3,  1,0,2,1,0,0,  1.5,1,0,0,0.5,0.5,  0,1,3+,3,0,0,  2.5,2,0,0,2,2,  0,0,1.5,1.5,0,0,  2,2,0,0,1.5,1,  0,0,2,1.5,0,0
+509,  3,3,0,0,3,3,  0,0,2,2,0,0,  1.5,1.5,2,2,3,3,  0,0,3,2,0,0,  1.5,1.5,0,0,1.5,1.5,  0,0,3+,3,0,0,  3,2,0,0,1.5,1.5,  0,0,1.5,1.5,0,0,  2.5,2,0,0,1.5,1.5,  0,0,1,1.5,0,0
+510,  1.5,2,0,0,2,1,  0,0,1.5,0,0,0,  3,0,0,0,3,3,  0,0,1.5,1.5,0,0,  3,2,0,0,2,1,  0,0,3+,3,0,0,  3,2,0,0,1,1,  0,0,2,0.5,0,0,  2,2,0,0,2,1,  0,0,1.5,1,0,0
+511,  1,2,0,0,2,1,  0,0,0.5,1,0,0,  1,0.5,0,0,2,2,  0,0,2,1,0,0,  1.5,1.5,0,0,1,1,  0,0,2.5,3,0,0,  2.5,2,0,0,2,2,  0,0,0,0,0,0,  1,0,0,0,0,0,  0,0,0,0,0,0
+
+napomena za sledece testiranje bi moglo(ngl na poslednja 4 image je uticala ova ideja):
+    3-imamo celom duzinom uspravnu liniju (cak i isprekidanu) i imamo horizontalnu liniju
+    2-imamo uspravnu i horizontalnu, ali uspravna ne ide kroz celu cizmu, ili uspravna kroz celu ali bez horizontalne
+    1-imamo uspravnu liniju
+    0-nista dovoljno jasno
+
+zakljucak:
+    75,100,3,true   -> najbolji kandidat
+    75,100,3,false  -> skoro jednako dobar
+    30,100,3,true   -> dobar, ali malo previše blag/agresivan
+    50,100,3,false  -> dobar backup
+    50,100,3,true   -> dobar backup
+
+Konacni kandidat:
+threshold_1 = 75
+threshold_2 = 100
+aperture_size = 3
+use_l2_gradient = true

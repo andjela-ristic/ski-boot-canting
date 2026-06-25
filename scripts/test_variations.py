@@ -33,6 +33,13 @@ def resolve_image_path(step: int, image_name: str) -> Path:
         step_config = CONFIG["step_02_grayscale_and_blur"]
         image_path = PROCESSED_DIR / step_config["input_subdir"] / image_name
 
+    elif step == 3:
+        step_02_config = CONFIG["step_02_grayscale_and_blur"]
+        step_02_output_dir = PROCESSED_DIR / step_02_config["output_subdir"]
+        selected_step_02_output = step_02_config["selected_output"]
+
+        image_path = step_02_output_dir / selected_step_02_output / image_name
+
     else:
         raise ValueError(f"Unsupported step: {step}")
 
@@ -40,7 +47,6 @@ def resolve_image_path(step: int, image_name: str) -> Path:
         raise FileNotFoundError(f"Image not found: {image_path}")
 
     return image_path
-
 
 def resize_for_display(image: np.ndarray, max_height: int = 520) -> np.ndarray:
     height, width = image.shape[:2]
@@ -200,7 +206,6 @@ def normalize_illumination_bgr(
 
     return normalized_bgr
 
-
 def run_step_01_variations(image_path: Path) -> None:
     step_config = CONFIG["step_01_illumination_normalization"]
     clahe_config = step_config["clahe"]
@@ -234,7 +239,6 @@ def run_step_01_variations(image_path: Path) -> None:
         results=results
     )
 
-
 def ensure_odd_kernel_size(value: int) -> int:
     if value < 1:
         raise ValueError(f"Kernel size must be positive. Got: {value}")
@@ -243,7 +247,6 @@ def ensure_odd_kernel_size(value: int) -> int:
         raise ValueError(f"Kernel size must be odd. Got: {value}")
 
     return value
-
 
 def run_step_02_variations(image_path: Path) -> None:
     step_config = CONFIG["step_02_grayscale_and_blur"]
@@ -307,6 +310,63 @@ def run_step_02_variations(image_path: Path) -> None:
         results=bilateral_results
     )
 
+def validate_aperture_size(value: int) -> int:
+    allowed_values = {3, 5, 7}
+
+    if value not in allowed_values:
+        raise ValueError(f"Canny aperture_size must be one of {allowed_values}. Got: {value}")
+
+    return value
+
+def run_step_03_variations(image_path: Path) -> None:
+    step_config = CONFIG["step_03_edge_detection"]
+    canny_config = step_config["canny"]
+
+    threshold_1_values = canny_config["threshold_1_test_values"]
+    threshold_2_values = canny_config["threshold_2_test_values"]
+    aperture_size_values = canny_config["aperture_size_test_values"]
+    use_l2_gradient_values = canny_config["use_l2_gradient_test_values"]
+
+    image_gray = cv2.imread(str(image_path), cv2.IMREAD_GRAYSCALE)
+
+    if image_gray is None:
+        raise ValueError(f"Could not read image: {image_path}")
+
+    results = []
+
+    for threshold_1, threshold_2, aperture_size, use_l2_gradient in itertools.product(
+        threshold_1_values,
+        threshold_2_values,
+        aperture_size_values,
+        use_l2_gradient_values
+    ):
+        threshold_1 = int(threshold_1)
+        threshold_2 = int(threshold_2)
+        aperture_size = validate_aperture_size(int(aperture_size))
+        use_l2_gradient = bool(use_l2_gradient)
+
+        if threshold_1 >= threshold_2:
+            continue
+
+        edges = cv2.Canny(
+            image=image_gray,
+            threshold1=threshold_1,
+            threshold2=threshold_2,
+            apertureSize=aperture_size,
+            L2gradient=use_l2_gradient
+        )
+
+        label = (
+            f"t1={threshold_1}, t2={threshold_2}, "
+            f"ap={aperture_size}, l2={use_l2_gradient}"
+        )
+
+        results.append((label, edges))
+
+    show_variation_pages(
+        title_prefix=f"Step 03 Canny variations | {image_path.name}",
+        results=results
+    )
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
@@ -317,8 +377,8 @@ def parse_args() -> argparse.Namespace:
         "--step",
         type=int,
         required=True,
-        choices=[1, 2],
-        help="Pipeline step to test. Supported: 1, 2."
+        choices=[1, 2, 3],
+        help="Pipeline step to test. Supported: 1, 2, 3."
     )
 
     parser.add_argument(
@@ -351,6 +411,9 @@ def main() -> None:
 
     elif args.step == 2:
         run_step_02_variations(image_path)
+
+    elif args.step == 3:
+        run_step_03_variations(image_path)
 
     cv2.destroyAllWindows()
 

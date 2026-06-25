@@ -51,3 +51,22 @@ step_02_grayscale_and_blur:
     sigma_color_test_values: [50, 75, 100]
     sigma_space: 50
     sigma_space_test_values: [50, 75, 100]
+
+step_03_edge_detection:
+  enabled: true
+
+  input_step: "02_grayscale_and_blur"
+  output_subdir: "03_edges"
+
+  canny:
+    threshold_1: 75
+    threshold_1_test_values: [30, 50, 75, 100]
+
+    threshold_2: 100
+    threshold_2_test_values: [100, 150, 200, 250]
+
+    aperture_size: 3
+    aperture_size_test_values: [3, 5]
+
+    use_l2_gradient: true
+    use_l2_gradient_test_values: [false, true]

@@ -1,0 +1,11 @@
+source_file,output_file,width,height,processing_step,input_from_step_02,threshold_1,threshold_2,aperture_size,use_l2_gradient
+data\processed\02_grayscale_blur\gaussian_blur\IMG_0502.png,data\processed\03_edges\IMG_0502.png,3024,4032,03_edge_detection,gaussian_blur,75,100,3,True
+data\processed\02_grayscale_blur\gaussian_blur\IMG_0503.png,data\processed\03_edges\IMG_0503.png,3024,4032,03_edge_detection,gaussian_blur,75,100,3,True
+data\processed\02_grayscale_blur\gaussian_blur\IMG_0504.png,data\processed\03_edges\IMG_0504.png,3024,4032,03_edge_detection,gaussian_blur,75,100,3,True
+data\processed\02_grayscale_blur\gaussian_blur\IMG_0505.png,data\processed\03_edges\IMG_0505.png,3024,4032,03_edge_detection,gaussian_blur,75,100,3,True
+data\processed\02_grayscale_blur\gaussian_blur\IMG_0506.png,data\processed\03_edges\IMG_0506.png,3024,4032,03_edge_detection,gaussian_blur,75,100,3,True
+data\processed\02_grayscale_blur\gaussian_blur\IMG_0507.png,data\processed\03_edges\IMG_0507.png,3024,4032,03_edge_detection,gaussian_blur,75,100,3,True
+data\processed\02_grayscale_blur\gaussian_blur\IMG_0508.png,data\processed\03_edges\IMG_0508.png,3024,4032,03_edge_detection,gaussian_blur,75,100,3,True
+data\processed\02_grayscale_blur\gaussian_blur\IMG_0509.png,data\processed\03_edges\IMG_0509.png,3024,4032,03_edge_detection,gaussian_blur,75,100,3,True
+data\processed\02_grayscale_blur\gaussian_blur\IMG_0510.png,data\processed\03_edges\IMG_0510.png,3024,4032,03_edge_detection,gaussian_blur,75,100,3,True
+data\processed\02_grayscale_blur\gaussian_blur\IMG_0511.png,data\processed\03_edges\IMG_0511.png,3024,4032,03_edge_detection,gaussian_blur,75,100,3,True
