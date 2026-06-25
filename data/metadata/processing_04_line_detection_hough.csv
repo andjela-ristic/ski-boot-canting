@@ -1,0 +1,11 @@
+source_file,output_file,width,height,processing_step,rho,theta_divisor,threshold,min_line_length,max_line_gap,vertical_angle_tolerance_degrees,horizontal_angle_tolerance_degrees,vertical_count,horizontal_count,other_count
+data\processed\03_edges\IMG_0502.png,data\processed\04_lines_hough\IMG_0502.png,3024,4032,04_line_detection_hough,1,180,40,80,20,10,8,152,52,194
+data\processed\03_edges\IMG_0503.png,data\processed\04_lines_hough\IMG_0503.png,3024,4032,04_line_detection_hough,1,180,40,80,20,10,8,170,65,141
+data\processed\03_edges\IMG_0504.png,data\processed\04_lines_hough\IMG_0504.png,3024,4032,04_line_detection_hough,1,180,40,80,20,10,8,151,95,121
+data\processed\03_edges\IMG_0505.png,data\processed\04_lines_hough\IMG_0505.png,3024,4032,04_line_detection_hough,1,180,40,80,20,10,8,121,24,72
+data\processed\03_edges\IMG_0506.png,data\processed\04_lines_hough\IMG_0506.png,3024,4032,04_line_detection_hough,1,180,40,80,20,10,8,111,32,94
+data\processed\03_edges\IMG_0507.png,data\processed\04_lines_hough\IMG_0507.png,3024,4032,04_line_detection_hough,1,180,40,80,20,10,8,107,36,111
+data\processed\03_edges\IMG_0508.png,data\processed\04_lines_hough\IMG_0508.png,3024,4032,04_line_detection_hough,1,180,40,80,20,10,8,391,42,189
+data\processed\03_edges\IMG_0509.png,data\processed\04_lines_hough\IMG_0509.png,3024,4032,04_line_detection_hough,1,180,40,80,20,10,8,180,22,72
+data\processed\03_edges\IMG_0510.png,data\processed\04_lines_hough\IMG_0510.png,3024,4032,04_line_detection_hough,1,180,40,80,20,10,8,202,21,129
+data\processed\03_edges\IMG_0511.png,data\processed\04_lines_hough\IMG_0511.png,3024,4032,04_line_detection_hough,1,180,40,80,20,10,8,138,17,112
