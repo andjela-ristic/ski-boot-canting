@@ -31,21 +31,23 @@ step_02_grayscale_and_blur:
   input_subdir: "01_illumination_normalized"
   output_subdir: "02_grayscale_blur"
 
+  selected_output: "gaussian_blur"
+
   grayscale:
     enabled: true
 
   gaussian_blur:
     enabled: true
-    kernel_size: 5
+    kernel_size: 3
     kernel_size_test_values: [3, 5, 7]
-    sigma_x: 0
+    sigma_x: 1.0
     sigma_x_test_values: [0, 1.0, 1.5]
 
   bilateral_filter:
     enabled: true
-    diameter: 9
+    diameter: 7
     diameter_test_values: [5, 7, 9, 11]
-    sigma_color: 75
+    sigma_color: 50
     sigma_color_test_values: [50, 75, 100]
-    sigma_space: 75
+    sigma_space: 50
     sigma_space_test_values: [50, 75, 100]

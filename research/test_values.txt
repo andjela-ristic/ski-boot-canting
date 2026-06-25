@@ -1,18 +1,58 @@
 STEP 1 RESULTS - ILLUMINATION NORMALIZATION
 
-| IMAGE | BEST CLIP | BEST TILE    | WORST CLIP | WORST TILE | NOTES                         |
-|------:|-----------|--------------|------------|------------|-------------------------------|
-| 502   | 3.0       | 4,4          | 2.5        | 16,16      |                               |
-| 503   | 2.5       | 8,8          | 1.5        | 16,16      |                               |
-| 504   |           |              | 3.0        | 4,4        | ali su sve ok                 |
-| 505   |           | 16,16        |            | 4,4        |                               |
-| 506   | 3.0       | 16,16        |            |            | sve lose                      |
-| 507   |           |              |            |            | sve lose                      |
-| 508   | 2.5/1.5   | 8,8/16,16    | 2.5        | 4,4        |                               |
-| 509   |           |              | 2.0        | 8,8        | ali sve su ok                 |
-| 510   |           | 4,4/16,16    | 3.0        | 8,8        |                               |
-| 511   | 1.5/2.0   | 16,16        | 1.5        | 8,8        |                               |
+| IMAGE | BEST CLIP | BEST TILE    | WORST CLIP | WORST TILE | NOTES                                       |
+|------:|-----------|--------------|------------|------------|---------------------------------------------|
+| 502   | 3.0       | 4,4          | 2.5        | 16,16      |                                             |
+| 503   | 2.5       | 8,8          | 1.5        | 16,16      |                                             |
+| 504   |           |              | 3.0        | 4,4        | ali su sve ok                               |
+| 505   |           | 16,16        |            | 4,4        |                                             |
+| 506   | 3.0       | 16,16        |            |            | sve lose                                    |
+| 507   |           |              |            |            | sve lose                                    |
+| 508   | 2.5/1.5   | 8,8/16,16    | 2.5        | 4,4        |                                             |
+| 509   |           |              | 2.0        | 8,8        | ali sve su ok                               |
+| 510   |           | 4,4/16,16    | 3.0        | 8,8        |                                             |
+| 511   | 1.5/2.0   | 16,16        | 1.5        | 8,8        |                                             |
 | 512   |           |              |            |            | odsekao vrh cizme nisam ni ocenjivala dalje |
 
 Konacno best: 2.0 16,16
 
+STEP 2 - GRAYSCALE AND BLUR
+
+| STEP 2A | BEST KERNEL | BEST SIGMA_X |  WORST KERNEL | WORST SIGMA_X | NOTES                                                                         |
+|--------:|-------------|--------------|---------------|---------------|-------------------------------------------------------------------------------|
+| 502     |      3      |     1.5      |               |               | sve su starno ok                                                              |
+| 503     |      5      |     1.0      |               |               | svi imaju cudnu refleksiju na nematiranoj plastici i to ce zbuniti sistem 100%|
+| 504     |             |              |               |               | sve super                                                                     |
+| 505     |      3      |     1.5      |               |               |                                                                               |
+| 506     |      3      |     1.0      |               |               | sve su ok                                                                     |
+| 507     |      3      |     1.0      |               |               |                                                                               |
+| 508     |             |              |               |               | sve su super                                                                  |
+| 509     |      3      |     1.5      |               |               | opet ima zbunjujuce refleksije, ali su prilicno dobre slike                   |
+| 510     |      7      |     1.0      |               |               | uglavnom prilicno slicne, refleksija smeta                                    |
+| 511     |      5      |     1.0      |               |               | uglavnom prilicno slicne (i dobre), refleksija smeta                          |
+
+
+| STEP 2B | BEST DIAMETER | BEST SIGMA_COLOR | BEST SIGMA_SPACE | WORST DIAMETER | WORST SIGMA_COLOR | WORST SIGMA_SPACE | NOTES                                                                  |
+|--------:|---------------|------------------|------------------|----------------|-------------------|-------------------|----------------------------------------------------------------------- |
+| 502     |       7       |      50.0        |       50.0       |                |                   |                   | skoro sve su iste(malo lose)                                           |
+| 503     |               |                  |                  |                |                   |                   | notes iz step 2a, slike su uglavnom iste                               |
+| 504     |               |                  |                  |                |                   |                   | sve super                                                              |
+| 505     |               |                  |                  |     7/11       |       50.0        |       100.0       | sve prilicno iste, kroz znak se vidi prolaz linije sto nije bas od dna!|
+| 506     |       5       |      50.0        |       100.0      |                |                   |                   | sve uglavnom slicne                                                    |
+| 507     |               |                  |                  |                |                   |                   | sve jako lose                                                          |
+| 508     |               |                  |                  |                |                   |                   | sve poprilicno dobre                                                   |
+| 509     |      7/9      |    100.0/50.0    |    100.0/50.0    |                |                   |                   | prilicno su slicne vecinom                                             |
+| 510     |               |                  |                  |                |                   |                   | prilicno su slicne                                                     |
+| 511     |               |                  |                  |                |                   |                   | prilicno su slicne i okej, refleksija smeta                            |
+
+Konacna metoda:
+Gaussian (2A)
+
+Konacni Gaussian parameteri:
+kernel_size = 3
+sigma_x = 1.0
+
+Konacni Bilateral parameteri:
+diameter = 7
+sigma_color = 50
+sigma_space = 50
