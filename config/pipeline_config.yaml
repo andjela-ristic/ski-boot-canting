@@ -96,4 +96,49 @@ step_04_line_detection_hough:
 
     horizontal_angle_tolerance_degrees: 8
     horizontal_angle_tolerance_degrees_test_values: [8]
- 
+step_05_detect_boot_roi:
+  enabled: true
+
+  input_edges_subdir: "03_edges"
+  input_visual_subdir: "01_illumination_normalized"
+  output_subdir: "05_boot_roi"
+
+  edge_activity:
+    density_kernel_size: 51
+    density_threshold: 0.039
+    close_kernel_size: 41
+    dilate_kernel_size: 31
+    dilate_iterations: 1
+  
+  component_scoring:
+    preferred_x_ratio: 0.50
+    preferred_y_ratio: 0.56
+  
+    x_band_ratio: 0.425
+    y_band_ratio: 0.56
+  
+    edge_density_weight: 0.21
+    area_weight: 0.32
+    center_weight: 0.27
+    shape_weight: 0.20
+  
+  roi_padding:
+    x_padding_ratio: 0.068
+    y_padding_ratio: 0.10
+  
+  component_filtering:
+    min_area_ratio: 0.006
+    max_area_ratio: 0.55
+
+    min_width_ratio: 0.12
+    max_width_ratio: 0.75
+
+    min_height_ratio: 0.20
+    max_height_ratio: 0.95
+
+  boot_mask:
+    use_convex_hull: true
+    selected_vertical_mask: "roi_mask"
+
+  draw:
+    show_all_candidate_boxes: true
