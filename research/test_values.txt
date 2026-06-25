@@ -1,1 +1,18 @@
-- za pipeline step 1 najbolji okom vidljiv rezultat dobijam sa tile_grid_size: 4,4 i clip_limit 2.5
+STEP 1 RESULTS - ILLUMINATION NORMALIZATION
+
+| IMAGE | BEST CLIP | BEST TILE    | WORST CLIP | WORST TILE | NOTES                         |
+|------:|-----------|--------------|------------|------------|-------------------------------|
+| 502   | 3.0       | 4,4          | 2.5        | 16,16      |                               |
+| 503   | 2.5       | 8,8          | 1.5        | 16,16      |                               |
+| 504   |           |              | 3.0        | 4,4        | ali su sve ok                 |
+| 505   |           | 16,16        |            | 4,4        |                               |
+| 506   | 3.0       | 16,16        |            |            | sve lose                      |
+| 507   |           |              |            |            | sve lose                      |
+| 508   | 2.5/1.5   | 8,8/16,16    | 2.5        | 4,4        |                               |
+| 509   |           |              | 2.0        | 8,8        | ali sve su ok                 |
+| 510   |           | 4,4/16,16    | 3.0        | 8,8        |                               |
+| 511   | 1.5/2.0   | 16,16        | 1.5        | 8,8        |                               |
+| 512   |           |              |            |            | odsekao vrh cizme nisam ni ocenjivala dalje |
+
+Konacno best: 2.0 16,16
+

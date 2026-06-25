@@ -14,13 +14,38 @@ step_01_illumination_normalization:
   method: "LAB_CLAHE"
 
   clahe:
-    clip_limit: 2.5
+    clip_limit: 2.0
     clip_limit_test_values: [1.5, 2.0, 2.5, 3.0]
 
-    tile_grid_size: [4, 4]
+    tile_grid_size: [16, 16]
     tile_grid_size_test_values:
       - [4, 4]
       - [8, 8]
       - [16, 16]
 
   output_subdir: "01_illumination_normalized"
+
+step_02_grayscale_and_blur:
+  enabled: true
+
+  input_subdir: "01_illumination_normalized"
+  output_subdir: "02_grayscale_blur"
+
+  grayscale:
+    enabled: true
+
+  gaussian_blur:
+    enabled: true
+    kernel_size: 5
+    kernel_size_test_values: [3, 5, 7]
+    sigma_x: 0
+    sigma_x_test_values: [0, 1.0, 1.5]
+
+  bilateral_filter:
+    enabled: true
+    diameter: 9
+    diameter_test_values: [5, 7, 9, 11]
+    sigma_color: 75
+    sigma_color_test_values: [50, 75, 100]
+    sigma_space: 75
+    sigma_space_test_values: [50, 75, 100]
