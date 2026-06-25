@@ -97,3 +97,39 @@ threshold_1 = 75
 threshold_2 = 100
 aperture_size = 3
 use_l2_gradient = true
+
+
+STEP 4 - LINE DETECTION HOUGH
+IMAGE,"30,80,20","30,80,40","30,80,60","30,100,20","30,100,40","30,100,60","30,120,20","30,120,40","30,120,60","30,150,20","30,150,40","30,150,60","40,80,20","40,80,40","40,80,60","40,100,20","40,100,40","40,100,60","40,120,20","40,120,40","40,120,60","40,150,20","40,150,40","40,150,60","50,80,20","50,80,40","50,80,60","50,100,20","50,100,40","50,100,60","50,120,20","50,120,40","50,120,60","50,150,20","50,150,40","50,150,60","60,80,20","60,80,40","60,80,60","60,100,20","60,100,40","60,100,60","60,120,20","60,120,40","60,120,60","60,150,20","60,150,40","60,150,60","75,80,20","75,80,40","75,80,60","75,100,20","75,100,40","75,100,60","75,120,20","75,120,40","75,120,60","75,150,20","75,150,40","75,150,60"
+502, ,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+503,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+504,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+505,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+506,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+507,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+508,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+509,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+510,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+511,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+
+guide:
+    3 = super
+        - jasno postoji horizontalna plava linija stola
+        - jasno postoji jedna ili nekoliko korisnih vertikalnih zelenih linija kroz čizmu
+        - nema previše lažnih zelenih linija koje bi zbunile izbor centralne ose
+        - linije su dovoljno duge i stabilne
+
+    2 = dobro
+        - ima horizontalnu liniju stola
+        - ima vertikalnu liniju ili više kandidata
+        - ima malo šuma, ali sledeći step bi verovatno mogao da izabere pravu liniju
+
+    1 = ok/slabo
+        - postoji nešto korisno, ali ili horizontalna ili vertikalna nije dovoljno jasna
+        - ima dosta šuma
+        - rezultat bi morao dodatno da se filtrira
+
+    0 = loše
+        - previše linija svuda
+        - nema jasne horizontalne/vertikalne reference
+        - Hough je uhvatio zavesu, sto, šum ili kaiš više nego korisne linije

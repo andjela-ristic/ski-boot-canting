@@ -5,7 +5,7 @@ import itertools
 
 import cv2
 import numpy as np
-
+import math
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.append(str(PROJECT_ROOT / "pipeline"))
@@ -40,6 +40,10 @@ def resolve_image_path(step: int, image_name: str) -> Path:
 
         image_path = step_02_output_dir / selected_step_02_output / image_name
 
+    elif step == 4:
+            step_03_config = CONFIG["step_03_edge_detection"]
+            image_path = PROCESSED_DIR / step_03_config["output_subdir"] / image_name
+    
     else:
         raise ValueError(f"Unsupported step: {step}")
 
@@ -60,13 +64,11 @@ def resize_for_display(image: np.ndarray, max_height: int = 520) -> np.ndarray:
 
     return cv2.resize(image, (new_width, new_height), interpolation=cv2.INTER_AREA)
 
-
 def to_bgr(image: np.ndarray) -> np.ndarray:
     if len(image.shape) == 2:
         return cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
 
     return image
-
 
 def add_label(image: np.ndarray, label: str) -> np.ndarray:
     image = to_bgr(image).copy()
@@ -92,7 +94,6 @@ def add_label(image: np.ndarray, label: str) -> np.ndarray:
 
     return image
 
-
 def pad_to_size(image: np.ndarray, width: int, height: int) -> np.ndarray:
     padded = np.full((height, width, 3), 255, dtype=np.uint8)
 
@@ -107,7 +108,6 @@ def pad_to_size(image: np.ndarray, width: int, height: int) -> np.ndarray:
     ] = image
 
     return padded
-
 
 def make_grid(images: list[tuple[str, np.ndarray]]) -> np.ndarray:
     prepared_images = []
@@ -135,7 +135,6 @@ def make_grid(images: list[tuple[str, np.ndarray]]) -> np.ndarray:
     grid = np.vstack([row_1, row_2])
 
     return grid
-
 
 def show_variation_pages(
     title_prefix: str,
@@ -368,6 +367,132 @@ def run_step_03_variations(image_path: Path) -> None:
         results=results
     )
 
+def classify_hough_line_for_test(
+    angle_degrees: float,
+    vertical_tolerance: float,
+    horizontal_tolerance: float
+) -> str | None:
+    normalized_angle = abs(angle_degrees)
+
+    if normalized_angle > 90:
+        normalized_angle = 180 - normalized_angle
+
+    if abs(normalized_angle - 90) <= vertical_tolerance:
+        return "vertical"
+
+    if normalized_angle <= horizontal_tolerance:
+        return "horizontal"
+
+    return None
+
+def draw_hough_lines_for_test(
+    edge_image: np.ndarray,
+    threshold: int,
+    min_line_length: int,
+    max_line_gap: int,
+    vertical_tolerance: float,
+    horizontal_tolerance: float,
+) -> np.ndarray:
+    overlay = cv2.cvtColor(edge_image, cv2.COLOR_GRAY2BGR)
+
+    lines = cv2.HoughLinesP(
+        image=edge_image,
+        rho=1,
+        theta=np.pi / 180,
+        threshold=threshold,
+        minLineLength=min_line_length,
+        maxLineGap=max_line_gap
+    )
+
+    if lines is None:
+        return overlay
+
+    for line in lines:
+        x1, y1, x2, y2 = line[0]
+
+        angle = math.degrees(math.atan2(y2 - y1, x2 - x1))
+
+        line_type = classify_hough_line_for_test(
+            angle_degrees=angle,
+            vertical_tolerance=vertical_tolerance,
+            horizontal_tolerance=horizontal_tolerance
+        )
+
+        if line_type == "vertical":
+            color = (0, 255, 0)
+            thickness = 2
+        elif line_type == "horizontal":
+            color = (255, 0, 0)
+            thickness = 2
+        else:
+            color = (80, 80, 80)
+            thickness = 1
+
+        cv2.line(
+            overlay,
+            (x1, y1),
+            (x2, y2),
+            color,
+            thickness,
+            cv2.LINE_AA
+        )
+
+    return overlay
+
+def run_step_04_variations(image_path: Path) -> None:
+    step_config = CONFIG["step_04_line_detection_hough"]
+
+    hough_config = step_config["hough_lines_p"]
+    classification_config = step_config["classification"]
+
+    threshold_values = hough_config["threshold_test_values"]
+    min_line_length_values = hough_config["min_line_length_test_values"]
+    max_line_gap_values = hough_config["max_line_gap_test_values"]
+
+    vertical_tolerance_values = classification_config["vertical_angle_tolerance_degrees_test_values"]
+    horizontal_tolerance_values = classification_config["horizontal_angle_tolerance_degrees_test_values"]
+
+    edge_image = cv2.imread(str(image_path), cv2.IMREAD_GRAYSCALE)
+
+    if edge_image is None:
+        raise ValueError(f"Could not read image: {image_path}")
+
+    results = []
+
+    for threshold, min_line_length, max_line_gap, vertical_tolerance, horizontal_tolerance in itertools.product(
+        threshold_values,
+        min_line_length_values,
+        max_line_gap_values,
+        vertical_tolerance_values,
+        horizontal_tolerance_values
+    ):
+        threshold = int(threshold)
+        min_line_length = int(min_line_length)
+        max_line_gap = int(max_line_gap)
+        vertical_tolerance = float(vertical_tolerance)
+        horizontal_tolerance = float(horizontal_tolerance)
+
+        overlay = draw_hough_lines_for_test(
+            edge_image=edge_image,
+            threshold=threshold,
+            min_line_length=min_line_length,
+            max_line_gap=max_line_gap,
+            vertical_tolerance=vertical_tolerance,
+            horizontal_tolerance=horizontal_tolerance,
+        )
+
+        label = (
+            f"thr={threshold}, len={min_line_length}, gap={max_line_gap}, "
+            f"v={vertical_tolerance}, h={horizontal_tolerance}"
+        )
+
+        results.append((label, overlay))
+
+    show_variation_pages(
+        title_prefix=f"Step 04 Hough variations | {image_path.name}",
+        results=results
+    )
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Visually test all configured parameter variations for one step and one image."
@@ -377,8 +502,8 @@ def parse_args() -> argparse.Namespace:
         "--step",
         type=int,
         required=True,
-        choices=[1, 2, 3],
-        help="Pipeline step to test. Supported: 1, 2, 3."
+        choices=[1, 2, 3, 4],
+        help="Pipeline step to test. Supported: 1, 2, 3, 4."
     )
 
     parser.add_argument(
@@ -389,7 +514,6 @@ def parse_args() -> argparse.Namespace:
     )
 
     return parser.parse_args()
-
 
 def main() -> None:
     args = parse_args()
@@ -414,6 +538,9 @@ def main() -> None:
 
     elif args.step == 3:
         run_step_03_variations(image_path)
+    
+    elif args.step == 4:
+        run_step_04_variations(image_path)
 
     cv2.destroyAllWindows()
 
