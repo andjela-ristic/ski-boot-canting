@@ -1,0 +1,267 @@
+  edge_activity:
+    density_kernel_size: 51
+    density_threshold: 0.035
+    close_kernel_size: 45
+    dilate_kernel_size: 35
+    dilate_iterations: 1
+
+  component_scoring:
+    preferred_x_ratio: 0.50
+    preferred_y_ratio: 0.55
+
+    x_band_ratio: 0.45
+    y_band_ratio: 0.55
+
+    edge_density_weight: 0.35
+    area_weight: 0.25
+    center_weight: 0.25
+    shape_weight: 0.15
+
+  roi_padding:
+    x_padding_ratio: 0.08
+    y_padding_ratio: 0.08
+
+
+
+TEST 2: nikako sece previse, ali ne dovoljno 
+edge_activity:
+  density_kernel_size: 41
+  density_threshold: 0.045
+  close_kernel_size: 35
+  dilate_kernel_size: 25
+  dilate_iterations: 1
+
+component_scoring:
+  preferred_x_ratio: 0.50
+  preferred_y_ratio: 0.58
+
+  x_band_ratio: 0.38
+  y_band_ratio: 0.55
+
+  edge_density_weight: 0.15
+  area_weight: 0.35
+  center_weight: 0.30
+  shape_weight: 0.20
+
+roi_padding:
+  x_padding_ratio: 0.05
+  y_padding_ratio: 0.10
+
+TEST 3: ponovo prestrogo gde ne treba
+edge_activity:
+  density_kernel_size: 41
+  density_threshold: 0.055
+  close_kernel_size: 31
+  dilate_kernel_size: 21
+  dilate_iterations: 1
+
+component_scoring:
+  preferred_x_ratio: 0.50
+  preferred_y_ratio: 0.58
+
+  x_band_ratio: 0.34
+  y_band_ratio: 0.55
+
+  edge_density_weight: 0.10
+  area_weight: 0.40
+  center_weight: 0.30
+  shape_weight: 0.20
+
+roi_padding:
+  x_padding_ratio: 0.04
+  y_padding_ratio: 0.10
+
+TEST 4: trebao da bude ground truth ali je i on prestrog, ali jos uvek nedovoljno
+edge_activity:
+  density_kernel_size: 51
+  density_threshold: 0.045
+  close_kernel_size: 35
+  dilate_kernel_size: 25
+  dilate_iterations: 1
+
+component_scoring:
+  preferred_x_ratio: 0.50
+  preferred_y_ratio: 0.58
+
+  x_band_ratio: 0.40
+  y_band_ratio: 0.58
+
+  edge_density_weight: 0.15
+  area_weight: 0.35
+  center_weight: 0.30
+  shape_weight: 0.20
+
+roi_padding:
+  x_padding_ratio: 0.06
+  y_padding_ratio: 0.12
+
+
+TEST 5:
+edge_activity:
+  density_kernel_size: 45
+  density_threshold: 0.045
+  close_kernel_size: 33
+  dilate_kernel_size: 23
+  dilate_iterations: 1
+
+component_scoring:
+  preferred_x_ratio: 0.50
+  preferred_y_ratio: 0.58
+
+  x_band_ratio: 0.38
+  y_band_ratio: 0.58
+
+  edge_density_weight: 0.12
+  area_weight: 0.38
+  center_weight: 0.30
+  shape_weight: 0.20
+
+roi_padding:
+  x_padding_ratio: 0.055
+  y_padding_ratio: 0.12
+
+TEST 6:
+edge_activity:
+  density_kernel_size: 49
+  density_threshold: 0.040
+  close_kernel_size: 39
+  dilate_kernel_size: 29
+  dilate_iterations: 1
+
+component_scoring:
+  preferred_x_ratio: 0.50
+  preferred_y_ratio: 0.56
+
+  x_band_ratio: 0.41
+  y_band_ratio: 0.56
+
+  edge_density_weight: 0.20
+  area_weight: 0.32
+  center_weight: 0.28
+  shape_weight: 0.20
+
+roi_padding:
+  x_padding_ratio: 0.065
+  y_padding_ratio: 0.10
+
+
+TEST 7: NAJBOLJI DO SAD
+edge_activity:
+  density_kernel_size: 51
+  density_threshold: 0.038
+  close_kernel_size: 41
+  dilate_kernel_size: 31
+  dilate_iterations: 1
+
+component_scoring:
+  preferred_x_ratio: 0.50
+  preferred_y_ratio: 0.56
+
+  x_band_ratio: 0.43
+  y_band_ratio: 0.56
+
+  edge_density_weight: 0.23
+  area_weight: 0.30
+  center_weight: 0.27
+  shape_weight: 0.20
+
+roi_padding:
+  x_padding_ratio: 0.07
+  y_padding_ratio: 0.10
+
+TEST 9: mrvicu stroze od 7, ali prestrogo
+edge_activity:
+  density_kernel_size: 51
+  density_threshold: 0.040
+  close_kernel_size: 39
+  dilate_kernel_size: 29
+  dilate_iterations: 1
+
+component_scoring:
+  preferred_x_ratio: 0.50
+  preferred_y_ratio: 0.56
+
+  x_band_ratio: 0.42
+  y_band_ratio: 0.56
+
+  edge_density_weight: 0.20
+  area_weight: 0.32
+  center_weight: 0.28
+  shape_weight: 0.20
+
+roi_padding:
+  x_padding_ratio: 0.065
+  y_padding_ratio: 0.10
+
+
+TEST 10: stroze od 7, blaze od 9, E OVAJ JE NAJBOLJI
+edge_activity:
+  density_kernel_size: 51
+  density_threshold: 0.039
+  close_kernel_size: 41
+  dilate_kernel_size: 31
+  dilate_iterations: 1
+
+component_scoring:
+  preferred_x_ratio: 0.50
+  preferred_y_ratio: 0.56
+
+  x_band_ratio: 0.425
+  y_band_ratio: 0.56
+
+  edge_density_weight: 0.22
+  area_weight: 0.31
+  center_weight: 0.27
+  shape_weight: 0.20
+
+roi_padding:
+  x_padding_ratio: 0.068
+  y_padding_ratio: 0.10
+
+TEST 11:
+edge_activity:
+  density_kernel_size: 51
+  density_threshold: 0.040
+  close_kernel_size: 41
+  dilate_kernel_size: 31
+  dilate_iterations: 1
+
+component_scoring:
+  preferred_x_ratio: 0.50
+  preferred_y_ratio: 0.56
+
+  x_band_ratio: 0.425
+  y_band_ratio: 0.56
+
+  edge_density_weight: 0.21
+  area_weight: 0.32
+  center_weight: 0.27
+  shape_weight: 0.20
+
+roi_padding:
+  x_padding_ratio: 0.065
+  y_padding_ratio: 0.10
+
+TEST 12: malo jaci od onog e ovaj je najbolji
+edge_activity:
+  density_kernel_size: 51
+  density_threshold: 0.040
+  close_kernel_size: 41
+  dilate_kernel_size: 31
+  dilate_iterations: 1
+
+component_scoring:
+  preferred_x_ratio: 0.50
+  preferred_y_ratio: 0.56
+
+  x_band_ratio: 0.425
+  y_band_ratio: 0.56
+
+  edge_density_weight: 0.21
+  area_weight: 0.32
+  center_weight: 0.27
+  shape_weight: 0.20
+
+roi_padding:
+  x_padding_ratio: 0.068
+  y_padding_ratio: 0.10
