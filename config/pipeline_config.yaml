@@ -142,3 +142,62 @@ step_05_detect_boot_roi:
 
   draw:
     show_all_candidate_boxes: true
+
+step_06_complete_line_fragments:
+  enabled: true
+
+  # Step 4 output folder. This should be the folder produced by:
+  # step_04_line_detection_hough.output_subdir
+  input_lines_subdir: "04_lines_hough"
+
+  # Step 5 boot mask folder. This should be:
+  # step_05_detect_boot_roi.output_subdir + "/boot_mask"
+  input_boot_mask_subdir: "05_boot_roi/boot_mask"
+
+  # Clean visual background. This should be:
+  # step_01_illumination_normalization.output_subdir
+  input_visual_subdir: "01_illumination_normalized"
+
+  output_subdir: "06_complete_line_fragments"
+
+  green_extraction:
+    min_green: 140
+    max_red: 130
+    max_blue: 130
+    green_dominance: 45
+    close_kernel_size: 3
+
+  fragment_filtering:
+    min_component_area_px: 8
+    min_fragment_length_px: 12
+    max_vertical_deviation_deg: 18
+
+  mask_validation:
+    min_fragment_mask_coverage: 0.60
+    sample_step_px: 2
+    sample_radius_px: 1
+
+  merge:
+    max_lateral_offset_px: 6
+    max_projected_gap_px: 35
+    max_angle_diff_deg: 7
+
+    small_rotation_probe_deg: 3
+    small_rotation_step_deg: 1
+
+    max_merged_fit_rms_px: 5.5
+    min_connector_mask_coverage: 0.55
+
+    fragment_sample_step_px: 2
+
+    gap_cost_weight: 1.0
+    lateral_cost_weight: 2.0
+
+    gap_score_penalty: 0.05
+    lateral_score_penalty: 0.10
+
+  output_filtering:
+    min_output_line_length_px: 20
+    extend_output_to_mask: true
+    output_extend_step_px: 2
+    max_output_extend_px: 1200
