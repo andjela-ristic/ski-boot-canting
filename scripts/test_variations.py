@@ -6,6 +6,8 @@ import itertools
 import cv2
 import numpy as np
 import math
+import copy
+import importlib.util
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.append(str(PROJECT_ROOT / "pipeline"))
@@ -14,15 +16,23 @@ from config_loader import load_config
 
 
 CONFIG = load_config()
-
 PATHS_CONFIG = CONFIG["paths"]
 DISPLAY_CONFIG = CONFIG["display"]
-
 WORKING_PNG_DIR = PROJECT_ROOT / PATHS_CONFIG["working_png_dir"]
 PROCESSED_DIR = PROJECT_ROOT / PATHS_CONFIG["processed_dir"]
 
 
 MAX_IMAGES_PER_WINDOW = 6
+
+
+def set_config(config_path: str | None) -> None:
+    global CONFIG, PATHS_CONFIG, DISPLAY_CONFIG, WORKING_PNG_DIR, PROCESSED_DIR
+
+    CONFIG = load_config(config_path)
+    PATHS_CONFIG = CONFIG["paths"]
+    DISPLAY_CONFIG = CONFIG["display"]
+    WORKING_PNG_DIR = PROJECT_ROOT / PATHS_CONFIG["working_png_dir"]
+    PROCESSED_DIR = PROJECT_ROOT / PATHS_CONFIG["processed_dir"]
 
 
 def resolve_image_path(step: int, image_name: str) -> Path:
@@ -43,7 +53,11 @@ def resolve_image_path(step: int, image_name: str) -> Path:
     elif step == 4:
             step_03_config = CONFIG["step_03_edge_detection"]
             image_path = PROCESSED_DIR / step_03_config["output_subdir"] / image_name
-    
+
+    elif step == 6:
+        step_config = CONFIG["step_06_detect_boot_landmarks"]
+        image_path = PROCESSED_DIR / step_config["input_visual_subdir"] / image_name
+
     else:
         raise ValueError(f"Unsupported step: {step}")
 
@@ -493,6 +507,113 @@ def run_step_04_variations(image_path: Path) -> None:
         results=results
     )
 
+def deep_merge_dict(base: dict, override: dict) -> dict:
+    result = copy.deepcopy(base)
+
+    for key, value in override.items():
+        if (
+            isinstance(value, dict)
+            and isinstance(result.get(key), dict)
+        ):
+            result[key] = deep_merge_dict(result[key], value)
+        else:
+            result[key] = copy.deepcopy(value)
+
+    return result
+
+def load_step_06_module():
+    module_path = PROJECT_ROOT / "pipeline" / "06_detect_boot_landmarks.py"
+
+    if not module_path.exists():
+        raise FileNotFoundError(f"Step 06 file not found: {module_path}")
+
+    spec = importlib.util.spec_from_file_location(
+        "step06_landmarks",
+        str(module_path)
+    )
+
+    if spec is None or spec.loader is None:
+        raise ImportError(f"Could not load module from: {module_path}")
+
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    return module
+
+def run_step_06_single_preset(
+    lm,
+    image_path: Path,
+    preset: dict,
+) -> tuple[str, np.ndarray]:
+    base_step_config = CONFIG["step_06_detect_boot_landmarks"]
+    preset_name = str(preset.get("name", "unnamed variation"))
+    preset_without_name = {key: value for key, value in preset.items() if key != "name"}
+
+    lm.STEP = deep_merge_dict(base_step_config, preset_without_name)
+
+    visual = cv2.imread(str(image_path))
+
+    if visual is None:
+        raise ValueError(f"Could not read image: {image_path}")
+
+    detection_input, _ = lm.prepare_detection_input(image_path, visual)
+    circles = lm.find_circles(detection_input)
+    overlay = lm.draw_circles(visual, circles)
+    label = f"{preset_name} | n={len(circles)}"
+
+    return label, overlay
+
+def run_step_06_variations(image_path: Path) -> None:
+    presets = [
+        {
+            "name": "edges default",
+            "detection_input": "edges",
+        },
+        {
+            "name": "grayscale default",
+            "detection_input": "grayscale",
+        },
+        {
+            "name": "edges higher recall",
+            "detection_input": "edges",
+            "hough": {"dp": 1.0, "min_dist": 16, "param1": 60, "param2": 16},
+        },
+        {
+            "name": "edges stricter threshold",
+            "detection_input": "edges",
+            "hough": {"dp": 1.2, "min_dist": 24, "param1": 100, "param2": 28},
+        },
+        {
+            "name": "grayscale small circles",
+            "detection_input": "grayscale",
+            "hough": {"min_radius": 4, "max_radius": 24, "param2": 20},
+        },
+        {
+            "name": "edge fallback retuned",
+            "detection_input": "edges",
+            "edge_fallback": {"threshold_1": 35, "threshold_2": 110},
+            "hough": {"dp": 1.0, "min_dist": 20, "param1": 80, "param2": 22},
+        },
+    ]
+
+    lm = load_step_06_module()
+
+    results = []
+
+    for preset in presets:
+        label, overlay = run_step_06_single_preset(
+            lm=lm,
+            image_path=image_path,
+            preset=preset
+        )
+
+        results.append((label, overlay))
+
+    show_variation_pages(
+        title_prefix=f"Step 06 circle variations | {image_path.name}",
+        results=results
+    )
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Visually test all configured parameter variations for one step and one image."
@@ -502,8 +623,8 @@ def parse_args() -> argparse.Namespace:
         "--step",
         type=int,
         required=True,
-        choices=[1, 2, 3, 4],
-        help="Pipeline step to test. Supported: 1, 2, 3, 4."
+        choices=[1, 2, 3, 4, 6],
+        help="Pipeline step to test. Supported: 1, 2, 3, 4, 6."
     )
 
     parser.add_argument(
@@ -513,10 +634,18 @@ def parse_args() -> argparse.Namespace:
         help="Image filename, for example IMG_0502.png."
     )
 
+    parser.add_argument(
+        "--config",
+        type=str,
+        default=None,
+        help="Optional config path relative to project root, for example config/pipeline_config_step06_test.yaml."
+    )
+
     return parser.parse_args()
 
 def main() -> None:
     args = parse_args()
+    set_config(args.config)
 
     image_path = resolve_image_path(
         step=args.step,
@@ -527,6 +656,7 @@ def main() -> None:
     print("Running visual test variations")
     print(f"Step:  {args.step}")
     print(f"Image: {image_path}")
+    print(f"Config: {args.config or 'config/pipeline_config.yaml'}")
     print("No files will be saved.")
     print()
 
@@ -542,6 +672,9 @@ def main() -> None:
     elif args.step == 4:
         run_step_04_variations(image_path)
 
+    elif args.step == 6:
+        run_step_06_variations(image_path)
+        
     cv2.destroyAllWindows()
 
     print("Done.")

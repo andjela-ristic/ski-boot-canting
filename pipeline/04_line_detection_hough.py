@@ -1,6 +1,8 @@
 from pathlib import Path
 import csv
+import json
 import math
+from typing import Any
 
 import cv2
 import numpy as np
@@ -22,12 +24,17 @@ METADATA_DIR = PROJECT_ROOT / PATHS_CONFIG["metadata_dir"]
 
 INPUT_DIR = PROCESSED_DIR / STEP_03_CONFIG["output_subdir"]
 OUTPUT_DIR = PROCESSED_DIR / STEP_04_CONFIG["output_subdir"]
+JSON_DIR = OUTPUT_DIR / "json"
 
-CSV_PATH = METADATA_DIR / "processing_04_line_detection_hough.csv"
+SUMMARY_CSV_PATH = METADATA_DIR / "processing_04_line_detection_hough.csv"
+LINES_CSV_PATH = METADATA_DIR / "processing_04_line_detection_hough_lines.csv"
 
 
 def collect_images() -> list[Path]:
     allowed_extensions = {".png", ".jpg", ".jpeg"}
+
+    if not INPUT_DIR.exists():
+        return []
 
     image_paths = [
         path
@@ -67,7 +74,7 @@ def add_label(image: np.ndarray, label: str) -> np.ndarray:
         (0, 0),
         (image.shape[1], 45),
         (0, 0, 0),
-        thickness=-1
+        thickness=-1,
     )
 
     cv2.putText(
@@ -78,7 +85,7 @@ def add_label(image: np.ndarray, label: str) -> np.ndarray:
         0.8,
         (255, 255, 255),
         2,
-        cv2.LINE_AA
+        cv2.LINE_AA,
     )
 
     return image
@@ -93,17 +100,17 @@ def make_side_by_side(edges: np.ndarray, overlay: np.ndarray) -> np.ndarray:
     edges_display = cv2.resize(
         edges_display,
         (int(edges_display.shape[1] * height / edges_display.shape[0]), height),
-        interpolation=cv2.INTER_AREA
+        interpolation=cv2.INTER_AREA,
     )
 
     overlay_display = cv2.resize(
         overlay_display,
         (int(overlay_display.shape[1] * height / overlay_display.shape[0]), height),
-        interpolation=cv2.INTER_AREA
+        interpolation=cv2.INTER_AREA,
     )
 
     edges_display = add_label(edges_display, "input edges")
-    overlay_display = add_label(overlay_display, "detected lines")
+    overlay_display = add_label(overlay_display, "detected Hough lines")
 
     separator = np.full((height, 10, 3), 255, dtype=np.uint8)
 
@@ -111,35 +118,45 @@ def make_side_by_side(edges: np.ndarray, overlay: np.ndarray) -> np.ndarray:
 
 
 def line_length(x1: int, y1: int, x2: int, y2: int) -> float:
-    return math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
+    return float(math.hypot(x2 - x1, y2 - y1))
 
 
 def line_angle_degrees(x1: int, y1: int, x2: int, y2: int) -> float:
     angle = math.degrees(math.atan2(y2 - y1, x2 - x1))
-    return angle
+
+    while angle > 90.0:
+        angle -= 180.0
+
+    while angle < -90.0:
+        angle += 180.0
+
+    return float(angle)
 
 
-def classify_line(angle_degrees: float) -> str | None:
+def distance_to_vertical_deg(angle_deg: float) -> float:
+    return float(abs(90.0 - abs(angle_deg)))
+
+
+def distance_to_horizontal_deg(angle_deg: float) -> float:
+    return float(abs(angle_deg))
+
+
+def classify_line(angle_degrees: float) -> str:
     config = STEP_04_CONFIG["classification"]
 
     vertical_tolerance = float(config["vertical_angle_tolerance_degrees"])
     horizontal_tolerance = float(config["horizontal_angle_tolerance_degrees"])
 
-    normalized_angle = abs(angle_degrees)
-
-    if normalized_angle > 90:
-        normalized_angle = 180 - normalized_angle
-
-    if abs(normalized_angle - 90) <= vertical_tolerance:
+    if distance_to_vertical_deg(angle_degrees) <= vertical_tolerance:
         return "vertical"
 
-    if normalized_angle <= horizontal_tolerance:
+    if distance_to_horizontal_deg(angle_degrees) <= horizontal_tolerance:
         return "horizontal"
 
-    return None
+    return "other"
 
 
-def detect_lines(edge_image: np.ndarray):
+def detect_lines(edge_image: np.ndarray) -> np.ndarray | None:
     hough_config = STEP_04_CONFIG["hough_lines_p"]
 
     rho = float(hough_config["rho"])
@@ -148,49 +165,72 @@ def detect_lines(edge_image: np.ndarray):
     min_line_length = int(hough_config["min_line_length"])
     max_line_gap = int(hough_config["max_line_gap"])
 
-    lines = cv2.HoughLinesP(
+    return cv2.HoughLinesP(
         image=edge_image,
         rho=rho,
         theta=theta,
         threshold=threshold,
         minLineLength=min_line_length,
-        maxLineGap=max_line_gap
+        maxLineGap=max_line_gap,
     )
 
-    return lines
 
-
-def draw_detected_lines(edge_image: np.ndarray):
-    overlay = cv2.cvtColor(edge_image, cv2.COLOR_GRAY2BGR)
-
+def build_line_records(edge_image: np.ndarray) -> list[dict[str, Any]]:
     lines = detect_lines(edge_image)
 
-    vertical_count = 0
-    horizontal_count = 0
-    other_count = 0
-
     if lines is None:
-        return overlay, vertical_count, horizontal_count, other_count
+        return []
 
-    for line in lines:
-        x1, y1, x2, y2 = line[0]
+    records: list[dict[str, Any]] = []
 
+    for index, line in enumerate(lines, start=1):
+        x1, y1, x2, y2 = [int(value) for value in line[0]]
         angle = line_angle_degrees(x1, y1, x2, y2)
         length = line_length(x1, y1, x2, y2)
         line_type = classify_line(angle)
 
+        records.append({
+            "id": f"l{index:05d}",
+            "x1": x1,
+            "y1": y1,
+            "x2": x2,
+            "y2": y2,
+            "length": round(float(length), 4),
+            "angle_deg": round(float(angle), 4),
+            "distance_to_vertical_deg": round(distance_to_vertical_deg(angle), 4),
+            "distance_to_horizontal_deg": round(distance_to_horizontal_deg(angle), 4),
+            "line_type": line_type,
+        })
+
+    return records
+
+
+def draw_detected_lines(edge_image: np.ndarray, records: list[dict[str, Any]]) -> tuple[np.ndarray, dict[str, int]]:
+    overlay = cv2.cvtColor(edge_image, cv2.COLOR_GRAY2BGR)
+
+    counts = {
+        "vertical": 0,
+        "horizontal": 0,
+        "other": 0,
+    }
+
+    for record in records:
+        x1 = int(record["x1"])
+        y1 = int(record["y1"])
+        x2 = int(record["x2"])
+        y2 = int(record["y2"])
+        line_type = str(record["line_type"])
+        length = float(record["length"])
+
+        counts[line_type] = counts.get(line_type, 0) + 1
+
         if line_type == "vertical":
-            vertical_count += 1
             color = (0, 255, 0)
             thickness = 2
-
         elif line_type == "horizontal":
-            horizontal_count += 1
             color = (255, 0, 0)
             thickness = 2
-
         else:
-            other_count += 1
             color = (80, 80, 80)
             thickness = 1
 
@@ -200,7 +240,7 @@ def draw_detected_lines(edge_image: np.ndarray):
             (x2, y2),
             color,
             thickness,
-            cv2.LINE_AA
+            cv2.LINE_AA,
         )
 
         midpoint = (int((x1 + x2) / 2), int((y1 + y2) / 2))
@@ -213,13 +253,22 @@ def draw_detected_lines(edge_image: np.ndarray):
             0.45,
             color,
             1,
-            cv2.LINE_AA
+            cv2.LINE_AA,
         )
 
-    return overlay, vertical_count, horizontal_count, other_count
+    return overlay, counts
 
 
-def save_metadata(rows: list[dict]) -> None:
+def relative(path: Path) -> str:
+    return str(path.relative_to(PROJECT_ROOT))
+
+
+def save_json(path: Path, data: dict[str, Any]) -> None:
+    with open(path, "w", encoding="utf-8") as file:
+        json.dump(data, file, indent=2, ensure_ascii=False)
+
+
+def save_summary_metadata(rows: list[dict[str, Any]]) -> None:
     if not rows:
         return
 
@@ -228,6 +277,7 @@ def save_metadata(rows: list[dict]) -> None:
     fieldnames = [
         "source_file",
         "output_file",
+        "json_file",
         "width",
         "height",
         "processing_step",
@@ -241,9 +291,37 @@ def save_metadata(rows: list[dict]) -> None:
         "vertical_count",
         "horizontal_count",
         "other_count",
+        "total_count",
     ]
 
-    with open(CSV_PATH, "w", newline="", encoding="utf-8") as file:
+    with open(SUMMARY_CSV_PATH, "w", newline="", encoding="utf-8") as file:
+        writer = csv.DictWriter(file, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(rows)
+
+
+def save_line_metadata(rows: list[dict[str, Any]]) -> None:
+    if not rows:
+        return
+
+    METADATA_DIR.mkdir(parents=True, exist_ok=True)
+
+    fieldnames = [
+        "source_file",
+        "json_file",
+        "line_id",
+        "line_type",
+        "x1",
+        "y1",
+        "x2",
+        "y2",
+        "length",
+        "angle_deg",
+        "distance_to_vertical_deg",
+        "distance_to_horizontal_deg",
+    ]
+
+    with open(LINES_CSV_PATH, "w", newline="", encoding="utf-8") as file:
         writer = csv.DictWriter(file, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(rows)
@@ -255,6 +333,7 @@ def main() -> None:
         return
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    JSON_DIR.mkdir(parents=True, exist_ok=True)
     METADATA_DIR.mkdir(parents=True, exist_ok=True)
 
     image_paths = collect_images()
@@ -266,12 +345,14 @@ def main() -> None:
     hough_config = STEP_04_CONFIG["hough_lines_p"]
     classification_config = STEP_04_CONFIG["classification"]
 
-    metadata_rows = []
+    summary_rows: list[dict[str, Any]] = []
+    line_rows: list[dict[str, Any]] = []
 
     print()
     print("Processing step 04: Hough line detection")
     print(f"Input:  {INPUT_DIR}")
     print(f"Output: {OUTPUT_DIR}")
+    print(f"JSON:   {JSON_DIR}")
     print()
     print("Line colors:")
     print("  green = vertical")
@@ -287,19 +368,49 @@ def main() -> None:
         edge_image = cv2.imread(str(image_path), cv2.IMREAD_GRAYSCALE)
 
         if edge_image is None:
-            print(f"Could not read image: {image_path}")
+            print(f"Could not read edge image: {image_path}")
             continue
 
-        overlay, vertical_count, horizontal_count, other_count = draw_detected_lines(edge_image)
+        height, width = edge_image.shape[:2]
+        records = build_line_records(edge_image)
+        overlay, counts = draw_detected_lines(edge_image, records)
 
         output_path = OUTPUT_DIR / image_path.name
+        json_path = JSON_DIR / f"{image_path.stem}.json"
+
         cv2.imwrite(str(output_path), overlay)
 
-        height, width = edge_image.shape[:2]
+        json_data = {
+            "source_file": image_path.name,
+            "source_path": relative(image_path),
+            "overlay_file": relative(output_path),
+            "width": width,
+            "height": height,
+            "processing_step": "04_line_detection_hough",
+            "parameters": {
+                "rho": hough_config["rho"],
+                "theta_divisor": hough_config["theta_divisor"],
+                "threshold": hough_config["threshold"],
+                "min_line_length": hough_config["min_line_length"],
+                "max_line_gap": hough_config["max_line_gap"],
+                "vertical_angle_tolerance_degrees": classification_config["vertical_angle_tolerance_degrees"],
+                "horizontal_angle_tolerance_degrees": classification_config["horizontal_angle_tolerance_degrees"],
+            },
+            "counts": {
+                "vertical": counts.get("vertical", 0),
+                "horizontal": counts.get("horizontal", 0),
+                "other": counts.get("other", 0),
+                "total": len(records),
+            },
+            "lines": records,
+        }
 
-        metadata_rows.append({
-            "source_file": str(image_path.relative_to(PROJECT_ROOT)),
-            "output_file": str(output_path.relative_to(PROJECT_ROOT)),
+        save_json(json_path, json_data)
+
+        summary_rows.append({
+            "source_file": relative(image_path),
+            "output_file": relative(output_path),
+            "json_file": relative(json_path),
             "width": width,
             "height": height,
             "processing_step": "04_line_detection_hough",
@@ -310,14 +421,34 @@ def main() -> None:
             "max_line_gap": hough_config["max_line_gap"],
             "vertical_angle_tolerance_degrees": classification_config["vertical_angle_tolerance_degrees"],
             "horizontal_angle_tolerance_degrees": classification_config["horizontal_angle_tolerance_degrees"],
-            "vertical_count": vertical_count,
-            "horizontal_count": horizontal_count,
-            "other_count": other_count,
+            "vertical_count": counts.get("vertical", 0),
+            "horizontal_count": counts.get("horizontal", 0),
+            "other_count": counts.get("other", 0),
+            "total_count": len(records),
         })
+
+        for record in records:
+            line_rows.append({
+                "source_file": relative(image_path),
+                "json_file": relative(json_path),
+                "line_id": record["id"],
+                "line_type": record["line_type"],
+                "x1": record["x1"],
+                "y1": record["y1"],
+                "x2": record["x2"],
+                "y2": record["y2"],
+                "length": record["length"],
+                "angle_deg": record["angle_deg"],
+                "distance_to_vertical_deg": record["distance_to_vertical_deg"],
+                "distance_to_horizontal_deg": record["distance_to_horizontal_deg"],
+            })
 
         print(
             f"[{index}/{len(image_paths)}] Saved: {output_path.name} | "
-            f"vertical={vertical_count}, horizontal={horizontal_count}, other={other_count}"
+            f"vertical={counts.get('vertical', 0)}, "
+            f"horizontal={counts.get('horizontal', 0)}, "
+            f"other={counts.get('other', 0)}, "
+            f"total={len(records)}"
         )
 
         if DISPLAY_CONFIG["show_windows"]:
@@ -341,14 +472,17 @@ def main() -> None:
                 print("Stopped by user.")
                 break
 
-    save_metadata(metadata_rows)
+    save_summary_metadata(summary_rows)
+    save_line_metadata(line_rows)
 
     cv2.destroyAllWindows()
 
     print()
     print("Done.")
     print(f"Line overlays saved to: {OUTPUT_DIR}")
-    print(f"Metadata saved to: {CSV_PATH}")
+    print(f"Line JSON saved to:     {JSON_DIR}")
+    print(f"Summary metadata saved to: {SUMMARY_CSV_PATH}")
+    print(f"Per-line metadata saved to: {LINES_CSV_PATH}")
 
 
 if __name__ == "__main__":

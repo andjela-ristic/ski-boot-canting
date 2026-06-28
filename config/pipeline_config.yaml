@@ -143,3 +143,24 @@ step_05_detect_boot_roi:
 
   draw:
     show_all_candidate_boxes: true
+
+step_06_detect_boot_landmarks:
+  enabled: true
+  input_visual_subdir: "01_illumination_normalized"
+  input_edges_subdir: "03_edges"
+  output_subdir: "06_boot_landmarks"
+  detection_input: "edges"
+
+  edge_fallback:
+    blur_kernel: 5
+    threshold_1: 50
+    threshold_2: 150
+
+  hough:
+    median_blur_kernel: 1
+    dp: 1.2
+    min_dist: 45
+    param1: 100
+    param2: 70
+    min_radius: 10
+    max_radius: 75

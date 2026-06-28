@@ -3,3 +3,4 @@ pipeline/_pycache__
 pipeline/__pycache__/config_loader.cpython-312.pyc
 /data/test
 scripts/visual_test_variations_save_windows.py
+*.pyc
