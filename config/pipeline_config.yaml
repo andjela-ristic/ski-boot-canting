@@ -180,3 +180,87 @@ step_06_detect_boot_landmarks:
 
     max_radius: 75
     max_radius_test_values: [60, 75, 90]
+
+step_07_complete_line_fragments:
+  enabled: true
+
+  input_visual_subdir: "01_illumination_normalized"
+  input_edges_subdir: "03_edges"
+  input_roi_subdir: "05_boot_roi"
+  output_subdir: "07_complete_line_fragments"
+
+  mask_filter:
+    enabled: true
+    mode: "boot_mask"
+    dilate_kernel_size: 21
+    dilate_iterations: 1
+    min_line_mask_coverage: 0.45
+
+  line_selection:
+    use_only_vertical: true
+    vertical_angle_tolerance_degrees: 15
+    min_fragment_length_px: 35
+
+  hough_lines_p:
+    rho: 1
+    theta_divisor: 180
+    threshold: 45
+    threshold_test_values: [40, 45, 50]
+
+    min_line_length: 70
+    min_line_length_test_values: [50, 60, 70, 80]
+
+    max_line_gap: 20
+    max_line_gap_test_values: [15, 20, 30]
+
+  extension:
+    extend_to_mask_bounds: true
+    extend_padding_px: 20
+
+  merge:
+    max_gap_px: 90
+    max_gap_px_test_values: [60, 90, 120]
+
+    exact:
+      enabled: true
+      max_angle_diff_degrees: 2.0
+      max_rho_diff_px: 6
+
+    shift:
+      enabled: true
+      max_parallel_shift_px: 18
+      max_parallel_shift_px_test_values: [10, 14, 18, 24]
+      max_angle_diff_degrees: 2.0
+
+    rotate:
+      enabled: true
+      max_angle_adjust_degrees: 3.0
+      max_angle_adjust_degrees_test_values: [1.5, 2.0, 3.0]
+      max_parallel_shift_after_rotation_px: 12
+
+    iterative_merge: true
+    max_iterations: 8
+
+  dominance:
+    length_weight: 0.40
+    edge_support_weight: 0.25
+    fragment_count_weight: 0.20
+    shift_penalty_weight: 0.10
+    angle_penalty_weight: 0.05
+
+  scoring:
+    edge_support_radius_px: 2
+
+  hypotheses:
+    keep_single_fragments: true
+    keep_top_hypotheses_per_seed: 5
+    max_total_hypotheses: 100
+    min_support_score: 0.0
+
+  debug:
+    enabled: true
+    draw_original_fragments: true
+    draw_mask_filtered_fragments: true
+    draw_vertical_fragments: true
+    draw_completed_lines: true
+    draw_transform_labels: true

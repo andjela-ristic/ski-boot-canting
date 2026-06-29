@@ -196,7 +196,7 @@ def process_image(image_path, show):
 
     if image is None:
         print(f"Cannot read image: {image_path}")
-        return
+        return []
 
     detection_input, input_mode = prepare_detection_input(image_path, image)
     circles, hough_input = find_circles(detection_input, input_mode)
