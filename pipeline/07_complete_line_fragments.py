@@ -225,6 +225,29 @@ def dilate_mask(mask: np.ndarray) -> np.ndarray:
     return cv2.dilate(mask, kernel, iterations=iterations)
 
 
+def make_inner_mask(mask: np.ndarray) -> np.ndarray:
+    if not bool(cfg("mask_filter", "enabled", default=True)):
+        return mask
+
+    if not bool(cfg("mask_filter", "use_inner_mask_for_hough", default=False)):
+        return mask
+
+    min_dist = float(cfg("mask_filter", "inner_mask_min_distance_px", default=18))
+    if min_dist <= 0:
+        return mask
+
+    binary = (mask > 0).astype(np.uint8)
+    dist = cv2.distanceTransform(binary, cv2.DIST_L2, 5)
+
+    inner = np.zeros_like(mask)
+    inner[dist >= min_dist] = 255
+
+    if not np.any(inner):
+        return mask
+
+    return inner
+
+
 def line_length(x1: float, y1: float, x2: float, y2: float) -> float:
     return float(math.hypot(x2 - x1, y2 - y1))
 
@@ -686,17 +709,67 @@ def draw_fragments(
     return out
 
 
-def draw_completed(visual: np.ndarray, completed: list[CompletedLine]) -> np.ndarray:
+def draw_completed(
+    visual: np.ndarray,
+    completed: list[CompletedLine],
+    fragments: list[Fragment],
+) -> np.ndarray:
     out = visual.copy()
+    max_draw = int(cfg("debug", "max_completed_lines_to_draw", default=25))
+    fragment_by_id = {f.id: f for f in fragments}
 
-    for line in completed:
+    if max_draw > 0:
+        lines_to_draw = completed[:max_draw]
+    else:
+        lines_to_draw = completed
+
+    for line in lines_to_draw:
+        color_original = (255, 120, 0)
+        color_extension = (0, 255, 255)
+        color_completed = (0, 255, 0)
+
         p1 = (int(round(line.x1)), int(round(line.y1)))
         p2 = (int(round(line.x2)), int(round(line.y2)))
+        cv2.line(out, p1, p2, color_completed, 1, cv2.LINE_AA)
 
-        thickness = 3 if line.fragment_count > 1 else 2
-        color = (0, 255, 0) if line.fragment_count > 1 else (0, 220, 255)
+        top_y = line.y_min_original
+        bottom_y = line.y_max_original
+        top_x = x_at_y(line.a, line.b, top_y)
+        bottom_x = x_at_y(line.a, line.b, bottom_y)
 
-        cv2.line(out, p1, p2, color, thickness, cv2.LINE_AA)
+        if abs(top_y - line.y1) > 3:
+            cv2.line(
+                out,
+                p1,
+                (int(round(top_x)), int(round(top_y))),
+                color_extension,
+                2,
+                cv2.LINE_AA,
+            )
+
+        if abs(line.y2 - bottom_y) > 3:
+            cv2.line(
+                out,
+                (int(round(bottom_x)), int(round(bottom_y))),
+                p2,
+                color_extension,
+                2,
+                cv2.LINE_AA,
+            )
+
+        for fragment_id in line.fragment_ids:
+            fragment = fragment_by_id.get(fragment_id)
+            if fragment is None:
+                continue
+
+            cv2.line(
+                out,
+                (int(round(fragment.x1)), int(round(fragment.y1))),
+                (int(round(fragment.x2)), int(round(fragment.y2))),
+                color_original,
+                3,
+                cv2.LINE_AA,
+            )
 
         label = f"{line.id.replace('completed_line_', 'L')} s={line.support_score:.2f} n={line.fragment_count}"
         cv2.putText(
@@ -704,29 +777,43 @@ def draw_completed(visual: np.ndarray, completed: list[CompletedLine]) -> np.nda
             label,
             (p1[0] + 5, max(20, p1[1] + 18)),
             cv2.FONT_HERSHEY_SIMPLEX,
-            0.48,
-            color,
+            0.45,
+            color_completed,
             1,
             cv2.LINE_AA,
         )
 
-    add_title(out, "completed vertical line hypotheses")
+    title = "completed lines: blue=real fragments, yellow=extension, green=hypothesis"
+    if 0 < max_draw < len(completed):
+        title = f"{title} (top {max_draw}/{len(completed)})"
+
+    add_title(out, title)
     return out
 
 
-def draw_mask_debug(visual: np.ndarray, mask: np.ndarray, masked_edge: np.ndarray) -> np.ndarray:
+def draw_mask_debug(
+    visual: np.ndarray,
+    outer_mask: np.ndarray,
+    hough_mask: np.ndarray,
+    masked_edge: np.ndarray,
+) -> np.ndarray:
     out = visual.copy()
 
-    tint = np.zeros_like(out)
-    tint[:, :, 1] = 180
-    inside = mask > 0
-    out[inside] = cv2.addWeighted(out[inside], 0.75, tint[inside], 0.25, 0)
+    outer_tint = np.zeros_like(out)
+    outer_tint[:, :, 1] = 180
+    outer_inside = outer_mask > 0
+    out[outer_inside] = cv2.addWeighted(out[outer_inside], 0.78, outer_tint[outer_inside], 0.22, 0)
+
+    inner_tint = np.zeros_like(out)
+    inner_tint[:, :, 2] = 180
+    inner_inside = hough_mask > 0
+    out[inner_inside] = cv2.addWeighted(out[inner_inside], 0.72, inner_tint[inner_inside], 0.28, 0)
 
     edge_col = cv2.cvtColor(masked_edge, cv2.COLOR_GRAY2BGR)
     edge_pixels = masked_edge > 0
     out[edge_pixels] = (255, 255, 255)
 
-    add_title(out, "dilated ROI/boot mask + masked edge")
+    add_title(out, "outer mask (green), Hough mask (red), masked edge")
     return out
 
 
@@ -788,15 +875,16 @@ def process_image(image_path: Path, show: bool) -> tuple[list[dict[str, Any]], b
 
     edge = load_edge(image_path, visual)
     raw_mask, mask_source = load_roi_mask(image_path.name, (h, w))
-    work_mask = dilate_mask(raw_mask)
+    outer_mask = dilate_mask(raw_mask)
+    hough_mask = make_inner_mask(raw_mask)
 
-    masked_edge = cv2.bitwise_and(edge, edge, mask=work_mask)
+    masked_edge = cv2.bitwise_and(edge, edge, mask=hough_mask)
 
     raw_hough_lines = detect_hough_lines(masked_edge)
 
     all_fragments: list[Fragment] = []
     for idx, line in enumerate(raw_hough_lines, start=1):
-        fragment = make_fragment(idx, line, work_mask)
+        fragment = make_fragment(idx, line, outer_mask)
         if fragment is not None:
             all_fragments.append(fragment)
 
@@ -806,7 +894,7 @@ def process_image(image_path: Path, show: bool) -> tuple[list[dict[str, Any]], b
     groups = merge_groups(vertical)
 
     completed = [
-        build_completed_line(idx, group, work_mask, edge)
+        build_completed_line(idx, group, outer_mask, edge)
         for idx, group in enumerate(groups, start=1)
     ]
 
@@ -818,8 +906,8 @@ def process_image(image_path: Path, show: bool) -> tuple[list[dict[str, Any]], b
     original_overlay = draw_fragments(visual, all_fragments, "all Hough fragments inside masked edge", (255, 160, 0))
     masked_overlay = draw_fragments(visual, mask_supported, "mask-supported fragments", (0, 220, 255))
     vertical_overlay = draw_fragments(visual, vertical, "vertical fragments only", (255, 0, 255))
-    completed_overlay = draw_completed(visual, completed)
-    mask_debug = draw_mask_debug(visual, work_mask, masked_edge)
+    completed_overlay = draw_completed(visual, completed, vertical)
+    mask_debug = draw_mask_debug(visual, outer_mask, hough_mask, masked_edge)
 
     cv2.imwrite(str(ORIGINAL_DIR / image_path.name), original_overlay)
     cv2.imwrite(str(MASKED_DIR / image_path.name), masked_overlay)
@@ -834,6 +922,7 @@ def process_image(image_path: Path, show: bool) -> tuple[list[dict[str, Any]], b
             "source_file": image_path.name,
             "processing_step": "07_complete_line_fragments",
             "mask_source": mask_source,
+            "hough_mask_mode": "inner_mask" if bool(cfg("mask_filter", "use_inner_mask_for_hough", default=False)) else "raw_mask",
             "counts": {
                 "raw_hough_lines": len(raw_hough_lines),
                 "all_fragments_after_min_length": len(all_fragments),

@@ -638,8 +638,8 @@ def parse_args() -> argparse.Namespace:
         "--step",
         type=int,
         required=True,
-        choices=[1, 2, 3, 4, 6],
-        help="Pipeline step to test. Supported: 1, 2, 3, 4, 6."
+        choices=[1, 2, 3, 4, 6, 7],
+        help="Pipeline step to test. Supported: 1, 2, 3, 4, 6, 7."
     )
 
     parser.add_argument(
@@ -689,7 +689,9 @@ def main() -> None:
 
     elif args.step == 6:
         run_step_06_variations(image_path)
-        
+    elif args.step == 7:
+        run_step_07_variations(image_path)
+
     cv2.destroyAllWindows()
 
     print("Done.")

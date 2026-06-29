@@ -5,7 +5,6 @@ import json
 import csv
 
 
-# Omogućava Pillow biblioteci da otvara .HEIC fajlove
 register_heif_opener()
 
 
