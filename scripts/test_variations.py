@@ -556,46 +556,61 @@ def run_step_06_single_preset(
     if visual is None:
         raise ValueError(f"Could not read image: {image_path}")
 
-    detection_input, _ = lm.prepare_detection_input(image_path, visual)
-    circles = lm.find_circles(detection_input)
+    detection_input, input_mode = lm.prepare_detection_input(image_path, visual)
+    circles, _ = lm.find_circles(detection_input, input_mode)
     overlay = lm.draw_circles(visual, circles)
     label = f"{preset_name} | n={len(circles)}"
 
     return label, overlay
 
-def run_step_06_variations(image_path: Path) -> None:
+def build_step_06_presets() -> list[dict]:
+    step_config = CONFIG["step_06_detect_boot_landmarks"]
+    hough_config = step_config["hough"]
+    explicit_presets = step_config.get("test_presets", [])
+
+    if explicit_presets:
+        presets = []
+
+        for preset in explicit_presets:
+            preset_copy = copy.deepcopy(preset)
+            preset_copy.setdefault("detection_input", step_config["detection_input"])
+            presets.append(preset_copy)
+
+        return presets
+
     presets = [
         {
-            "name": "edges default",
-            "detection_input": "edges",
-        },
-        {
-            "name": "grayscale default",
-            "detection_input": "grayscale",
-        },
-        {
-            "name": "edges higher recall",
-            "detection_input": "edges",
-            "hough": {"dp": 1.0, "min_dist": 16, "param1": 60, "param2": 16},
-        },
-        {
-            "name": "edges stricter threshold",
-            "detection_input": "edges",
-            "hough": {"dp": 1.2, "min_dist": 24, "param1": 100, "param2": 28},
-        },
-        {
-            "name": "grayscale small circles",
-            "detection_input": "grayscale",
-            "hough": {"min_radius": 4, "max_radius": 24, "param2": 20},
-        },
-        {
-            "name": "edge fallback retuned",
-            "detection_input": "edges",
-            "edge_fallback": {"threshold_1": 35, "threshold_2": 110},
-            "hough": {"dp": 1.0, "min_dist": 20, "param1": 80, "param2": 22},
-        },
+            "name": f"default ({step_config['detection_input']})",
+            "detection_input": step_config["detection_input"],
+        }
     ]
 
+    for key, value in hough_config.items():
+        if not key.endswith("_test_values"):
+            continue
+
+        base_key = key.removesuffix("_test_values")
+        test_values = value
+
+        if base_key not in hough_config:
+            continue
+
+        for test_value in test_values:
+            if test_value == hough_config[base_key]:
+                continue
+
+            presets.append(
+                {
+                    "name": f"{base_key}={test_value}",
+                    "detection_input": step_config["detection_input"],
+                    "hough": {base_key: test_value},
+                }
+            )
+
+    return presets
+
+def run_step_06_variations(image_path: Path) -> None:
+    presets = build_step_06_presets()
     lm = load_step_06_module()
 
     results = []

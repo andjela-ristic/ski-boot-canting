@@ -1,5 +1,7 @@
 from pathlib import Path
 import argparse
+import csv
+import json
 import cv2
 import numpy as np
 
@@ -14,20 +16,21 @@ STEP = CONFIG["step_06_detect_boot_landmarks"]
 DISPLAY = CONFIG.get("display", {})
 
 PROCESSED_DIR = PROJECT_ROOT / PATHS["processed_dir"]
+METADATA_DIR = PROJECT_ROOT / PATHS["metadata_dir"]
 
 VISUAL_INPUT_DIR = PROCESSED_DIR / STEP["input_visual_subdir"]
 EDGE_INPUT_DIR = PROCESSED_DIR / STEP.get("input_edges_subdir", "03_edges")
 
 OUTPUT_DIR = PROCESSED_DIR / STEP["output_subdir"]
 OVERLAY_DIR = OUTPUT_DIR / "circles_overlay"
-EDGE_DEBUG_DIR = OUTPUT_DIR / "edges_used"
-DETECTION_INPUT_DIR = OUTPUT_DIR / "detection_input"
+JSON_DIR = OUTPUT_DIR / "json"
+CSV_PATH = METADATA_DIR / "processing_06_detect_boot_landmarks.csv"
 
 
 def ensure_dirs():
     OVERLAY_DIR.mkdir(parents=True, exist_ok=True)
-    EDGE_DEBUG_DIR.mkdir(parents=True, exist_ok=True)
-    DETECTION_INPUT_DIR.mkdir(parents=True, exist_ok=True)
+    JSON_DIR.mkdir(parents=True, exist_ok=True)
+    METADATA_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def collect_images():
@@ -82,14 +85,23 @@ def prepare_detection_input(image_path, image_bgr):
     return load_or_make_edge(image_path, image_bgr), "edges"
 
 
-def find_circles(detection_input):
+def find_circles(detection_input, input_mode):
     hough = STEP.get("hough", {})
+    hough_input = detection_input
 
-    blur_k = int(hough.get("median_blur_kernel", 5))
-    if blur_k % 2 == 0:
-        blur_k += 1
-
-    hough_input = cv2.medianBlur(detection_input, blur_k)
+    if input_mode == "edges":
+        dilate_iterations = int(hough.get("edge_dilate_iterations", 0))
+        if dilate_iterations > 0:
+            kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
+            hough_input = cv2.dilate(hough_input, kernel, iterations=dilate_iterations)
+    elif input_mode == "grayscale":
+        blur_k = int(hough.get("median_blur_kernel", 1))
+        if blur_k > 1:
+            if blur_k % 2 == 0:
+                blur_k += 1
+            hough_input = cv2.medianBlur(hough_input, blur_k)
+    else:
+        raise ValueError(f"Unsupported input_mode: {input_mode}")
 
     circles = cv2.HoughCircles(
         hough_input,
@@ -103,9 +115,9 @@ def find_circles(detection_input):
     )
 
     if circles is None:
-        return []
+        return [], hough_input
 
-    return np.round(circles[0]).astype(int).tolist()
+    return np.round(circles[0]).astype(int).tolist(), hough_input
 
 
 def draw_circles(image_bgr, circles):
@@ -139,6 +151,46 @@ def resize_for_display(image):
     return cv2.resize(image, (int(w * scale), max_h), interpolation=cv2.INTER_AREA)
 
 
+def relative(path: Path) -> str:
+    return str(path.relative_to(PROJECT_ROOT))
+
+
+def save_json(path: Path, data: dict) -> None:
+    with path.open("w", encoding="utf-8") as file:
+        json.dump(data, file, indent=2, ensure_ascii=False)
+
+
+def save_metadata(rows: list[dict]) -> None:
+    fieldnames = [
+        "source_file",
+        "edge_input_file",
+        "overlay_file",
+        "json_file",
+        "width",
+        "height",
+        "processing_step",
+        "input_mode",
+        "nonzero_before",
+        "nonzero_hough",
+        "dp",
+        "min_dist",
+        "param1",
+        "param2",
+        "min_radius",
+        "max_radius",
+        "circle_count",
+        "circle_id",
+        "x",
+        "y",
+        "radius",
+    ]
+
+    with CSV_PATH.open("w", newline="", encoding="utf-8") as file:
+        writer = csv.DictWriter(file, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(rows)
+
+
 def process_image(image_path, show):
     image = cv2.imread(str(image_path))
 
@@ -147,21 +199,59 @@ def process_image(image_path, show):
         return
 
     detection_input, input_mode = prepare_detection_input(image_path, image)
-    circles = find_circles(detection_input)
+    circles, hough_input = find_circles(detection_input, input_mode)
     overlay = draw_circles(image, circles)
 
-    if input_mode == "edges":
-        cv2.imwrite(str(EDGE_DEBUG_DIR / image_path.name), detection_input)
-    cv2.imwrite(str(DETECTION_INPUT_DIR / image_path.name), detection_input)
-    cv2.imwrite(str(OVERLAY_DIR / image_path.name), overlay)
+    nonzero_before = int(cv2.countNonZero(detection_input))
+    nonzero_hough = int(cv2.countNonZero(hough_input))
+    hough = STEP.get("hough", {})
+    overlay_path = OVERLAY_DIR / image_path.name
+    json_path = JSON_DIR / f"{image_path.stem}.json"
+
+    cv2.imwrite(str(overlay_path), overlay)
+    save_json(
+        json_path,
+        {
+            "source_file": relative(image_path),
+            "overlay_file": relative(overlay_path),
+            "input_mode": input_mode,
+            "width": int(image.shape[1]),
+            "height": int(image.shape[0]),
+            "processing_step": "06_detect_boot_landmarks",
+            "nonzero_before": nonzero_before,
+            "nonzero_hough": nonzero_hough,
+            "hough_parameters": {
+                "dp": float(hough.get("dp", 1.2)),
+                "min_dist": float(hough.get("min_dist", 35)),
+                "param1": float(hough.get("param1", 100)),
+                "param2": float(hough.get("param2", 18)),
+                "min_radius": int(hough.get("min_radius", 6)),
+                "max_radius": int(hough.get("max_radius", 45)),
+            },
+            "circle_count": len(circles),
+            "circles": [
+                {
+                    "id": index,
+                    "x": int(x),
+                    "y": int(y),
+                    "radius": int(r),
+                }
+                for index, (x, y, r) in enumerate(circles, start=1)
+            ],
+        },
+    )
 
     print(
-        f"{image_path.name}: input={input_mode} raw_candidates={len(circles)} "
-        f"radius=({STEP['hough']['min_radius']},{STEP['hough']['max_radius']})"
+        f"{image_path.name}: input={input_mode} "
+        f"nonzero_before={nonzero_before} "
+        f"nonzero_hough={nonzero_hough} "
+        f"circles={len(circles)} "
+        f"radius=({hough['min_radius']},{hough['max_radius']}) "
+        f"param2={hough['param2']}"
     )
 
     if show:
-        detection_bgr = cv2.cvtColor(detection_input, cv2.COLOR_GRAY2BGR)
+        detection_bgr = cv2.cvtColor(hough_input, cv2.COLOR_GRAY2BGR)
         grid = np.hstack([
             resize_for_display(image),
             resize_for_display(detection_bgr),
@@ -174,6 +264,60 @@ def process_image(image_path, show):
 
         if key in [ord("q"), 27]:
             raise KeyboardInterrupt
+
+    rows = []
+
+    for index, (x, y, r) in enumerate(circles, start=1):
+        rows.append({
+            "source_file": relative(image_path),
+            "edge_input_file": relative(EDGE_INPUT_DIR / image_path.name),
+            "overlay_file": relative(overlay_path),
+            "json_file": relative(json_path),
+            "width": int(image.shape[1]),
+            "height": int(image.shape[0]),
+            "processing_step": "06_detect_boot_landmarks",
+            "input_mode": input_mode,
+            "nonzero_before": nonzero_before,
+            "nonzero_hough": nonzero_hough,
+            "dp": float(hough.get("dp", 1.2)),
+            "min_dist": float(hough.get("min_dist", 35)),
+            "param1": float(hough.get("param1", 100)),
+            "param2": float(hough.get("param2", 18)),
+            "min_radius": int(hough.get("min_radius", 6)),
+            "max_radius": int(hough.get("max_radius", 45)),
+            "circle_count": len(circles),
+            "circle_id": f"circle_{index:03d}",
+            "x": int(x),
+            "y": int(y),
+            "radius": int(r),
+        })
+
+    if not rows:
+        rows.append({
+            "source_file": relative(image_path),
+            "edge_input_file": relative(EDGE_INPUT_DIR / image_path.name),
+            "overlay_file": relative(overlay_path),
+            "json_file": relative(json_path),
+            "width": int(image.shape[1]),
+            "height": int(image.shape[0]),
+            "processing_step": "06_detect_boot_landmarks",
+            "input_mode": input_mode,
+            "nonzero_before": nonzero_before,
+            "nonzero_hough": nonzero_hough,
+            "dp": float(hough.get("dp", 1.2)),
+            "min_dist": float(hough.get("min_dist", 35)),
+            "param1": float(hough.get("param1", 100)),
+            "param2": float(hough.get("param2", 18)),
+            "min_radius": int(hough.get("min_radius", 6)),
+            "max_radius": int(hough.get("max_radius", 45)),
+            "circle_count": 0,
+            "circle_id": "",
+            "x": "",
+            "y": "",
+            "radius": "",
+        })
+
+    return rows
 
 
 def main():
@@ -189,9 +333,12 @@ def main():
         return
 
     show = bool(DISPLAY.get("show_windows", True)) and not args.no_show
+    metadata_rows = []
 
     for image_path in images:
-        process_image(image_path, show)
+        metadata_rows.extend(process_image(image_path, show))
+
+    save_metadata(metadata_rows)
 
 
 if __name__ == "__main__":

@@ -147,3 +147,42 @@ VERZIJA 2: promenila sam test values i nijanse su u pitanju sada
 40-80-20 najvise hopefull i za mnog top 
 50-70-20 bas top ali osim za poslednje dve 
 50-75-20 mi se isto bas svidja
+
+
+STEP 6 - pronalazenje krugova (sarafi)
+image,"default,n=19","edi=1,n=16","dp=1.1,n=9","dp=1.3,n=35","min_dist=35,n=22","min_dist=55,n=18","param1=120,n=19","param2=60,n=40","param2=65,n=29","param2=75,n=12","param2=80,n=9","min_radius=8,n=20","min_radius=12,n=19","max_radius=60,n=8","max_radius=90,n=39"
+502,  2.5,2,1.5,2,2.5,2.5  2.5,1,1.5,3,3,2.5  2.5,3,1
+503,  2,2.5,3,1,1.5,1.5  2,1,1,2,2.5,2.5  2.5,2.5,0
+504,  1.5,2,2.5,1,1,1  1,1,1,1.5,2,1.5  2.5,2.5,1
+505,  0,3,1.5,1,0,0.5  1,1,1,1,1,1  2,2.5,1
+506,  2,1,1,0,2,2  2,1,1,2,1.5,2  2,2.5,0
+507,  1,2,2,0,0,1  1,1,1,1,1.5,1  1,2.5,0
+508,  1,1,2,0,0,0  1,0,0,1,1.5,1  1.5,2.5,0
+509,  2,1,1,1.5,2,2.5  1,1,1,1,1,1  2,1,1
+510,  2.5,2,1,1.5,2,2  1,1,1,0.5,0,0  2,1,0.5
+511,  2.5,2,2,1.5,1.5,2  3,2,2.5,3,2,2.5  3,2,2
+
+best result value:
+    dp: 1.1
+    min_dist: 45
+    param1: 100
+    param2: 75
+    min_radius: 12
+    max_radius: 75
+    edge_dilate_iterations: 0
+
+3 = super
+    - uhvaceni su svi sarafi, sa relativno dobrim centrom
+    - nema mnogo false-positives
+
+2 = dobro
+    - uhvaceni svi, ali ima mnogo false positives
+    - uhvaceni svi, ali centar nije centar
+
+1 = slabo / ok
+    - poneki koristan krug, ali nije dovoljno dobro
+    - ima korisnih, ali ima previse false positives da bi ti korisni ikada imali smisla
+0 = lose
+    - nema korisnih krugova
+
+

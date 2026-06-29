@@ -1,0 +1,51 @@
+{
+  "source_file": "data\\processed\\01_illumination_normalized\\IMG_0506.png",
+  "overlay_file": "data\\processed\\06_boot_landmarks\\circles_overlay\\IMG_0506.png",
+  "input_mode": "edges",
+  "width": 3024,
+  "height": 4032,
+  "processing_step": "06_detect_boot_landmarks",
+  "nonzero_before": 60957,
+  "nonzero_hough": 60957,
+  "hough_parameters": {
+    "dp": 1.1,
+    "min_dist": 45.0,
+    "param1": 100.0,
+    "param2": 75.0,
+    "min_radius": 12,
+    "max_radius": 75
+  },
+  "circle_count": 5,
+  "circles": [
+    {
+      "id": 1,
+      "x": 1437,
+      "y": 1578,
+      "radius": 56
+    },
+    {
+      "id": 2,
+      "x": 1429,
+      "y": 1464,
+      "radius": 47
+    },
+    {
+      "id": 3,
+      "x": 1437,
+      "y": 1099,
+      "radius": 35
+    },
+    {
+      "id": 4,
+      "x": 1475,
+      "y": 1024,
+      "radius": 66
+    },
+    {
+      "id": 5,
+      "x": 1618,
+      "y": 912,
+      "radius": 39
+    }
+  ]
+}

@@ -158,9 +158,25 @@ step_06_detect_boot_landmarks:
 
   hough:
     median_blur_kernel: 1
-    dp: 1.2
+    median_blur_kernel_test_values: [1]
+
+    edge_dilate_iterations: 0
+    edge_dilate_iterations_test_values: [0, 1]
+
+    dp: 1.1
+    dp_test_values: [1.1, 1.2, 1.3]
+
     min_dist: 45
+    min_dist_test_values: [35, 45, 55]
+
     param1: 100
-    param2: 70
-    min_radius: 10
+    param1_test_values: [100, 120]
+
+    param2: 75
+    param2_test_values: [60, 65, 70, 75, 80]
+
+    min_radius: 12
+    min_radius_test_values: [8, 10, 12]
+
     max_radius: 75
+    max_radius_test_values: [60, 75, 90]
