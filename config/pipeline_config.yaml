@@ -90,30 +90,70 @@ step_03_edge_detection:
       override:
         selected_output: "cleaned"
         canny:
-          mode: "auto_median"
+          mode: "manual"
+          threshold_1: 60
+          threshold_2: 140
 
-step_14_debug_hough_lines:
+step_04_boot_roi_from_edges:
   enabled: true
 
-  input_step: "03_edge_detection"
-  output_subdir: "14_debug_hough_lines"
+  input_subdir: "03_edges"
+  selected_input: "roi_edges"
 
-  hough_lines_p:
-    rho: 1
-    theta_divisor: 180
+  output_subdir: "04_boot_roi_from_edges"
 
-    threshold: 40
-    threshold_test_values: [40, 45, 50]
+  edge_threshold: 1
 
-    min_line_length: 80
-    min_line_length_test_values: [70, 75, 80]
+  noise:
+    min_component_area: 12
 
-    max_line_gap: 20
-    max_line_gap_test_values: [20]
+  density:
+    kernel_size: 61
+    threshold_percentile: 82
+    min_threshold: 3
 
-  classification:
-    vertical_angle_tolerance_degrees: 10
-    vertical_angle_tolerance_degrees_test_values: [10]
+  center_prior:
+    enabled: true
+    sigma_x_ratio: 0.28
+    sigma_y_ratio: 0.38
+    power: 1.2
 
-    horizontal_angle_tolerance_degrees: 8
-    horizontal_angle_tolerance_degrees_test_values: [8]
+  morphology:
+    close_kernel_size: 65
+    dilate_kernel_size: 41
+    second_close_kernel_size: 95
+    smooth_kernel_size: 17
+    iterations_close: 1
+    iterations_dilate: 1
+    iterations_second_close: 1
+
+  component_selection:
+    min_area_ratio: 0.01
+    center_weight: 2.0
+    vertical_extent_weight: 1.0
+
+  hull:
+    enabled: true
+    mode: "convex"
+    approx_epsilon_ratio: 0.008
+
+  overlay:
+    alpha: 0.35
+    contour_thickness: 3
+
+  test_presets:
+    - name: "wider_cutoff_more_grow"
+      override: {}
+    - name: "wider_cutoff_soft_center"
+      override:
+        density:
+          threshold_percentile: 83
+          min_threshold: 3
+        center_prior:
+          sigma_x_ratio: 0.38
+          sigma_y_ratio: 0.48
+          power: 0.7
+        morphology:
+          close_kernel_size: 59
+          dilate_kernel_size: 35
+          second_close_kernel_size: 85

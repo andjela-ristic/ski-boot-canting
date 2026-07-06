@@ -38,38 +38,102 @@ def set_config(config_path: str | None) -> None:
     PROCESSED_DIR = PROJECT_ROOT / PATHS_CONFIG["processed_dir"]
 
 
+def resolve_existing_image_path(base_dir: Path, image_name: str) -> Path:
+    candidate = base_dir / image_name
+
+    if candidate.exists():
+        return candidate
+
+    allowed_extensions = [".png", ".jpg", ".jpeg"]
+    requested_path = Path(image_name)
+    requested_stem = requested_path.stem if requested_path.suffix else requested_path.name
+    requested_suffix = requested_path.suffix.lower()
+
+    matches = []
+
+    for extension in allowed_extensions:
+        if requested_suffix and not extension.startswith(requested_suffix):
+            continue
+
+        extension_candidate = base_dir / f"{requested_stem}{extension}"
+        if extension_candidate.exists():
+            matches.append(extension_candidate)
+
+    if len(matches) == 1:
+        return matches[0]
+
+    if not requested_suffix:
+        for extension in allowed_extensions:
+            extension_candidate = base_dir / f"{requested_stem}{extension}"
+            if extension_candidate.exists():
+                matches.append(extension_candidate)
+
+        unique_matches = []
+        seen = set()
+        for match in matches:
+            match_key = str(match)
+            if match_key in seen:
+                continue
+            seen.add(match_key)
+            unique_matches.append(match)
+
+        if len(unique_matches) == 1:
+            return unique_matches[0]
+
+    raise FileNotFoundError(f"Image not found: {candidate}")
+
+
 def resolve_image_path(step: int, image_name: str) -> Path:
     if step == 1:
-        image_path = WORKING_PNG_DIR / image_name
+        image_path = resolve_existing_image_path(WORKING_PNG_DIR, image_name)
 
     elif step == 2:
         step_config = CONFIG["step_02_grayscale_and_blur"]
-        image_path = PROCESSED_DIR / step_config["input_subdir"] / image_name
+        image_path = resolve_existing_image_path(
+            PROCESSED_DIR / step_config["input_subdir"],
+            image_name
+        )
 
     elif step == 3:
         step_02_config = CONFIG["step_02_grayscale_and_blur"]
         step_02_output_dir = PROCESSED_DIR / step_02_config["output_subdir"]
         selected_step_02_output = step_02_config["selected_output"]
 
-        image_path = step_02_output_dir / selected_step_02_output / image_name
+        image_path = resolve_existing_image_path(
+            step_02_output_dir / selected_step_02_output,
+            image_name
+        )
 
     elif step == 4:
-        step_config = CONFIG["step_04_detect_boot_roi"]
-        image_path = PROCESSED_DIR / step_config["input_subdir"] / image_name
+        step_config = CONFIG["step_04_boot_roi_from_edges"]
+        input_root_dir = PROCESSED_DIR / step_config["input_subdir"]
+        selected_input = step_config.get("selected_input")
+        image_dir = (
+            input_root_dir / str(selected_input).strip()
+            if selected_input is not None
+            else input_root_dir
+        )
+        image_path = resolve_existing_image_path(
+            image_dir,
+            image_name
+        )
 
     elif step == 14:
         step_14_config = CONFIG["step_14_debug_hough_lines"]
-        image_path = PROCESSED_DIR / step_14_config["input_visual_subdir"] / image_name
+        image_path = resolve_existing_image_path(
+            PROCESSED_DIR / step_14_config["input_visual_subdir"],
+            image_name
+        )
 
     elif step == 7:
         step_config = CONFIG["step_07_complete_line_fragments"]
-        image_path = PROCESSED_DIR / step_config["input_visual_subdir"] / image_name
+        image_path = resolve_existing_image_path(
+            PROCESSED_DIR / step_config["input_visual_subdir"],
+            image_name
+        )
 
     else:
         raise ValueError(f"Unsupported step: {step}")
-
-    if not image_path.exists():
-        raise FileNotFoundError(f"Image not found: {image_path}")
 
     return image_path
 
@@ -749,7 +813,7 @@ def load_step_07_module():
     return module
 
 def load_step_04_module():
-    module_path = PROJECT_ROOT / "pipeline" / "04_detect_boot_roi.py"
+    module_path = PROJECT_ROOT / "pipeline" / "04_detect_boot_roi_from_edges.py"
 
     if not module_path.exists():
         raise FileNotFoundError(f"Step 04 file not found: {module_path}")
@@ -768,7 +832,7 @@ def load_step_04_module():
     return module
 
 def build_step_04_presets() -> list[dict]:
-    step_config = CONFIG["step_04_detect_boot_roi"]
+    step_config = CONFIG["step_04_boot_roi_from_edges"]
     explicit_presets = step_config.get("test_presets", [])
 
     if explicit_presets:
@@ -788,35 +852,24 @@ def run_step_04_single_preset(
     image_path: Path,
     preset: dict,
 ) -> tuple[str, np.ndarray]:
-    base_step_config = CONFIG["step_04_detect_boot_roi"]
+    base_step_config = CONFIG["step_04_boot_roi_from_edges"]
     preset_name = str(preset.get("name", "unnamed variation"))
     override = copy.deepcopy(preset.get("override", {}))
 
-    lm.STEP_04_CONFIG = deep_merge_dict(base_step_config, override)
+    lm.STEP_CONFIG = deep_merge_dict(base_step_config, override)
 
     edge_image = cv2.imread(str(image_path), cv2.IMREAD_GRAYSCALE)
 
     if edge_image is None:
         raise ValueError(f"Could not read image: {image_path}")
 
-    height, width = edge_image.shape[:2]
-    visual_input = lm.load_visual_input(image_path.name, (height, width))
-    boot_mask, edge_clean, activity_mask, component_stats = lm.extract_boot_roi_from_edges(edge_image)
-    overlay = lm.draw_boot_roi_overlay(visual_input, boot_mask)
+    results = lm.process_edge_image(edge_image)
+    overlay = lm.make_overlay(edge_image, results["final_mask"])
+    area = int(np.count_nonzero(results["final_mask"]))
+    threshold = int(results["density_threshold"])
+    label = f"{preset_name} | thr={threshold} area={area}"
 
-    found = component_stats.get("best_component_found", False)
-    area = component_stats.get("best_component_area", 0)
-    score = component_stats.get("best_component_score", 0.0)
-
-    panel = lm.make_comparison_view(
-        visual_input,
-        edge_clean,
-        activity_mask,
-        overlay
-    )
-    label = f"{preset_name} | found={found} area={area} score={score}"
-
-    return label, panel
+    return label, overlay
 
 def run_step_04_variations(image_path: Path) -> None:
     presets = build_step_04_presets()
@@ -824,16 +877,23 @@ def run_step_04_variations(image_path: Path) -> None:
 
     results = []
 
-    for preset in presets:
+    print("Step 04 test variations:")
+
+    for index, preset in enumerate(presets, start=1):
         label, panel = run_step_04_single_preset(
             lm=lm,
             image_path=image_path,
             preset=preset
         )
+        print(f"  #{index}: {label}")
         results.append((label, panel))
 
-    output_dir = test_image_output_dir(image_path)
-    save_labeled_results(output_dir=output_dir, results=results)
+    print()
+
+    show_variation_pages(
+        title_prefix=f"Step 04 ROI variations | {image_path.name}",
+        results=results
+    )
 
 def run_step_06_single_preset(
     lm,
@@ -1100,10 +1160,7 @@ def main() -> None:
     print(f"Step:  {args.step}")
     print(f"Image: {image_path}")
     print(f"Config: {args.config or 'config/pipeline_config.yaml'}")
-    if args.step in {4, 7}:
-        print(f"Results will be saved to: {test_image_output_dir(image_path)}")
-    else:
-        print("No files will be saved.")
+    print("No test files will be saved.")
     print()
 
     if args.step == 1:
