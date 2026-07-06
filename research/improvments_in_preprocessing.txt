@@ -81,5 +81,16 @@ Experimental:
     6. metadata za sve parametre
 
 04->14 todo.
-new 04 changes:
-    
+new 04 changes(used to be 05):
+    Pravi: 
+        intensity_mask
+        edge_activity_mask
+        combined_mask
+        cleaned_mask
+        boot_mask
+        roi_mask
+        masked_edges_boot
+        masked_intensity_boot
+        overlay
+        json
+

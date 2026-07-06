@@ -27,30 +27,30 @@ step_01_illumination_normalization:
 
 step_02_grayscale_and_blur:
   enabled: true
-
   input_subdir: "01_illumination_normalized"
   output_subdir: "02_grayscale_blur"
-
-  selected_output: "gaussian_blur"
+  
+  selected_output: "bilateral_filter"
 
   grayscale:
     enabled: true
-    method: "lab_l"   # options: bgr2gray, lab_l, ycrcb_y
+    method: "bgr2gray"  
 
   gaussian_blur:
     enabled: true
-    kernel_size: 3
-    sigma_x: 1.0
+    kernel_size: 7
+    sigma_x: 2.0
 
   bilateral_filter:
     enabled: true
-    diameter: 7
-    sigma_color: 50
-    sigma_space: 50
+    diameter: 15         # Sa 7 podignuto na 15 za jako zamućenje pozadine
+    sigma_color: 75      # Agresivnije stapanje sličnih sivih tonova
+    sigma_space: 75
 
 step_03_edge_detection:
   enabled: true
 
+  selected_input: "grayscale_lab_l"
   output_subdir: "03_edges"
   selected_output: "cleaned"   # options: raw, cleaned
 
@@ -109,50 +109,101 @@ step_14_debug_hough_lines:
 
 step_04_detect_boot_roi:
   enabled: true
-
-  input_edges_subdir: "03_edges"
-  input_visual_subdir: "01_illumination_normalized"
+  input_subdir: "02_grayscale_blur"
+  selected_input: "grayscale_bgr2gray"
   output_subdir: "04_boot_roi"
 
-  edge_activity:
-    density_kernel_size: 51
-    density_threshold: 0.039
-    close_kernel_size: 41
-    dilate_kernel_size: 31
+  threshold:
+    # Adaptivni je mrtav, otsu i fixed preuzimaju kontrolu
+    method: "fixed"
+    method_test: ["fixed", "otsu"]
+
+    # Testiramo pragove: pošto je čizma tamnija od svetlih delova zavese
+    fixed_threshold: 110
+    fixed_threshold_test: [90, 110, 130]
+
+    adaptive_method: "gaussian"
+    adaptive_method_test: ["gaussian"]
+    adaptive_block_size: 51
+    adaptive_block_size_test: [51]
+    adaptive_c: 3
+    adaptive_c_test: [3]
+
+    # Invert true/false će sada igrati ključnu ulogu da baci zavesu u crno
+    invert: false
+    invert_test: [false, true]
+
+  boundary:
+    # Granica po logici iz ZIP primera:
+    # erosion  => boundary = A - erode(A)
+    # dilation => boundary = dilate(A) - A
+    # both     => union obe granice
+    mode: "both"
+    mode_test: ["erosion", "dilation", "both"]
+
+    erode_kernel_size: [5, 5]
+    erode_kernel_size_test:
+      - [3, 3]
+      - [5, 5]
+
+    erode_iterations: 1
+    erode_iterations_test: [1]
+
+    dilate_kernel_size: [5, 5]
+    dilate_kernel_size_test:
+      - [3, 3]
+      - [5, 5]
+
     dilate_iterations: 1
-  
-  component_scoring:
-    preferred_x_ratio: 0.50
-    preferred_y_ratio: 0.56
-  
-    x_band_ratio: 0.425
-    y_band_ratio: 0.56
-  
-    edge_density_weight: 0.21
-    area_weight: 0.32
-    center_weight: 0.27
-    shape_weight: 0.20
-  
-  roi_padding:
-    x_padding_ratio: 0.068
-    y_padding_ratio: 0.10
-  
-  component_filtering:
-    min_area_ratio: 0.006
-    max_area_ratio: 0.55
+    dilate_iterations_test: [1]
 
-    min_width_ratio: 0.12
-    max_width_ratio: 0.75
+    postprocess_enabled: true
+    postprocess_enabled_test: [true]
 
-    min_height_ratio: 0.20
-    max_height_ratio: 0.95
+    post_close_kernel_size: [11, 11]
+    post_close_kernel_size_test:
+      - [9, 9]
+      - [11, 11]
 
-  boot_mask:
-    use_convex_hull: true
-    selected_vertical_mask: "roi_mask"
+    post_close_iterations: 1
+    post_close_iterations_test: [1]
 
-  draw:
-    show_all_candidate_boxes: true
+    post_dilate_kernel_size: [5, 5]
+    post_dilate_kernel_size_test:
+      - [3, 3]
+      - [5, 5]
+
+    post_dilate_iterations: 1
+    post_dilate_iterations_test: [1]
+
+  contour_filter:
+    # Vraćamo podrazumevane filtere veličine da odmah od baci sitno smeće
+    min_area_ratio: 0.015
+    min_area_ratio_test: [0.015]
+    max_area_ratio: 0.65
+    max_area_ratio_test: [0.65]
+
+    center_weight: 4.0
+    center_weight_test: [4.0]
+    vertical_weight: 2.0
+    vertical_weight_test: [2.0]
+    prefer_lower_half: true
+    prefer_lower_half_test: [true]
+
+  mask:
+    convex_hull: true
+    convex_hull_test: [true]
+    fill_contour: true
+    fill_contour_test: [true]
+    final_close_kernel_size: [31, 31]
+    final_close_kernel_size_test:
+      - [31, 31]
+    final_close_iterations: 1
+    final_close_iterations_test: [1]
+
+  debug:
+    save_debug_steps: true
+    save_metadata: true
 
 step_06_detect_boot_landmarks:
   enabled: true

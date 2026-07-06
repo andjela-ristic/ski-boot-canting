@@ -22,6 +22,11 @@ INPUT_DIR = PROCESSED_DIR / STEP_CONFIG["input_subdir"]
 OUTPUT_DIR = PROCESSED_DIR / STEP_CONFIG["output_subdir"]
 
 GRAYSCALE_DIR = OUTPUT_DIR / "grayscale"
+GRAYSCALE_METHOD_DIRS = {
+    "bgr2gray": OUTPUT_DIR / "grayscale_bgr2gray",
+    "lab_l": OUTPUT_DIR / "grayscale_lab_l",
+    "ycrcb_y": OUTPUT_DIR / "grayscale_ycrcb_y",
+}
 GAUSSIAN_DIR = OUTPUT_DIR / "gaussian_blur"
 BILATERAL_DIR = OUTPUT_DIR / "bilateral_filter"
 
@@ -229,6 +234,15 @@ def process_image(image_bgr: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.nda
     return grayscale, gaussian, bilateral
 
 
+def build_all_grayscale_variants(image_bgr: np.ndarray) -> dict[str, np.ndarray]:
+    grayscale_variants = {}
+
+    for method in GRAYSCALE_METHOD_DIRS:
+        grayscale_variants[method] = convert_to_grayscale(image_bgr, method)
+
+    return grayscale_variants
+
+
 def save_metadata(rows: list[dict]) -> None:
     if not rows:
         return
@@ -238,6 +252,9 @@ def save_metadata(rows: list[dict]) -> None:
     fieldnames = [
         "source_file",
         "grayscale_file",
+        "grayscale_bgr2gray_file",
+        "grayscale_lab_l_file",
+        "grayscale_ycrcb_y_file",
         "gaussian_file",
         "bilateral_file",
         "width",
@@ -263,6 +280,8 @@ def main() -> None:
         return
 
     GRAYSCALE_DIR.mkdir(parents=True, exist_ok=True)
+    for grayscale_dir in GRAYSCALE_METHOD_DIRS.values():
+        grayscale_dir.mkdir(parents=True, exist_ok=True)
     GAUSSIAN_DIR.mkdir(parents=True, exist_ok=True)
     BILATERAL_DIR.mkdir(parents=True, exist_ok=True)
     METADATA_DIR.mkdir(parents=True, exist_ok=True)
@@ -307,13 +326,20 @@ def main() -> None:
             print(f"Could not read image: {image_path}")
             continue
 
+        grayscale_variants = build_all_grayscale_variants(image_bgr)
         grayscale, gaussian, bilateral = process_image(image_bgr)
 
         grayscale_output_path = GRAYSCALE_DIR / image_path.name
+        grayscale_variant_paths = {
+            method: output_dir / image_path.name
+            for method, output_dir in GRAYSCALE_METHOD_DIRS.items()
+        }
         gaussian_output_path = GAUSSIAN_DIR / image_path.name
         bilateral_output_path = BILATERAL_DIR / image_path.name
 
         cv2.imwrite(str(grayscale_output_path), grayscale)
+        for method, output_path in grayscale_variant_paths.items():
+            cv2.imwrite(str(output_path), grayscale_variants[method])
         cv2.imwrite(str(gaussian_output_path), gaussian)
         cv2.imwrite(str(bilateral_output_path), bilateral)
 
@@ -322,6 +348,15 @@ def main() -> None:
         metadata_rows.append({
             "source_file": str(image_path.relative_to(PROJECT_ROOT)),
             "grayscale_file": str(grayscale_output_path.relative_to(PROJECT_ROOT)),
+            "grayscale_bgr2gray_file": str(
+                grayscale_variant_paths["bgr2gray"].relative_to(PROJECT_ROOT)
+            ),
+            "grayscale_lab_l_file": str(
+                grayscale_variant_paths["lab_l"].relative_to(PROJECT_ROOT)
+            ),
+            "grayscale_ycrcb_y_file": str(
+                grayscale_variant_paths["ycrcb_y"].relative_to(PROJECT_ROOT)
+            ),
             "gaussian_file": str(gaussian_output_path.relative_to(PROJECT_ROOT)),
             "bilateral_file": str(bilateral_output_path.relative_to(PROJECT_ROOT)),
             "width": width,
@@ -373,6 +408,9 @@ def main() -> None:
     print("Done.")
     print(f"Grayscale method: {grayscale_method}")
     print(f"Grayscale saved to: {GRAYSCALE_DIR}")
+    print(f"Grayscale bgr2gray saved to: {GRAYSCALE_METHOD_DIRS['bgr2gray']}")
+    print(f"Grayscale lab_l saved to: {GRAYSCALE_METHOD_DIRS['lab_l']}")
+    print(f"Grayscale ycrcb_y saved to: {GRAYSCALE_METHOD_DIRS['ycrcb_y']}")
     print(f"Gaussian blur saved to: {GAUSSIAN_DIR}")
     print(f"Bilateral filter saved to: {BILATERAL_DIR}")
     print(f"Metadata saved to: {CSV_PATH}")
