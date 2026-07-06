@@ -54,8 +54,8 @@ def resolve_image_path(step: int, image_name: str) -> Path:
         image_path = step_02_output_dir / selected_step_02_output / image_name
 
     elif step == 4:
-        step_03_config = CONFIG["step_03_edge_detection"]
-        image_path = PROCESSED_DIR / step_03_config["output_subdir"] / image_name
+        step_config = CONFIG["step_04_detect_boot_roi"]
+        image_path = PROCESSED_DIR / step_config["input_subdir"] / image_name
 
     elif step == 14:
         step_14_config = CONFIG["step_14_debug_hough_lines"]
@@ -423,61 +423,150 @@ def run_step_02_variations(image_path: Path) -> None:
         results=bilateral_results
     )
 
-def validate_aperture_size(value: int) -> int:
-    allowed_values = {3, 5, 7}
+def load_step_03_module():
+    module_path = PROJECT_ROOT / "pipeline" / "03_edge_detection.py"
 
-    if value not in allowed_values:
-        raise ValueError(f"Canny aperture_size must be one of {allowed_values}. Got: {value}")
+    if not module_path.exists():
+        raise FileNotFoundError(f"Step 03 file not found: {module_path}")
 
-    return value
+    spec = importlib.util.spec_from_file_location(
+        "step03_edge_detection",
+        str(module_path)
+    )
 
-def run_step_03_variations(image_path: Path) -> None:
+    if spec is None or spec.loader is None:
+        raise ImportError(f"Could not load module from: {module_path}")
+
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    return module
+
+def build_step_03_presets() -> list[dict]:
     step_config = CONFIG["step_03_edge_detection"]
-    canny_config = step_config["canny"]
+    explicit_presets = step_config.get("test_presets", [])
 
-    threshold_1_values = canny_config["threshold_1_test_values"]
-    threshold_2_values = canny_config["threshold_2_test_values"]
-    aperture_size_values = canny_config["aperture_size_test_values"]
-    use_l2_gradient_values = canny_config["use_l2_gradient_test_values"]
+    if explicit_presets:
+        presets = []
+
+        for preset in explicit_presets:
+            preset_copy = copy.deepcopy(preset)
+            preset_copy.setdefault("override", {})
+            presets.append(preset_copy)
+
+        return presets
+
+    test_dimensions = []
+
+    def walk(node: dict, path: tuple[str, ...] = ()) -> None:
+        for key, value in node.items():
+            if isinstance(value, dict):
+                walk(value, path + (key,))
+                continue
+
+            if not key.endswith("_test_values"):
+                continue
+
+            base_key = key.removesuffix("_test_values")
+            if base_key not in node:
+                continue
+
+            current_value = copy.deepcopy(node[base_key])
+            test_values = [copy.deepcopy(item) for item in value]
+
+            if current_value not in test_values:
+                test_values.insert(0, current_value)
+
+            test_dimensions.append((path + (base_key,), test_values))
+
+    walk(step_config)
+
+    if not test_dimensions:
+        return [{"name": "default", "override": {}}]
+
+    presets = []
+
+    for combination in itertools.product(*(values for _, values in test_dimensions)):
+        override = {}
+        label_parts = []
+
+        for (path, _), selected_value in zip(test_dimensions, combination):
+            current = override
+
+            for key in path[:-1]:
+                current = current.setdefault(key, {})
+
+            current[path[-1]] = copy.deepcopy(selected_value)
+            label_parts.append(f"{'.'.join(path)}={selected_value}")
+
+        presets.append(
+            {
+                "name": " | ".join(label_parts),
+                "override": override,
+            }
+        )
+
+    return presets
+
+def run_step_03_single_preset(
+    lm,
+    image_path: Path,
+    preset: dict,
+) -> tuple[str, np.ndarray]:
+    base_step_config = CONFIG["step_03_edge_detection"]
+    preset_name = str(preset.get("name", "unnamed variation"))
+    override = copy.deepcopy(preset.get("override", {}))
+
+    lm.STEP_03_CONFIG = deep_merge_dict(base_step_config, override)
 
     image_gray = cv2.imread(str(image_path), cv2.IMREAD_GRAYSCALE)
 
     if image_gray is None:
         raise ValueError(f"Could not read image: {image_path}")
 
+    raw_edges, threshold_1, threshold_2 = lm.run_canny(image_gray)
+    cleaned_edges = lm.clean_edges(raw_edges)
+
+    selected_output = lm.get_selected_edge_output()
+    result_image = raw_edges if selected_output == "raw" else cleaned_edges
+
+    canny_config = lm.STEP_03_CONFIG["canny"]
+    preprocessing_config = lm.STEP_03_CONFIG.get("preprocessing", {})
+    postprocessing_config = lm.STEP_03_CONFIG.get("postprocessing", {})
+
+    label = (
+        f"{preset_name} | mode={lm.get_canny_mode()} "
+        f"t1={threshold_1} t2={threshold_2} "
+        f"ap={canny_config['aperture_size']} "
+        f"l2={bool(canny_config['use_l2_gradient'])} "
+        f"pre={bool(preprocessing_config.get('enabled', False))} "
+        f"post={bool(postprocessing_config.get('enabled', False))} "
+        f"out={selected_output}"
+    )
+
+    return label, result_image
+
+def run_step_03_variations(image_path: Path) -> None:
+    presets = build_step_03_presets()
+    lm = load_step_03_module()
+
     results = []
 
-    for threshold_1, threshold_2, aperture_size, use_l2_gradient in itertools.product(
-        threshold_1_values,
-        threshold_2_values,
-        aperture_size_values,
-        use_l2_gradient_values
-    ):
-        threshold_1 = int(threshold_1)
-        threshold_2 = int(threshold_2)
-        aperture_size = validate_aperture_size(int(aperture_size))
-        use_l2_gradient = bool(use_l2_gradient)
+    print("Step 03 test variations:")
 
-        if threshold_1 >= threshold_2:
-            continue
-
-        edges = cv2.Canny(
-            image=image_gray,
-            threshold1=threshold_1,
-            threshold2=threshold_2,
-            apertureSize=aperture_size,
-            L2gradient=use_l2_gradient
+    for index, preset in enumerate(presets, start=1):
+        label, edge_image = run_step_03_single_preset(
+            lm=lm,
+            image_path=image_path,
+            preset=preset
         )
+        print(f"  #{index}: {label}")
+        results.append((f"#{index} | {label}", edge_image))
 
-        label = (
-            f"t1={threshold_1}, t2={threshold_2}, "
-            f"ap={aperture_size}, l2={use_l2_gradient}"
-        )
-
-        results.append((label, edges))
+    print()
 
     show_variation_pages(
-        title_prefix=f"Step 03 Canny variations | {image_path.name}",
+        title_prefix=f"Step 03 edge variations | {image_path.name}",
         results=results
     )
 
@@ -658,6 +747,93 @@ def load_step_07_module():
     spec.loader.exec_module(module)
 
     return module
+
+def load_step_04_module():
+    module_path = PROJECT_ROOT / "pipeline" / "04_detect_boot_roi.py"
+
+    if not module_path.exists():
+        raise FileNotFoundError(f"Step 04 file not found: {module_path}")
+
+    spec = importlib.util.spec_from_file_location(
+        "step04_boot_roi",
+        str(module_path)
+    )
+
+    if spec is None or spec.loader is None:
+        raise ImportError(f"Could not load module from: {module_path}")
+
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    return module
+
+def build_step_04_presets() -> list[dict]:
+    step_config = CONFIG["step_04_detect_boot_roi"]
+    explicit_presets = step_config.get("test_presets", [])
+
+    if explicit_presets:
+        presets = []
+
+        for preset in explicit_presets:
+            preset_copy = copy.deepcopy(preset)
+            preset_copy.setdefault("override", {})
+            presets.append(preset_copy)
+
+        return presets
+
+    return [{"name": "default", "override": {}}]
+
+def run_step_04_single_preset(
+    lm,
+    image_path: Path,
+    preset: dict,
+) -> tuple[str, np.ndarray]:
+    base_step_config = CONFIG["step_04_detect_boot_roi"]
+    preset_name = str(preset.get("name", "unnamed variation"))
+    override = copy.deepcopy(preset.get("override", {}))
+
+    lm.STEP_04_CONFIG = deep_merge_dict(base_step_config, override)
+
+    edge_image = cv2.imread(str(image_path), cv2.IMREAD_GRAYSCALE)
+
+    if edge_image is None:
+        raise ValueError(f"Could not read image: {image_path}")
+
+    height, width = edge_image.shape[:2]
+    visual_input = lm.load_visual_input(image_path.name, (height, width))
+    boot_mask, edge_clean, activity_mask, component_stats = lm.extract_boot_roi_from_edges(edge_image)
+    overlay = lm.draw_boot_roi_overlay(visual_input, boot_mask)
+
+    found = component_stats.get("best_component_found", False)
+    area = component_stats.get("best_component_area", 0)
+    score = component_stats.get("best_component_score", 0.0)
+
+    panel = lm.make_comparison_view(
+        visual_input,
+        edge_clean,
+        activity_mask,
+        overlay
+    )
+    label = f"{preset_name} | found={found} area={area} score={score}"
+
+    return label, panel
+
+def run_step_04_variations(image_path: Path) -> None:
+    presets = build_step_04_presets()
+    lm = load_step_04_module()
+
+    results = []
+
+    for preset in presets:
+        label, panel = run_step_04_single_preset(
+            lm=lm,
+            image_path=image_path,
+            preset=preset
+        )
+        results.append((label, panel))
+
+    output_dir = test_image_output_dir(image_path)
+    save_labeled_results(output_dir=output_dir, results=results)
 
 def run_step_06_single_preset(
     lm,
@@ -890,8 +1066,8 @@ def parse_args() -> argparse.Namespace:
         "--step",
         type=int,
         required=True,
-        choices=[1, 2, 3, 14, 6, 7],
-        help="Pipeline step to test. Supported: 1, 2, 3, 14, 6, 7."
+        choices=[1, 2, 3, 4, 14, 6, 7],
+        help="Pipeline step to test. Supported: 1, 2, 3, 4, 14, 6, 7."
     )
 
     parser.add_argument(
@@ -924,8 +1100,8 @@ def main() -> None:
     print(f"Step:  {args.step}")
     print(f"Image: {image_path}")
     print(f"Config: {args.config or 'config/pipeline_config.yaml'}")
-    if args.step == 7:
-        print(f"Step 7 results will be saved to: {test_image_output_dir(image_path)}")
+    if args.step in {4, 7}:
+        print(f"Results will be saved to: {test_image_output_dir(image_path)}")
     else:
         print("No files will be saved.")
     print()
@@ -941,6 +1117,9 @@ def main() -> None:
     
     elif args.step == 14:
         run_step_14_variations(image_path)
+
+    elif args.step == 4:
+        run_step_04_variations(image_path)
 
     elif args.step == 6:
         run_step_06_variations(image_path)

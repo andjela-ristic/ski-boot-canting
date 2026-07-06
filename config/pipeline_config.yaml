@@ -6,6 +6,7 @@ paths:
 display:
   show_windows: true
   wait_between_images: true
+  max_height: 900
 
 step_01_illumination_normalization:
   enabled: true
@@ -42,8 +43,8 @@ step_02_grayscale_and_blur:
 
   bilateral_filter:
     enabled: true
-    diameter: 15         # Sa 7 podignuto na 15 za jako zamućenje pozadine
-    sigma_color: 75      # Agresivnije stapanje sličnih sivih tonova
+    diameter: 15
+    sigma_color: 75
     sigma_space: 75
 
 step_03_edge_detection:
@@ -51,10 +52,12 @@ step_03_edge_detection:
 
   selected_input: "grayscale_lab_l"
   output_subdir: "03_edges"
-  selected_output: "cleaned"   # options: raw, cleaned
+  selected_output: "cleaned"
+  selected_output_test_values: ["raw", "cleaned"]
 
   canny:
-    mode: "manual"             # options: manual, auto_median
+    mode: "manual"
+    mode_test_values: ["manual", "auto_median"]
     threshold_1: 40
     threshold_2: 120
 
@@ -79,7 +82,16 @@ step_03_edge_detection:
 
     erode_iterations: 0
     erode_kernel_size: [3, 3]
-    
+
+  saved_test_variants:
+    - name: "roi_edges"
+      output_subdir: "03_edges/roi_edges"
+      use_step_03_test_input: true
+      override:
+        selected_output: "cleaned"
+        canny:
+          mode: "auto_median"
+
 step_14_debug_hough_lines:
   enabled: true
 

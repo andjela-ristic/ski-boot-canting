@@ -1,10 +1,11 @@
 from pathlib import Path
 import csv
+import itertools
 
 import cv2
 import numpy as np
 
-from config_loader import load_config
+from config_loader import deep_merge_dict, load_config
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -23,11 +24,12 @@ STEP_02_OUTPUT_DIR = PROCESSED_DIR / STEP_02_CONFIG["output_subdir"]
 SELECTED_STEP_02_OUTPUT = str(
     STEP_03_CONFIG.get("selected_input", STEP_02_CONFIG["selected_output"])
 ).strip()
+STEP_03_TEST_INPUT_NAME = str(STEP_02_CONFIG["selected_output"]).strip()
 
 INPUT_DIR = STEP_02_OUTPUT_DIR / SELECTED_STEP_02_OUTPUT
+TEST_INPUT_DIR = STEP_02_OUTPUT_DIR / STEP_03_TEST_INPUT_NAME
 OUTPUT_DIR = PROCESSED_DIR / STEP_03_CONFIG["output_subdir"]
 
-RAW_DIR = OUTPUT_DIR / "raw"
 CLEANED_DIR = OUTPUT_DIR / "cleaned"
 
 CSV_PATH = METADATA_DIR / "processing_03_edge_detection.csv"
@@ -43,6 +45,25 @@ def collect_images() -> list[Path]:
     ]
 
     return sorted(image_paths)
+
+
+def load_variant_input_image(
+    image_name: str,
+    variant: dict,
+) -> np.ndarray:
+    use_step_03_test_input = bool(variant.get("use_step_03_test_input", False))
+
+    if use_step_03_test_input:
+        image_path = TEST_INPUT_DIR / image_name
+    else:
+        image_path = INPUT_DIR / image_name
+
+    image_gray = cv2.imread(str(image_path), cv2.IMREAD_GRAYSCALE)
+
+    if image_gray is None:
+        raise ValueError(f"Could not read variant input image: {image_path}")
+
+    return image_gray
 
 
 def resize_for_display(image: np.ndarray) -> np.ndarray:
@@ -213,6 +234,105 @@ def get_selected_edge_output() -> str:
     return selected_output
 
 
+def build_step_03_test_presets(step_config: dict) -> list[dict]:
+    test_dimensions = []
+
+    def walk(node: dict, path: tuple[str, ...] = ()) -> None:
+        for key, value in node.items():
+            if isinstance(value, dict):
+                walk(value, path + (key,))
+                continue
+
+            if not key.endswith("_test_values"):
+                continue
+
+            base_key = key.removesuffix("_test_values")
+            if base_key not in node:
+                continue
+
+            current_value = node[base_key]
+            test_values = list(value)
+
+            if current_value not in test_values:
+                test_values.insert(0, current_value)
+
+            test_dimensions.append((path + (base_key,), test_values))
+
+    walk(step_config)
+
+    if not test_dimensions:
+        return [{"name": "default", "override": {}}]
+
+    presets = []
+
+    for combination in itertools.product(*(values for _, values in test_dimensions)):
+        override = {}
+        label_parts = []
+
+        for (path, _), selected_value in zip(test_dimensions, combination):
+            current = override
+
+            for key in path[:-1]:
+                current = current.setdefault(key, {})
+
+            current[path[-1]] = selected_value
+            label_parts.append(f"{'.'.join(path)}={selected_value}")
+
+        presets.append(
+            {
+                "name": " | ".join(label_parts),
+                "override": override,
+            }
+        )
+
+    return presets
+
+
+def get_saved_test_variants() -> list[dict]:
+    variants = []
+    test_presets = build_step_03_test_presets(STEP_03_CONFIG)
+
+    for index, variant in enumerate(STEP_03_CONFIG.get("saved_test_variants", []), start=1):
+        variant_name = str(variant.get("name", f"variant_{index:02d}")).strip()
+        variant_output_subdir = str(
+            variant.get(
+                "output_subdir",
+                f"{STEP_03_CONFIG['output_subdir']}/{variant_name}",
+            )
+        ).strip()
+        preset_number = variant.get("from_test_preset_number")
+
+        if preset_number is not None:
+            preset_index = int(preset_number) - 1
+
+            if preset_index < 0 or preset_index >= len(test_presets):
+                raise ValueError(
+                    f"Invalid from_test_preset_number={preset_number} for variant '{variant_name}'. "
+                    f"Valid range: 1-{len(test_presets)}"
+                )
+
+            variant_override = test_presets[preset_index]["override"]
+            variant_source = f"test preset #{preset_number}: {test_presets[preset_index]['name']}"
+        else:
+            variant_override = variant.get("override", {})
+            variant_source = "explicit override"
+
+        variant_step_config = deep_merge_dict(STEP_03_CONFIG, variant_override)
+
+        variants.append(
+            {
+                "name": variant_name,
+                "output_subdir": variant_output_subdir,
+                "output_dir": PROCESSED_DIR / variant_output_subdir,
+                "step_config": variant_step_config,
+                "source": variant_source,
+                "use_step_03_test_input": bool(variant.get("use_step_03_test_input", False)),
+            }
+        )
+
+    return variants
+
+
 def maybe_preprocess_before_canny(image_gray: np.ndarray) -> np.ndarray:
     preprocessing_config = STEP_03_CONFIG.get("preprocessing", {})
     enabled = bool(preprocessing_config.get("enabled", False))
@@ -305,6 +425,25 @@ def run_canny(image_gray: np.ndarray) -> tuple[np.ndarray, int, int]:
     )
 
     return edges, threshold_1, threshold_2
+
+
+def render_edges_for_config(
+    image_gray: np.ndarray,
+    step_config: dict,
+) -> tuple[np.ndarray, np.ndarray, int, int, str]:
+    global STEP_03_CONFIG
+
+    previous_step_config = STEP_03_CONFIG
+    STEP_03_CONFIG = step_config
+
+    try:
+        raw_edges, threshold_1, threshold_2 = run_canny(image_gray)
+        cleaned_edges = clean_edges(raw_edges)
+        selected_output = get_selected_edge_output()
+    finally:
+        STEP_03_CONFIG = previous_step_config
+
+    return raw_edges, cleaned_edges, threshold_1, threshold_2, selected_output
 
 
 def make_kernel(kernel_size: tuple[int, int]) -> np.ndarray | None:
@@ -429,14 +568,12 @@ def save_metadata(rows: list[dict]) -> None:
 
     fieldnames = [
         "source_file",
-        "raw_output_file",
         "cleaned_output_file",
-        "selected_output_file",
+        "roi_output_file",
         "width",
         "height",
         "processing_step",
         "input_from_step_02",
-        "selected_output",
         "canny_mode",
         "threshold_1",
         "threshold_2",
@@ -466,8 +603,6 @@ def main() -> None:
         print("Step 03 is disabled in config.")
         return
 
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    RAW_DIR.mkdir(parents=True, exist_ok=True)
     CLEANED_DIR.mkdir(parents=True, exist_ok=True)
     METADATA_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -477,25 +612,31 @@ def main() -> None:
         print(f"No images found in: {INPUT_DIR}")
         return
 
-    selected_output = get_selected_edge_output()
-
     canny_config = STEP_03_CONFIG["canny"]
     canny_mode = get_canny_mode()
     aperture_size = validate_aperture_size(int(canny_config["aperture_size"]))
     use_l2_gradient = bool(canny_config["use_l2_gradient"])
     auto_sigma = float(canny_config.get("auto_sigma", 0.33))
+    saved_test_variants = get_saved_test_variants()
+
+    for variant in saved_test_variants:
+        variant["output_dir"].mkdir(parents=True, exist_ok=True)
 
     metadata_rows = []
 
     print()
     print("Processing step 03: edge detection")
     print(f"Input:  {INPUT_DIR}")
+    print(f"Step 03 test input: {TEST_INPUT_DIR}")
     print(f"Output: {OUTPUT_DIR}")
-    print(f"Raw output: {RAW_DIR}")
     print(f"Cleaned output: {CLEANED_DIR}")
     print(f"Selected step 2 output: {SELECTED_STEP_02_OUTPUT}")
     print(f"Canny mode: {canny_mode}")
-    print(f"Selected edge output: {selected_output}")
+    if saved_test_variants:
+        print("Extra saved test variants:")
+        for variant in saved_test_variants:
+            variant_input = TEST_INPUT_DIR if variant["use_step_03_test_input"] else INPUT_DIR
+            print(f"  {variant['name']} -> {variant['output_dir']} ({variant['source']}, input={variant_input})")
     print()
     print("Controls:")
     print("  n / SPACE / ENTER  -> next image")
@@ -512,33 +653,43 @@ def main() -> None:
             print(f"Could not read image: {image_path}")
             continue
 
-        raw_edges, threshold_1, threshold_2 = run_canny(input_image)
-        cleaned_edges = clean_edges(raw_edges)
+        raw_edges, cleaned_edges, threshold_1, threshold_2, _ = render_edges_for_config(
+            input_image,
+            STEP_03_CONFIG,
+        )
 
-        raw_output_path = RAW_DIR / image_path.name
         cleaned_output_path = CLEANED_DIR / image_path.name
-        selected_output_path = OUTPUT_DIR / image_path.name
-
-        cv2.imwrite(str(raw_output_path), raw_edges)
         cv2.imwrite(str(cleaned_output_path), cleaned_edges)
+        roi_output_file = ""
 
-        if selected_output == "raw":
-            cv2.imwrite(str(selected_output_path), raw_edges)
-        else:
-            cv2.imwrite(str(selected_output_path), cleaned_edges)
+        for variant in saved_test_variants:
+            variant_input_image = load_variant_input_image(image_path.name, variant)
+            variant_raw_edges, variant_cleaned_edges, _, _, variant_selected_output = render_edges_for_config(
+                variant_input_image,
+                variant["step_config"],
+            )
+
+            variant_output_path = variant["output_dir"] / image_path.name
+            variant_output = (
+                variant_raw_edges
+                if variant_selected_output == "raw"
+                else variant_cleaned_edges
+            )
+
+            cv2.imwrite(str(variant_output_path), variant_output)
+            if variant["name"] == "roi_edges":
+                roi_output_file = str(variant_output_path.relative_to(PROJECT_ROOT))
 
         height, width = input_image.shape[:2]
 
         metadata_row = {
             "source_file": str(image_path.relative_to(PROJECT_ROOT)),
-            "raw_output_file": str(raw_output_path.relative_to(PROJECT_ROOT)),
             "cleaned_output_file": str(cleaned_output_path.relative_to(PROJECT_ROOT)),
-            "selected_output_file": str(selected_output_path.relative_to(PROJECT_ROOT)),
+            "roi_output_file": roi_output_file,
             "width": width,
             "height": height,
             "processing_step": "03_edge_detection",
             "input_from_step_02": SELECTED_STEP_02_OUTPUT,
-            "selected_output": selected_output,
             "canny_mode": canny_mode,
             "threshold_1": threshold_1,
             "threshold_2": threshold_2,
@@ -592,9 +743,9 @@ def main() -> None:
 
     print()
     print("Done.")
-    print(f"Raw edges saved to: {RAW_DIR}")
     print(f"Cleaned edges saved to: {CLEANED_DIR}")
-    print(f"Selected edges saved to: {OUTPUT_DIR}")
+    for variant in saved_test_variants:
+        print(f"Saved test variant {variant['name']}: {variant['output_dir']}")
     print(f"Metadata saved to: {CSV_PATH}")
 
 

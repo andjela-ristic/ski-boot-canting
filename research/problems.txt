@@ -20,3 +20,5 @@ kruga, njoj ce se dodeliti poen koji odredjuje prioritet linije. ti poeni ce na 
 - veliki problem predstavlja i limitirani test krug od 10 slika. sve trenutne cizme su istog brenda, a ukupno imamo dva modela po dve
 cizme (leva i desna). kada se promeni brend cizme, postoji mogucnost da logika sa krugovima nece vise imati smisla, i morace da postoji 
 drugacija fallback logika za odredjivanje prioriteta linije.
+
+- dilacija i erozija ne rade dovoljno dobar posao
