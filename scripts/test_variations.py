@@ -2,6 +2,7 @@ from pathlib import Path
 import sys
 import argparse
 import itertools
+import re
 
 import cv2
 import numpy as np
@@ -23,6 +24,8 @@ PROCESSED_DIR = PROJECT_ROOT / PATHS_CONFIG["processed_dir"]
 
 
 MAX_IMAGES_PER_WINDOW = 6
+MAX_PAGE_WIDTH = 1600
+SAVED_TEST_WINDOWS_DIR = PROJECT_ROOT / "data" / "test"
 
 
 def set_config(config_path: str | None) -> None:
@@ -58,6 +61,10 @@ def resolve_image_path(step: int, image_name: str) -> Path:
         step_config = CONFIG["step_06_detect_boot_landmarks"]
         image_path = PROCESSED_DIR / step_config["input_visual_subdir"] / image_name
 
+    elif step == 7:
+        step_config = CONFIG["step_07_complete_line_fragments"]
+        image_path = PROCESSED_DIR / step_config["input_visual_subdir"] / image_name
+
     else:
         raise ValueError(f"Unsupported step: {step}")
 
@@ -77,6 +84,31 @@ def resize_for_display(image: np.ndarray, max_height: int = 520) -> np.ndarray:
     new_height = int(height * scale)
 
     return cv2.resize(image, (new_width, new_height), interpolation=cv2.INTER_AREA)
+
+
+def scale_to_fit(image: np.ndarray, max_width: int, max_height: int) -> np.ndarray:
+    height, width = image.shape[:2]
+
+    if width <= max_width and height <= max_height:
+        return image
+
+    scale = min(max_width / max(1, width), max_height / max(1, height))
+    new_width = max(1, int(width * scale))
+    new_height = max(1, int(height * scale))
+
+    return cv2.resize(image, (new_width, new_height), interpolation=cv2.INTER_AREA)
+
+
+def scale_image(image: np.ndarray, zoom_factor: float) -> np.ndarray:
+    if abs(zoom_factor - 1.0) < 1e-6:
+        return image
+
+    height, width = image.shape[:2]
+    new_width = max(1, int(width * zoom_factor))
+    new_height = max(1, int(height * zoom_factor))
+
+    interpolation = cv2.INTER_LINEAR if zoom_factor >= 1.0 else cv2.INTER_AREA
+    return cv2.resize(image, (new_width, new_height), interpolation=interpolation)
 
 def to_bgr(image: np.ndarray) -> np.ndarray:
     if len(image.shape) == 2:
@@ -123,7 +155,40 @@ def pad_to_size(image: np.ndarray, width: int, height: int) -> np.ndarray:
 
     return padded
 
-def make_grid(images: list[tuple[str, np.ndarray]]) -> np.ndarray:
+
+def safe_filename(value: str) -> str:
+    value = value.replace("|", "_")
+    value = re.sub(r"[^A-Za-z0-9_. -]+", "_", value)
+    value = re.sub(r"\s+", "_", value.strip())
+    value = re.sub(r"_+", "_", value)
+    return value.strip("_")
+
+
+def test_image_output_dir(image_path: Path) -> Path:
+    digits = "".join(ch for ch in image_path.stem if ch.isdigit())
+    suffix = digits[-3:] if len(digits) >= 3 else (digits or image_path.stem)
+    return SAVED_TEST_WINDOWS_DIR / f"test_{suffix}"
+
+
+def save_labeled_results(output_dir: Path, results: list[tuple[str, np.ndarray]]) -> None:
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    for index, (label, image) in enumerate(results, start=1):
+        labeled = add_label(image, label)
+        filename = f"{index:02d}__{safe_filename(label)}.png"
+        output_path = output_dir / filename
+
+        ok = cv2.imwrite(str(output_path), labeled)
+        if not ok:
+            raise RuntimeError(f"Could not save result: {output_path}")
+
+        print(f"Saved: {output_path}")
+
+def make_grid(
+    images: list[tuple[str, np.ndarray]],
+    images_per_window: int = MAX_IMAGES_PER_WINDOW,
+    columns: int = 3,
+) -> np.ndarray:
     prepared_images = []
 
     for label, image in images:
@@ -139,35 +204,57 @@ def make_grid(images: list[tuple[str, np.ndarray]]) -> np.ndarray:
         for image in prepared_images
     ]
 
-    while len(padded_images) < MAX_IMAGES_PER_WINDOW:
+    while len(padded_images) < images_per_window:
         empty = np.full((max_height, max_width, 3), 245, dtype=np.uint8)
         padded_images.append(empty)
 
-    row_1 = np.hstack(padded_images[:3])
-    row_2 = np.hstack(padded_images[3:6])
+    columns = max(1, min(columns, images_per_window))
+    rows = []
+    for row_start in range(0, images_per_window, columns):
+        row_images = padded_images[row_start:row_start + columns]
+        if len(row_images) < columns:
+            empty = np.full((max_height, max_width, 3), 245, dtype=np.uint8)
+            while len(row_images) < columns:
+                row_images.append(empty)
+        rows.append(np.hstack(row_images))
 
-    grid = np.vstack([row_1, row_2])
+    grid = rows[0] if len(rows) == 1 else np.vstack(rows)
 
     return grid
 
 def show_variation_pages(
     title_prefix: str,
-    results: list[tuple[str, np.ndarray]]
+    results: list[tuple[str, np.ndarray]],
+    images_per_window: int = MAX_IMAGES_PER_WINDOW,
+    columns: int = 3,
+    fit_to_screen: bool = False,
+    initial_zoom: float = 1.0,
 ) -> None:
     if not results:
         print("No results to display.")
         return
 
-    total_pages = (len(results) + MAX_IMAGES_PER_WINDOW - 1) // MAX_IMAGES_PER_WINDOW
+    total_pages = (len(results) + images_per_window - 1) // images_per_window
 
     page_index = 0
+    zoom_factor = max(0.25, float(initial_zoom))
 
     while page_index < total_pages:
-        start = page_index * MAX_IMAGES_PER_WINDOW
-        end = start + MAX_IMAGES_PER_WINDOW
+        start = page_index * images_per_window
+        end = start + images_per_window
 
         page_results = results[start:end]
-        grid = make_grid(page_results)
+        grid = make_grid(
+            page_results,
+            images_per_window=images_per_window,
+            columns=columns,
+        )
+
+        if fit_to_screen:
+            max_height = int(DISPLAY_CONFIG.get("max_height", 800))
+            grid = scale_to_fit(grid, max_width=MAX_PAGE_WIDTH, max_height=max_height)
+
+        grid = scale_image(grid, zoom_factor)
 
         title = f"{title_prefix} | page {page_index + 1}/{total_pages}"
 
@@ -177,7 +264,10 @@ def show_variation_pages(
         print(f"Showing page {page_index + 1}/{total_pages}")
         print("SPACE / ENTER / n -> next page")
         print("b / LEFT          -> previous page")
+        print("+ / =             -> zoom in")
+        print("- / _             -> zoom out")
         print("q / ESC           -> quit")
+        print(f"zoom={zoom_factor:.2f}x")
         print()
 
         key = cv2.waitKey(0) & 0xFF
@@ -189,6 +279,16 @@ def show_variation_pages(
 
         if key in [ord("q"), 27]:
             break
+
+        if key in [ord("+"), ord("=")]:
+            zoom_factor = min(4.0, zoom_factor * 1.25)
+            page_index = page_index
+            continue
+
+        if key in [ord("-"), ord("_")]:
+            zoom_factor = max(0.25, zoom_factor / 1.25)
+            page_index = page_index
+            continue
 
         if key in [ord("b"), 81]:
             page_index = max(0, page_index - 1)
@@ -540,6 +640,25 @@ def load_step_06_module():
 
     return module
 
+def load_step_07_module():
+    module_path = PROJECT_ROOT / "pipeline" / "07_complete_line_fragments.py"
+
+    if not module_path.exists():
+        raise FileNotFoundError(f"Step 07 file not found: {module_path}")
+
+    spec = importlib.util.spec_from_file_location(
+        "step07_complete_fragments",
+        str(module_path)
+    )
+
+    if spec is None or spec.loader is None:
+        raise ImportError(f"Could not load module from: {module_path}")
+
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    return module
+
 def run_step_06_single_preset(
     lm,
     image_path: Path,
@@ -629,6 +748,139 @@ def run_step_06_variations(image_path: Path) -> None:
         results=results
     )
 
+def collect_step_07_test_presets(
+    current_value,
+    test_values,
+    path: tuple[str, ...],
+    presets: list[dict],
+) -> None:
+    for test_value in test_values:
+        if test_value == current_value:
+            continue
+
+        override = current = {}
+
+        for key in path[:-1]:
+            next_level = {}
+            current[key] = next_level
+            current = next_level
+
+        current[path[-1]] = copy.deepcopy(test_value)
+
+        presets.append(
+            {
+                "name": f"{'.'.join(path)}={test_value}",
+                "override": override,
+            }
+        )
+
+def build_step_07_presets() -> list[dict]:
+    step_config = CONFIG["step_07_complete_line_fragments"]
+    explicit_presets = step_config.get("test_presets", [])
+
+    if explicit_presets:
+        presets = []
+
+        for preset in explicit_presets:
+            preset_copy = copy.deepcopy(preset)
+            preset_copy.setdefault("override", {})
+            presets.append(preset_copy)
+
+        return presets
+
+    presets = [{"name": "default", "override": {}}]
+
+    def walk(node: dict, path: tuple[str, ...] = ()) -> None:
+        for key, value in node.items():
+            if isinstance(value, dict):
+                walk(value, path + (key,))
+                continue
+
+            if not key.endswith("_test_values"):
+                continue
+
+            base_key = key.removesuffix("_test_values")
+            if base_key not in node:
+                continue
+
+            collect_step_07_test_presets(
+                current_value=node[base_key],
+                test_values=value,
+                path=path + (base_key,),
+                presets=presets
+            )
+
+    walk(step_config)
+
+    return presets
+
+def run_step_07_single_preset(
+    lm,
+    image_path: Path,
+    preset: dict,
+) -> tuple[str, np.ndarray]:
+    base_step_config = CONFIG["step_07_complete_line_fragments"]
+    preset_name = str(preset.get("name", "unnamed variation"))
+    override = copy.deepcopy(preset.get("override", {}))
+
+    lm.STEP = deep_merge_dict(base_step_config, override)
+
+    visual = cv2.imread(str(image_path))
+
+    if visual is None:
+        raise ValueError(f"Could not read image: {image_path}")
+
+    h, w = visual.shape[:2]
+    edge = lm.load_edge(image_path, visual)
+    raw_mask, _ = lm.load_roi_mask(image_path.name, (h, w))
+    outer_mask = lm.dilate_mask(raw_mask)
+    hough_mask = lm.make_inner_mask(raw_mask)
+    masked_edge = cv2.bitwise_and(edge, edge, mask=hough_mask)
+
+    raw_hough_lines = lm.detect_hough_lines(masked_edge)
+
+    all_fragments = []
+    for idx, line in enumerate(raw_hough_lines, start=1):
+        fragment = lm.make_fragment(idx, line, outer_mask)
+        if fragment is not None:
+            all_fragments.append(fragment)
+
+    mask_supported = lm.filter_mask_supported(all_fragments)
+    vertical = lm.filter_vertical(mask_supported)
+    groups = lm.merge_groups(vertical)
+    completed = [
+        lm.build_completed_line(idx, group, outer_mask, edge)
+        for idx, group in enumerate(groups, start=1)
+    ]
+    completed.sort(key=lambda item: item.support_score, reverse=True)
+
+    completed_overlay = lm.draw_completed(visual, completed, vertical)
+
+    label = (
+        f"{preset_name} | "
+        f"h={len(raw_hough_lines)} f={len(all_fragments)} "
+        f"v={len(vertical)} c={len(completed)}"
+    )
+
+    return label, completed_overlay
+
+def run_step_07_variations(image_path: Path) -> None:
+    presets = build_step_07_presets()
+    lm = load_step_07_module()
+
+    results = []
+
+    for preset in presets:
+        label, panel = run_step_07_single_preset(
+            lm=lm,
+            image_path=image_path,
+            preset=preset
+        )
+        results.append((label, panel))
+
+    output_dir = test_image_output_dir(image_path)
+    save_labeled_results(output_dir=output_dir, results=results)
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Visually test all configured parameter variations for one step and one image."
@@ -672,7 +924,10 @@ def main() -> None:
     print(f"Step:  {args.step}")
     print(f"Image: {image_path}")
     print(f"Config: {args.config or 'config/pipeline_config.yaml'}")
-    print("No files will be saved.")
+    if args.step == 7:
+        print(f"Step 7 results will be saved to: {test_image_output_dir(image_path)}")
+    else:
+        print("No files will be saved.")
     print()
 
     if args.step == 1:

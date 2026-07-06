@@ -62,6 +62,8 @@ class Transform:
 @dataclass
 class CompletedLine:
     id: str
+    source: str
+    synthetic: bool
     a: float
     b: float
     x1: float
@@ -81,7 +83,10 @@ class CompletedLine:
     total_angle_adjust_deg: float
     max_angle_adjust_deg: float
     edge_support: float
+    mask_coverage: float
     support_score: float
+    offset_px: float
+    angle_offset_deg: float
     transforms: list[dict[str, Any]]
 
 
@@ -547,6 +552,12 @@ def completed_line_endpoints(
     return x1, y1, x2, y2
 
 
+def line_mask_coverage(mask: np.ndarray, a: float, b: float, y1: float, y2: float) -> float:
+    x1 = x_at_y(a, b, y1)
+    x2 = x_at_y(a, b, y2)
+    return segment_mask_coverage(mask, x1, y1, x2, y2)
+
+
 def edge_support_along_line(edge: np.ndarray, x1: float, y1: float, x2: float, y2: float) -> float:
     length = max(1.0, line_length(x1, y1, x2, y2))
     samples = max(20, int(round(length / 3.0)))
@@ -626,6 +637,7 @@ def build_completed_line(idx: int, group: list[Fragment], mask: np.ndarray, edge
     total_original_length = float(sum(f.length for f in group))
     completed_length = float(line_length(x1, y1, x2, y2))
     edge_support = edge_support_along_line(edge, x1, y1, x2, y2)
+    mask_coverage = line_mask_coverage(mask, a, b, y1, y2)
 
     mask_h = max(1.0, float(mask.shape[0]))
     length_score = min(1.0, total_original_length / mask_h)
@@ -655,6 +667,8 @@ def build_completed_line(idx: int, group: list[Fragment], mask: np.ndarray, edge
 
     return CompletedLine(
         id=f"completed_line_{idx:03d}",
+        source="hough_merge",
+        synthetic=False,
         a=float(a),
         b=float(b),
         x1=float(x1),
@@ -674,9 +688,154 @@ def build_completed_line(idx: int, group: list[Fragment], mask: np.ndarray, edge
         total_angle_adjust_deg=float(total_angle_adjust),
         max_angle_adjust_deg=float(max_angle_adjust),
         edge_support=float(edge_support),
+        mask_coverage=float(mask_coverage),
         support_score=float(support_score),
+        offset_px=0.0,
+        angle_offset_deg=0.0,
         transforms=[asdict(t) for t in transforms],
     )
+
+
+def synthetic_mask_source_mask(raw_mask: np.ndarray, outer_mask: np.ndarray, hough_mask: np.ndarray) -> np.ndarray:
+    source_name = str(cfg("synthetic_centerlines", "source_mask", default="hough_mask")).lower()
+    if source_name == "outer_mask":
+        return outer_mask
+    if source_name == "raw_mask":
+        return raw_mask
+    return hough_mask
+
+
+def fit_mask_centerline(mask: np.ndarray) -> tuple[float, float] | None:
+    min_row_width = int(cfg("synthetic_centerlines", "min_row_width_px", default=40))
+    sample_step = max(1, int(cfg("synthetic_centerlines", "sample_step_px", default=5)))
+
+    h, _ = mask.shape[:2]
+    points: list[tuple[float, float, float]] = []
+
+    for y in range(0, h, sample_step):
+        xs = np.flatnonzero(mask[y] > 0)
+        if xs.size == 0:
+            continue
+
+        left = float(xs[0])
+        right = float(xs[-1])
+        row_width = right - left
+        if row_width < min_row_width:
+            continue
+
+        x_center = (left + right) / 2.0
+        points.append((x_center, float(y), max(1.0, row_width)))
+
+    if len(points) < 2:
+        return None
+
+    return fit_x_as_function_of_y(points)
+
+
+def apply_angle_offset(base_a: float, angle_offset_deg: float) -> float:
+    theta = math.atan(base_a)
+    return float(math.tan(theta + math.radians(angle_offset_deg)))
+
+
+def build_synthetic_completed_line(
+    idx: int,
+    base_a: float,
+    base_b: float,
+    offset_px: float,
+    angle_offset_deg: float,
+    mask: np.ndarray,
+    edge: np.ndarray,
+) -> CompletedLine | None:
+    a = apply_angle_offset(base_a, angle_offset_deg)
+    b = float(base_b + offset_px)
+
+    y1, y2 = 0.0, float(mask.shape[0] - 1)
+    if bool(cfg("extension", "extend_to_mask_bounds", default=True)):
+        _, mask_y1, _, mask_y2 = mask_bbox(mask)
+        pad = float(cfg("extension", "extend_padding_px", default=20))
+        y1 = max(0.0, float(mask_y1) - pad)
+        y2 = min(float(mask.shape[0] - 1), float(mask_y2) + pad)
+
+    x1 = float(np.clip(x_at_y(a, b, y1), 0, mask.shape[1] - 1))
+    x2 = float(np.clip(x_at_y(a, b, y2), 0, mask.shape[1] - 1))
+
+    mask_coverage = line_mask_coverage(mask, a, b, y1, y2)
+    if bool(cfg("synthetic_centerlines", "keep_only_inside_mask", default=True)):
+        min_mask_coverage = float(cfg("synthetic_centerlines", "min_mask_coverage", default=0.60))
+        if mask_coverage < min_mask_coverage:
+            return None
+
+    edge_support = edge_support_along_line(edge, x1, y1, x2, y2)
+    completed_length = float(line_length(x1, y1, x2, y2))
+    mask_h = max(1.0, float(mask.shape[0]))
+    length_score = min(1.0, completed_length / mask_h)
+    base_support = float(cfg("synthetic_centerlines", "support_score", default=0.25))
+    edge_bonus_weight = float(cfg("synthetic_centerlines", "edge_bonus_weight", default=0.10))
+    coverage_bonus_weight = float(cfg("synthetic_centerlines", "coverage_bonus_weight", default=0.05))
+    support_score = base_support + edge_bonus_weight * edge_support + coverage_bonus_weight * mask_coverage
+
+    return CompletedLine(
+        id=f"synthetic_centerline_{idx:03d}",
+        source="mask_centerline",
+        synthetic=True,
+        a=float(a),
+        b=float(b),
+        x1=float(x1),
+        y1=float(y1),
+        x2=float(x2),
+        y2=float(y2),
+        theta_deviation_from_vertical_deg=float(angle_deviation_from_vertical(a)),
+        fragment_ids=[],
+        fragment_count=0,
+        total_original_length=0.0,
+        completed_length=float(completed_length),
+        y_min_original=float(y1),
+        y_max_original=float(y2),
+        max_gap_filled_px=0.0,
+        total_shift_px=0.0,
+        max_shift_px=0.0,
+        total_angle_adjust_deg=0.0,
+        max_angle_adjust_deg=0.0,
+        edge_support=float(edge_support),
+        mask_coverage=float(mask_coverage),
+        support_score=float(support_score + 0.05 * length_score),
+        offset_px=float(offset_px),
+        angle_offset_deg=float(angle_offset_deg),
+        transforms=[],
+    )
+
+
+def generate_synthetic_centerlines(raw_mask: np.ndarray, outer_mask: np.ndarray, hough_mask: np.ndarray, edge: np.ndarray) -> list[CompletedLine]:
+    if not bool(cfg("synthetic_centerlines", "enabled", default=False)):
+        return []
+
+    source_mask = synthetic_mask_source_mask(raw_mask, outer_mask, hough_mask)
+    fitted = fit_mask_centerline(source_mask)
+    if fitted is None:
+        return []
+
+    base_a, base_b = fitted
+    offsets = cfg("synthetic_centerlines", "offsets_px", default=[-30, -15, 0, 15, 30])
+    angle_offsets = cfg("synthetic_centerlines", "angle_offsets_degrees", default=[0.0])
+
+    candidates: list[CompletedLine] = []
+    idx = 1
+    for angle_offset in angle_offsets:
+        for offset in offsets:
+            candidate = build_synthetic_completed_line(
+                idx=idx,
+                base_a=float(base_a),
+                base_b=float(base_b),
+                offset_px=float(offset),
+                angle_offset_deg=float(angle_offset),
+                mask=outer_mask,
+                edge=edge,
+            )
+            if candidate is not None:
+                candidates.append(candidate)
+                idx += 1
+
+    return candidates
 
 
 def draw_fragments(
@@ -724,9 +883,10 @@ def draw_completed(
         lines_to_draw = completed
 
     for line in lines_to_draw:
+        is_synthetic = bool(line.synthetic)
         color_original = (255, 120, 0)
         color_extension = (0, 255, 255)
-        color_completed = (0, 255, 0)
+        color_completed = (180, 80, 255) if is_synthetic else (0, 255, 0)
 
         p1 = (int(round(line.x1)), int(round(line.y1)))
         p2 = (int(round(line.x2)), int(round(line.y2)))
@@ -737,7 +897,7 @@ def draw_completed(
         top_x = x_at_y(line.a, line.b, top_y)
         bottom_x = x_at_y(line.a, line.b, bottom_y)
 
-        if abs(top_y - line.y1) > 3:
+        if not is_synthetic and abs(top_y - line.y1) > 3:
             cv2.line(
                 out,
                 p1,
@@ -747,7 +907,7 @@ def draw_completed(
                 cv2.LINE_AA,
             )
 
-        if abs(line.y2 - bottom_y) > 3:
+        if not is_synthetic and abs(line.y2 - bottom_y) > 3:
             cv2.line(
                 out,
                 (int(round(bottom_x)), int(round(bottom_y))),
@@ -771,7 +931,8 @@ def draw_completed(
                 cv2.LINE_AA,
             )
 
-        label = f"{line.id.replace('completed_line_', 'L')} s={line.support_score:.2f} n={line.fragment_count}"
+        label_id = line.id.replace("completed_line_", "L").replace("synthetic_centerline_", "S")
+        label = f"{label_id} s={line.support_score:.2f} n={line.fragment_count}"
         cv2.putText(
             out,
             label,
@@ -783,7 +944,7 @@ def draw_completed(
             cv2.LINE_AA,
         )
 
-    title = "completed lines: blue=real fragments, yellow=extension, green=hypothesis"
+    title = "completed lines: blue=real fragments, yellow=extension, green=hough, pink=synthetic center"
     if 0 < max_draw < len(completed):
         title = f"{title} (top {max_draw}/{len(completed)})"
 
@@ -893,15 +1054,26 @@ def process_image(image_path: Path, show: bool) -> tuple[list[dict[str, Any]], b
 
     groups = merge_groups(vertical)
 
-    completed = [
+    hough_completed = [
         build_completed_line(idx, group, outer_mask, edge)
         for idx, group in enumerate(groups, start=1)
     ]
+    synthetic = generate_synthetic_centerlines(raw_mask, outer_mask, hough_mask, edge)
 
-    completed.sort(key=lambda item: item.support_score, reverse=True)
+    hough_completed.sort(key=lambda item: item.support_score, reverse=True)
+    synthetic.sort(key=lambda item: item.support_score, reverse=True)
 
     max_total = int(cfg("hypotheses", "max_total_hypotheses", default=100))
-    completed = completed[:max_total]
+    min_keep_synthetic = int(cfg("synthetic_centerlines", "min_keep_after_ranking", default=3))
+
+    if max_total > 0:
+        kept_synthetic = synthetic[:min(max(0, min_keep_synthetic), len(synthetic), max_total)]
+        remaining_slots = max(0, max_total - len(kept_synthetic))
+        completed = hough_completed[:remaining_slots] + kept_synthetic
+    else:
+        completed = hough_completed + synthetic
+
+    completed.sort(key=lambda item: item.support_score, reverse=True)
 
     original_overlay = draw_fragments(visual, all_fragments, "all Hough fragments inside masked edge", (255, 160, 0))
     masked_overlay = draw_fragments(visual, mask_supported, "mask-supported fragments", (0, 220, 255))
@@ -928,11 +1100,13 @@ def process_image(image_path: Path, show: bool) -> tuple[list[dict[str, Any]], b
                 "all_fragments_after_min_length": len(all_fragments),
                 "mask_supported_fragments": len(mask_supported),
                 "vertical_fragments": len(vertical),
+                "synthetic_centerlines": len(synthetic),
                 "completed_lines": len(completed),
             },
             "all_fragments": [asdict(f) for f in all_fragments],
             "mask_supported_fragments": [f.id for f in mask_supported],
             "vertical_fragments": [f.id for f in vertical],
+            "synthetic_centerlines": [asdict(c) for c in synthetic],
             "completed_lines": [asdict(c) for c in completed],
         },
     )
@@ -950,6 +1124,8 @@ def process_image(image_path: Path, show: bool) -> tuple[list[dict[str, Any]], b
                     "vertical_fragments": len(vertical),
                     "completed_lines": len(completed),
                     "line_id": line.id,
+                    "source": line.source,
+                    "synthetic": line.synthetic,
                     "fragment_count": line.fragment_count,
                     "fragment_ids": "|".join(line.fragment_ids),
                     "x1": round(line.x1, 3),
@@ -965,7 +1141,10 @@ def process_image(image_path: Path, show: bool) -> tuple[list[dict[str, Any]], b
                     "total_angle_adjust_deg": round(line.total_angle_adjust_deg, 3),
                     "max_angle_adjust_deg": round(line.max_angle_adjust_deg, 3),
                     "edge_support": round(line.edge_support, 4),
+                    "mask_coverage": round(line.mask_coverage, 4),
                     "support_score": round(line.support_score, 4),
+                    "offset_px": round(line.offset_px, 3),
+                    "angle_offset_deg": round(line.angle_offset_deg, 3),
                 }
             )
     else:
@@ -979,6 +1158,8 @@ def process_image(image_path: Path, show: bool) -> tuple[list[dict[str, Any]], b
                 "vertical_fragments": len(vertical),
                 "completed_lines": 0,
                 "line_id": "",
+                "source": "",
+                "synthetic": "",
                 "fragment_count": "",
                 "fragment_ids": "",
                 "x1": "",
@@ -994,7 +1175,10 @@ def process_image(image_path: Path, show: bool) -> tuple[list[dict[str, Any]], b
                 "total_angle_adjust_deg": "",
                 "max_angle_adjust_deg": "",
                 "edge_support": "",
+                "mask_coverage": "",
                 "support_score": "",
+                "offset_px": "",
+                "angle_offset_deg": "",
             }
         )
 
@@ -1004,6 +1188,7 @@ def process_image(image_path: Path, show: bool) -> tuple[list[dict[str, Any]], b
         f"fragments={len(all_fragments)} "
         f"mask={len(mask_supported)} "
         f"vertical={len(vertical)} "
+        f"synthetic={len(synthetic)} "
         f"completed={len(completed)}"
     )
 
@@ -1044,6 +1229,8 @@ def save_metadata(rows: list[dict[str, Any]]) -> None:
         "vertical_fragments",
         "completed_lines",
         "line_id",
+        "source",
+        "synthetic",
         "fragment_count",
         "fragment_ids",
         "x1",
@@ -1059,7 +1246,10 @@ def save_metadata(rows: list[dict[str, Any]]) -> None:
         "total_angle_adjust_deg",
         "max_angle_adjust_deg",
         "edge_support",
+        "mask_coverage",
         "support_score",
+        "offset_px",
+        "angle_offset_deg",
     ]
 
     rows = sorted(rows, key=lambda r: (str(r["source_file"]), str(r["line_id"])))

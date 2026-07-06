@@ -1,0 +1,115 @@
+extends: "pipeline_config.yaml"
+
+step_07_complete_line_fragments:
+  test_presets:
+    - name: "baseline.threshold_45"
+      override: {}
+
+    - name: "threshold_45.min_len_70"
+      override:
+        hough_lines_p:
+          min_line_length: 70
+
+    - name: "threshold_45.merge_gap_90"
+      override:
+        merge:
+          max_gap_px: 90
+
+    - name: "threshold_45.merge_gap_120"
+      override:
+        merge:
+          max_gap_px: 120
+
+    - name: "threshold_45.shift_14"
+      override:
+        merge:
+          shift:
+            max_parallel_shift_px: 14
+
+    - name: "threshold_45.rotate_2.0"
+      override:
+        merge:
+          rotate:
+            max_angle_adjust_degrees: 2.0
+
+    - name: "threshold_45.min_len_70.merge_gap_90"
+      override:
+        hough_lines_p:
+          min_line_length: 70
+        merge:
+          max_gap_px: 90
+
+    - name: "threshold_45.min_len_70.merge_gap_120"
+      override:
+        hough_lines_p:
+          min_line_length: 70
+        merge:
+          max_gap_px: 120
+
+    - name: "threshold_45.min_len_70.shift_14"
+      override:
+        hough_lines_p:
+          min_line_length: 70
+        merge:
+          shift:
+            max_parallel_shift_px: 14
+
+    - name: "threshold_45.min_len_70.rotate_2.0"
+      override:
+        hough_lines_p:
+          min_line_length: 70
+        merge:
+          rotate:
+            max_angle_adjust_degrees: 2.0
+
+    - name: "threshold_45.merge_gap_90.shift_14"
+      override:
+        merge:
+          max_gap_px: 90
+          shift:
+            max_parallel_shift_px: 14
+
+    - name: "threshold_45.merge_gap_90.rotate_2.0"
+      override:
+        merge:
+          max_gap_px: 90
+          rotate:
+            max_angle_adjust_degrees: 2.0
+
+    - name: "threshold_45.min_len_70.merge_gap_90.shift_14"
+      override:
+        hough_lines_p:
+          min_line_length: 70
+        merge:
+          max_gap_px: 90
+          shift:
+            max_parallel_shift_px: 14
+
+    - name: "threshold_45.min_len_70.merge_gap_90.rotate_2.0"
+      override:
+        hough_lines_p:
+          min_line_length: 70
+        merge:
+          max_gap_px: 90
+          rotate:
+            max_angle_adjust_degrees: 2.0
+
+    - name: "threshold_45.min_len_70.merge_gap_120.shift_14"
+      override:
+        hough_lines_p:
+          min_line_length: 70
+        merge:
+          max_gap_px: 120
+          shift:
+            max_parallel_shift_px: 14
+
+    - name: "threshold_45.min_len_70.merge_gap_90.shift_14.rotate_2.0"
+      override:
+        hough_lines_p:
+          min_line_length: 70
+        merge:
+          max_gap_px: 90
+          shift:
+            max_parallel_shift_px: 14
+          rotate:
+            max_angle_adjust_degrees: 2.0

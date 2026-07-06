@@ -206,7 +206,7 @@ step_07_complete_line_fragments:
   hough_lines_p:
     rho: 1
     theta_divisor: 180
-    threshold: 55
+    threshold: 45
     threshold_test_values: [40, 45, 50]
 
     min_line_length: 80
@@ -252,6 +252,20 @@ step_07_complete_line_fragments:
 
   scoring:
     edge_support_radius_px: 2
+
+  synthetic_centerlines:
+    enabled: true
+    source_mask: "hough_mask"
+    min_row_width_px: 40
+    sample_step_px: 5
+    offsets_px: [-30, -15, 0, 15, 30]
+    angle_offsets_degrees: [0.0]
+    keep_only_inside_mask: true
+    min_mask_coverage: 0.60
+    min_keep_after_ranking: 3
+    support_score: 0.25
+    edge_bonus_weight: 0.10
+    coverage_bonus_weight: 0.05
 
   hypotheses:
     keep_single_fragments: true
