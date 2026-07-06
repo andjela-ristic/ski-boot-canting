@@ -54,12 +54,12 @@ def resolve_image_path(step: int, image_name: str) -> Path:
         image_path = step_02_output_dir / selected_step_02_output / image_name
 
     elif step == 4:
-            step_03_config = CONFIG["step_03_edge_detection"]
-            image_path = PROCESSED_DIR / step_03_config["output_subdir"] / image_name
+        step_03_config = CONFIG["step_03_edge_detection"]
+        image_path = PROCESSED_DIR / step_03_config["output_subdir"] / image_name
 
-    elif step == 6:
-        step_config = CONFIG["step_06_detect_boot_landmarks"]
-        image_path = PROCESSED_DIR / step_config["input_visual_subdir"] / image_name
+    elif step == 14:
+        step_14_config = CONFIG["step_14_debug_hough_lines"]
+        image_path = PROCESSED_DIR / step_14_config["input_visual_subdir"] / image_name
 
     elif step == 7:
         step_config = CONFIG["step_07_complete_line_fragments"]
@@ -553,8 +553,8 @@ def draw_hough_lines_for_test(
 
     return overlay
 
-def run_step_04_variations(image_path: Path) -> None:
-    step_config = CONFIG["step_04_line_detection_hough"]
+def run_step_14_variations(image_path: Path) -> None:
+    step_config = CONFIG["step_14_debug_hough_lines"]
 
     hough_config = step_config["hough_lines_p"]
     classification_config = step_config["classification"]
@@ -603,7 +603,7 @@ def run_step_04_variations(image_path: Path) -> None:
         results.append((label, overlay))
 
     show_variation_pages(
-        title_prefix=f"Step 04 Hough variations | {image_path.name}",
+        title_prefix=f"Step 14 Debug Hough lines | {image_path.name}",
         results=results
     )
 
@@ -890,8 +890,8 @@ def parse_args() -> argparse.Namespace:
         "--step",
         type=int,
         required=True,
-        choices=[1, 2, 3, 4, 6, 7],
-        help="Pipeline step to test. Supported: 1, 2, 3, 4, 6, 7."
+        choices=[1, 2, 3, 14, 6, 7],
+        help="Pipeline step to test. Supported: 1, 2, 3, 14, 6, 7."
     )
 
     parser.add_argument(
@@ -939,8 +939,8 @@ def main() -> None:
     elif args.step == 3:
         run_step_03_variations(image_path)
     
-    elif args.step == 4:
-        run_step_04_variations(image_path)
+    elif args.step == 14:
+        run_step_14_variations(image_path)
 
     elif args.step == 6:
         run_step_06_variations(image_path)
@@ -954,3 +954,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+

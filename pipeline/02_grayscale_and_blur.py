@@ -70,7 +70,7 @@ def add_label(image: np.ndarray, label: str) -> np.ndarray:
         (0, 0),
         (image.shape[1], 45),
         (0, 0, 0),
-        thickness=-1
+        thickness=-1,
     )
 
     cv2.putText(
@@ -81,7 +81,7 @@ def add_label(image: np.ndarray, label: str) -> np.ndarray:
         0.8,
         (255, 255, 255),
         2,
-        cv2.LINE_AA
+        cv2.LINE_AA,
     )
 
     return image
@@ -121,14 +121,16 @@ def make_comparison_view(
         resized = cv2.resize(
             image,
             (new_width, target_height),
-            interpolation=cv2.INTER_AREA
+            interpolation=cv2.INTER_AREA,
         )
 
         resized_images.append(resized)
 
+    grayscale_method = get_grayscale_method()
+
     labeled_images = [
         add_label(resized_images[0], "01 normalized"),
-        add_label(resized_images[1], "grayscale"),
+        add_label(resized_images[1], f"grayscale: {grayscale_method}"),
         add_label(resized_images[2], "gaussian blur"),
         add_label(resized_images[3], "bilateral filter"),
     ]
@@ -153,8 +155,52 @@ def ensure_odd_kernel_size(value: int) -> int:
     return value
 
 
+def get_grayscale_method() -> str:
+    grayscale_config = STEP_CONFIG.get("grayscale", {})
+    method = grayscale_config.get("method", "bgr2gray")
+
+    return str(method).strip().lower()
+
+
+def convert_to_grayscale(image_bgr: np.ndarray, method: str) -> np.ndarray:
+    """
+    Supported methods:
+
+    bgr2gray:
+        Standard OpenCV luminance-weighted grayscale conversion.
+        This is NOT a simple RGB average.
+
+    lab_l:
+        Uses the L channel from LAB color space.
+        Good for geometry/edge detection because it isolates luminance.
+
+    ycrcb_y:
+        Uses the Y channel from YCrCb color space.
+        Another luminance-based alternative.
+    """
+
+    if method == "bgr2gray":
+        return cv2.cvtColor(image_bgr, cv2.COLOR_BGR2GRAY)
+
+    if method == "lab_l":
+        lab = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2LAB)
+        l_channel, _, _ = cv2.split(lab)
+        return l_channel
+
+    if method == "ycrcb_y":
+        ycrcb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2YCrCb)
+        y_channel, _, _ = cv2.split(ycrcb)
+        return y_channel
+
+    raise ValueError(
+        "Unsupported grayscale method: "
+        f"{method}. Supported: bgr2gray, lab_l, ycrcb_y"
+    )
+
+
 def process_image(image_bgr: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    grayscale = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2GRAY)
+    grayscale_method = get_grayscale_method()
+    grayscale = convert_to_grayscale(image_bgr, grayscale_method)
 
     gaussian_config = STEP_CONFIG["gaussian_blur"]
     gaussian_kernel_size = ensure_odd_kernel_size(
@@ -165,7 +211,7 @@ def process_image(image_bgr: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.nda
     gaussian = cv2.GaussianBlur(
         grayscale,
         (gaussian_kernel_size, gaussian_kernel_size),
-        gaussian_sigma_x
+        gaussian_sigma_x,
     )
 
     bilateral_config = STEP_CONFIG["bilateral_filter"]
@@ -177,7 +223,7 @@ def process_image(image_bgr: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.nda
         grayscale,
         bilateral_diameter,
         bilateral_sigma_color,
-        bilateral_sigma_space
+        bilateral_sigma_space,
     )
 
     return grayscale, gaussian, bilateral
@@ -197,6 +243,7 @@ def save_metadata(rows: list[dict]) -> None:
         "width",
         "height",
         "processing_step",
+        "grayscale_method",
         "gaussian_kernel_size",
         "gaussian_sigma_x",
         "bilateral_diameter",
@@ -226,10 +273,14 @@ def main() -> None:
         print(f"No images found in: {INPUT_DIR}")
         return
 
+    grayscale_method = get_grayscale_method()
+
     gaussian_config = STEP_CONFIG["gaussian_blur"]
     bilateral_config = STEP_CONFIG["bilateral_filter"]
 
-    gaussian_kernel_size = int(gaussian_config["kernel_size"])
+    gaussian_kernel_size = ensure_odd_kernel_size(
+        int(gaussian_config["kernel_size"])
+    )
     gaussian_sigma_x = float(gaussian_config["sigma_x"])
 
     bilateral_diameter = int(bilateral_config["diameter"])
@@ -242,6 +293,7 @@ def main() -> None:
     print("Processing step 02: grayscale and blur")
     print(f"Input:  {INPUT_DIR}")
     print(f"Output: {OUTPUT_DIR}")
+    print(f"Grayscale method: {grayscale_method}")
     print()
     print("Controls:")
     print("  n / SPACE / ENTER  -> next image")
@@ -275,6 +327,7 @@ def main() -> None:
             "width": width,
             "height": height,
             "processing_step": "02_grayscale_and_blur",
+            "grayscale_method": grayscale_method,
             "gaussian_kernel_size": gaussian_kernel_size,
             "gaussian_sigma_x": gaussian_sigma_x,
             "bilateral_diameter": bilateral_diameter,
@@ -289,10 +342,15 @@ def main() -> None:
                 image_bgr,
                 grayscale,
                 gaussian,
-                bilateral
+                bilateral,
             )
 
-            title = f"02 Grayscale and blur | {index}/{len(image_paths)} | {image_path.name}"
+            title = (
+                f"02 Grayscale and blur | "
+                f"{index}/{len(image_paths)} | "
+                f"{image_path.name} | "
+                f"{grayscale_method}"
+            )
 
             cv2.imshow(title, comparison)
 
@@ -313,6 +371,7 @@ def main() -> None:
 
     print()
     print("Done.")
+    print(f"Grayscale method: {grayscale_method}")
     print(f"Grayscale saved to: {GRAYSCALE_DIR}")
     print(f"Gaussian blur saved to: {GAUSSIAN_DIR}")
     print(f"Bilateral filter saved to: {BILATERAL_DIR}")

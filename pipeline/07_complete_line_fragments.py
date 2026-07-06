@@ -30,7 +30,7 @@ OUTPUT_DIR = PROCESSED_DIR / STEP["output_subdir"]
 ORIGINAL_DIR = OUTPUT_DIR / "01_original_hough_fragments"
 MASKED_DIR = OUTPUT_DIR / "02_mask_filtered_fragments"
 VERTICAL_DIR = OUTPUT_DIR / "03_vertical_fragments"
-COMPLETED_DIR = OUTPUT_DIR / "04_completed_lines"
+COMPLETED_DIR = OUTPUT_DIR / "14_debug_hough_lines"
 DEBUG_DIR = OUTPUT_DIR / "debug"
 JSON_DIR = OUTPUT_DIR / "json"
 
@@ -1313,3 +1313,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+

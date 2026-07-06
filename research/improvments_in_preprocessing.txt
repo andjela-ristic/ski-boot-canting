@@ -1,0 +1,85 @@
+Ispitala sam moguca poboljsanja po istrazivanju o soft komjutingu.
+1. Da li da umesto RGB koristimo HSV?
+    - Ne. Jer je HSV dobar kada znamo da ce nam cizma uvek biti crvena, ovako nema poente zakomplikovati nesto sto funkcionise. Osim toga mogu se zbog value izgubiti neke linije.
+    - Medjutim, mozemo da umesto greyscale uvedemo LAB L kanal + CLAHE
+2. Afine transformacije?
+    - Da, ali samo po ovom redosledu:
+        1. nađi boot ROI / masku
+        2. proceni centralnu osu čizme
+        3. izračunaj ugao ose
+        4. rotiraj ROI da osa bude vertikalna
+        5. onda meri canting / landmarke
+    - U suprotnom se moze izgubiti vaznost glavne ose
+3. Otvaranje i zatvaranje za ROI masku (dilacija,erozija)?
+    - Veliko DA!
+    - Morfologija
+    - Pazljivo. edges
+        → dilate / close da spojiš konturu
+        → fill holes / largest contour
+        → opening da ukloniš sitan šum
+        → closing još jednom ako treba
+4. Da li da poboljsavam kontrast? 
+    - Da, ali kontrolisano
+    - Radicemo za:
+        ROI/maska: umereno
+        landmark/šrafovi: možda jače lokalno
+        centralna osa: ne treba previše detalja
+5. HOG
+    - Ne
+6. Da li da ukljucujem segmentaciju?
+    - I da i ne
+    - Potrebno je pazljivo raditi da ne predje u deep learning, pokusati sa OpenCV metodama:
+        edge-based mask
+        largest connected component
+        contour fill
+        morphological closing
+        GrabCut eventualno
+
+Ciljevi:
+| Cilj             | Metoda                                                |
+| ---------------- | ----------------------------------------------------- |
+| Osvetljenje      | LAB L + CLAHE                                         |
+| Edge slika       | Canny nad blur-ovanim L/grayscale                     |
+| ROI maska        | morphology + largest contour + fill                   |
+| Centralna osa    | midpoint po horizontalnim slice-ovima + `cv2.fitLine` |
+| Stabilnija osa   | distance transform ridge + robust fit                 |
+| Najtačnija osa   | symmetry-axis search                                  |
+| Poravnanje slike | affine rotation nakon ose                             |
+| Srafovi          | HoughCircles / contour circularity unutar ROI         |
+| Hough linije     | samo pomocno/debug, ne kao glavna osa                 |
+| HOG              | ne sada                                               |
+| HSV              | ne kao glavni tok                                     |
+
+
+TOK changes:
+Glavni tok:
+    01_illumination_normalization.py
+    02_grayscale_and_blur.py
+    03_edge_detection.py
+    04_detect_boot_roi_mask.py
+    05_estimate_boot_center_axis.py
+    06_detect_landmarks.py
+    07_measure_canting.py
+    08_quality_confidence.py
+Pomocni tok:
+    14_debug_hough_lines.py
+    15_debug_circle_detection.py
+    16_debug_visualize_pipeline.py
+Experimental:
+    21_experiment_hough_centerline.py
+    22_experiment_threshold_mask.py
+    23_experiment_grabcut_mask.py
+
+02 changes:
+    
+03 changes:
+    1. mode: manual / auto_median
+    2. opcioni pre-blur u step 03, ako želiš dodatno peglanje
+    3. raw edges output
+    4. cleaned edges output
+    5. comparison view: input | raw edges | cleaned edges
+    6. metadata za sve parametre
+
+04->14 todo.
+new 04 changes:
+    
