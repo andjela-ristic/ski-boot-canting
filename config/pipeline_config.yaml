@@ -157,3 +157,80 @@ step_04_boot_roi_from_edges:
           close_kernel_size: 59
           dilate_kernel_size: 35
           second_close_kernel_size: 85
+
+step_05_valid_hough_lines_in_roi:
+  enabled: true
+
+  edge_input_subdir: "03_edges/cleaned"
+  roi_mask_subdir: "04_boot_roi_from_edges/mask"
+  output_subdir: "05_valid_hough_lines_in_roi"
+
+  save:
+    debug_images: true
+    metadata_csv: false
+
+  roi:
+    use_inner_mask: true
+    inner_erode_kernel_size: 31
+    inner_erode_kernel_size_test_values: [21, 31, 41]
+    inner_erode_iterations: 1
+    inner_erode_iterations_test_values: [1, 2]
+
+  hough_lines_p:
+    rho: 1
+    theta_degrees: 1
+    threshold: 55
+    threshold_test_values: [35, 45, 55]
+    min_line_length: 100
+    min_line_length_test_values: [60, 80, 100]
+    max_line_gap: 15
+    max_line_gap_test_values: [15, 25, 35]
+
+  validation:
+    min_mask_support_ratio: 0.92
+    min_mask_support_ratio_test_values: [0.85, 0.92, 0.97]
+    min_points_inside_mask: 60
+    min_points_inside_mask_test_values: [40, 60, 90]
+    max_deviation_from_vertical_degrees: 20
+
+  drawing:
+    raw_line_thickness: 2
+    valid_line_thickness: 3
+
+  test_presets:
+    - name: "default"
+      override: {}
+    - name: "looser_hough"
+      override:
+        hough_lines_p:
+          threshold: 35
+          min_line_length: 60
+          max_line_gap: 35
+    - name: "stricter_hough"
+      override:
+        hough_lines_p:
+          threshold: 55
+          min_line_length: 100
+          max_line_gap: 15
+    - name: "looser_mask_support"
+      override:
+        validation:
+          min_mask_support_ratio: 0.85
+          min_points_inside_mask: 40
+          max_deviation_from_vertical_degrees: 25
+    - name: "stricter_mask_support"
+      override:
+        validation:
+          min_mask_support_ratio: 0.97
+          min_points_inside_mask: 90
+          max_deviation_from_vertical_degrees: 12
+    - name: "narrower_inner_roi"
+      override:
+        roi:
+          inner_erode_kernel_size: 41
+          inner_erode_iterations: 2
+    - name: "wider_inner_roi"
+      override:
+        roi:
+          inner_erode_kernel_size: 21
+          inner_erode_iterations: 1

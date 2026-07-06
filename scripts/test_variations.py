@@ -118,6 +118,13 @@ def resolve_image_path(step: int, image_name: str) -> Path:
             image_name
         )
 
+    elif step == 5:
+        step_config = CONFIG["step_05_valid_hough_lines_in_roi"]
+        image_path = resolve_existing_image_path(
+            PROCESSED_DIR / step_config["edge_input_subdir"],
+            image_name
+        )
+
     elif step == 14:
         step_14_config = CONFIG["step_14_debug_hough_lines"]
         image_path = resolve_existing_image_path(
@@ -232,6 +239,9 @@ def test_image_output_dir(image_path: Path) -> Path:
     digits = "".join(ch for ch in image_path.stem if ch.isdigit())
     suffix = digits[-3:] if len(digits) >= 3 else (digits or image_path.stem)
     return SAVED_TEST_WINDOWS_DIR / f"test_{suffix}"
+
+def step_image_output_dir(step: int, image_path: Path) -> Path:
+    return SAVED_TEST_WINDOWS_DIR / f"{step:02d}xx" / image_path.stem
 
 
 def save_labeled_results(output_dir: Path, results: list[tuple[str, np.ndarray]]) -> None:
@@ -831,6 +841,25 @@ def load_step_04_module():
 
     return module
 
+def load_step_05_module():
+    module_path = PROJECT_ROOT / "pipeline" / "05_detect_valid_hough_lines_in_roi.py"
+
+    if not module_path.exists():
+        raise FileNotFoundError(f"Step 05 file not found: {module_path}")
+
+    spec = importlib.util.spec_from_file_location(
+        "step05_valid_hough_lines",
+        str(module_path)
+    )
+
+    if spec is None or spec.loader is None:
+        raise ImportError(f"Could not load module from: {module_path}")
+
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    return module
+
 def build_step_04_presets() -> list[dict]:
     step_config = CONFIG["step_04_boot_roi_from_edges"]
     explicit_presets = step_config.get("test_presets", [])
@@ -892,6 +921,142 @@ def run_step_04_variations(image_path: Path) -> None:
 
     show_variation_pages(
         title_prefix=f"Step 04 ROI variations | {image_path.name}",
+        results=results
+    )
+
+def build_step_05_presets() -> list[dict]:
+    step_config = CONFIG["step_05_valid_hough_lines_in_roi"]
+    explicit_presets = step_config.get("test_presets", [])
+
+    if explicit_presets:
+        presets = []
+
+        for preset in explicit_presets:
+            preset_copy = copy.deepcopy(preset)
+            preset_copy.setdefault("override", {})
+            presets.append(preset_copy)
+
+        return presets
+
+    test_dimensions = []
+
+    def walk(node: dict, path: tuple[str, ...] = ()) -> None:
+        for key, value in node.items():
+            if isinstance(value, dict):
+                walk(value, path + (key,))
+                continue
+
+            if not key.endswith("_test_values"):
+                continue
+
+            base_key = key.removesuffix("_test_values")
+            if base_key not in node:
+                continue
+
+            current_value = copy.deepcopy(node[base_key])
+            test_values = [copy.deepcopy(item) for item in value]
+
+            if current_value not in test_values:
+                test_values.insert(0, current_value)
+
+            test_dimensions.append((path + (base_key,), test_values))
+
+    walk(step_config)
+
+    if not test_dimensions:
+        return [{"name": "default", "override": {}}]
+
+    presets = []
+
+    for combination in itertools.product(*(values for _, values in test_dimensions)):
+        override = {}
+        label_parts = []
+
+        for (path, _), selected_value in zip(test_dimensions, combination):
+            current = override
+
+            for key in path[:-1]:
+                current = current.setdefault(key, {})
+
+            current[path[-1]] = copy.deepcopy(selected_value)
+            label_parts.append(f"{'.'.join(path)}={selected_value}")
+
+        presets.append(
+            {
+                "name": " | ".join(label_parts),
+                "override": override,
+            }
+        )
+
+    return presets
+
+def run_step_05_single_preset(
+    lm,
+    image_path: Path,
+    preset: dict,
+) -> tuple[str, np.ndarray]:
+    base_step_config = CONFIG["step_05_valid_hough_lines_in_roi"]
+    preset_name = str(preset.get("name", "unnamed variation"))
+    override = copy.deepcopy(preset.get("override", {}))
+
+    lm.STEP_CONFIG = deep_merge_dict(base_step_config, override)
+
+    edge_image = cv2.imread(str(image_path), cv2.IMREAD_GRAYSCALE)
+
+    if edge_image is None:
+        raise ValueError(f"Could not read image: {image_path}")
+
+    roi_dir = PROCESSED_DIR / lm.STEP_CONFIG["roi_mask_subdir"]
+    roi_path = resolve_existing_image_path(roi_dir, image_path.name)
+    roi_mask = cv2.imread(str(roi_path), cv2.IMREAD_GRAYSCALE)
+
+    if roi_mask is None:
+        raise ValueError(f"Could not read ROI mask: {roi_path}")
+
+    hough_mask = lm.make_hough_mask(roi_mask)
+    masked_edge = cv2.bitwise_and(edge_image, edge_image, mask=hough_mask)
+    raw_lines = lm.detect_hough_lines(masked_edge)
+    line_records = [
+        lm.build_line_record(record_index, line, roi_mask)
+        for record_index, line in enumerate(raw_lines, start=1)
+    ]
+
+    valid_overlay = lm.draw_lines(edge_image, line_records, valid_only=True)
+    valid_count = sum(1 for record in line_records if bool(record["is_valid"]))
+
+    label = (
+        f"{preset_name} | raw={len(line_records)} valid={valid_count} "
+        f"thr={lm.STEP_CONFIG['hough_lines_p']['threshold']} "
+        f"len={lm.STEP_CONFIG['hough_lines_p']['min_line_length']} "
+        f"gap={lm.STEP_CONFIG['hough_lines_p']['max_line_gap']}"
+    )
+
+    return label, valid_overlay
+
+def run_step_05_variations(image_path: Path) -> None:
+    presets = build_step_05_presets()
+    lm = load_step_05_module()
+
+    results = []
+
+    print("Step 05 test variations:")
+
+    for index, preset in enumerate(presets, start=1):
+        label, panel = run_step_05_single_preset(
+            lm=lm,
+            image_path=image_path,
+            preset=preset
+        )
+        print(f"  #{index}: {label}")
+        results.append((f"#{index} | {label}", panel))
+
+    print()
+
+    output_dir = step_image_output_dir(step=5, image_path=image_path)
+    save_labeled_results(output_dir=output_dir, results=results)
+
+    show_variation_pages(
+        title_prefix=f"Step 05 valid Hough lines | {image_path.name}",
         results=results
     )
 
@@ -1126,8 +1291,8 @@ def parse_args() -> argparse.Namespace:
         "--step",
         type=int,
         required=True,
-        choices=[1, 2, 3, 4, 14, 6, 7],
-        help="Pipeline step to test. Supported: 1, 2, 3, 4, 14, 6, 7."
+        choices=[1, 2, 3, 4, 5, 14, 6, 7],
+        help="Pipeline step to test. Supported: 1, 2, 3, 4, 5, 14, 6, 7."
     )
 
     parser.add_argument(
@@ -1171,12 +1336,15 @@ def main() -> None:
 
     elif args.step == 3:
         run_step_03_variations(image_path)
-    
-    elif args.step == 14:
-        run_step_14_variations(image_path)
 
     elif args.step == 4:
         run_step_04_variations(image_path)
+
+    elif args.step == 5:
+        run_step_05_variations(image_path)
+
+    elif args.step == 14:
+        run_step_14_variations(image_path)
 
     elif args.step == 6:
         run_step_06_variations(image_path)
