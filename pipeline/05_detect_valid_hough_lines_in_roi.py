@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import json
 import math
 from pathlib import Path
 
@@ -29,6 +30,7 @@ MASKED_EDGE_DIR = OUTPUT_DIR / "masked_edges"
 RAW_OVERLAY_DIR = OUTPUT_DIR / "raw_lines_overlay"
 VALID_OVERLAY_DIR = OUTPUT_DIR / "valid_lines_overlay"
 COMPARISON_DIR = OUTPUT_DIR / "comparison"
+VALID_LINES_JSON_DIR = OUTPUT_DIR / "valid_lines_json"
 METADATA_DIR = PROJECT_ROOT / PATHS_CONFIG["metadata_dir"]
 CSV_PATH = METADATA_DIR / "processing_05_valid_hough_lines_in_roi.csv"
 
@@ -357,12 +359,64 @@ def save_metadata(rows: list[dict[str, str | int | float]]) -> None:
         writer.writerows(rows)
 
 
+def save_valid_lines_json(
+    output_path: Path,
+    image_name: str,
+    edge_path: Path,
+    roi_path: Path,
+    image_shape: tuple[int, int],
+    raw_line_count: int,
+    valid_lines: list[dict[str, float | int | bool]],
+) -> None:
+    height, width = image_shape
+    roi_config = STEP_CONFIG["roi"]
+    hough_config = STEP_CONFIG["hough_lines_p"]
+    validation_config = STEP_CONFIG["validation"]
+
+    payload = {
+        "image_name": image_name,
+        "source_file": str(edge_path.relative_to(PROJECT_ROOT)),
+        "roi_mask_file": str(roi_path.relative_to(PROJECT_ROOT)),
+        "processing_step": "05_valid_hough_lines_in_roi",
+        "width": width,
+        "height": height,
+        "raw_line_count": raw_line_count,
+        "valid_line_count": len(valid_lines),
+        "parameters": {
+            "roi": {
+                "use_inner_mask": bool(roi_config.get("use_inner_mask", True)),
+                "inner_erode_kernel_size": int(roi_config["inner_erode_kernel_size"]),
+                "inner_erode_iterations": int(roi_config.get("inner_erode_iterations", 1)),
+            },
+            "hough_lines_p": {
+                "rho": float(hough_config["rho"]),
+                "theta_degrees": float(hough_config["theta_degrees"]),
+                "threshold": int(hough_config["threshold"]),
+                "min_line_length": int(hough_config["min_line_length"]),
+                "max_line_gap": int(hough_config["max_line_gap"]),
+            },
+            "validation": {
+                "min_mask_support_ratio": float(validation_config["min_mask_support_ratio"]),
+                "min_points_inside_mask": int(validation_config["min_points_inside_mask"]),
+                "max_deviation_from_vertical_degrees": float(
+                    validation_config["max_deviation_from_vertical_degrees"]
+                ),
+            },
+        },
+        "valid_lines": valid_lines,
+    }
+
+    with open(output_path, "w", encoding="utf-8") as file:
+        json.dump(payload, file, ensure_ascii=True, indent=2)
+
+
 def ensure_output_dirs() -> None:
     for directory in [
         OUTPUT_DIR,
         RAW_OVERLAY_DIR,
         VALID_OVERLAY_DIR,
         COMPARISON_DIR,
+        VALID_LINES_JSON_DIR,
     ]:
         directory.mkdir(parents=True, exist_ok=True)
 
@@ -377,8 +431,9 @@ def main() -> None:
     save_config = STEP_CONFIG.get("save", {})
     save_debug_images = bool(save_config.get("debug_images", False))
     save_metadata_csv = bool(save_config.get("metadata_csv", False))
+    save_valid_lines_json_enabled = bool(save_config.get("valid_lines_json", False))
 
-    if save_debug_images:
+    if save_debug_images or save_valid_lines_json_enabled:
         ensure_output_dirs()
 
     image_names = collect_images(args.image)
@@ -395,7 +450,8 @@ def main() -> None:
     print(f"ROI input:   {ROI_MASK_DIR}")
     print(f"Save debug images: {save_debug_images}")
     print(f"Save metadata CSV: {save_metadata_csv}")
-    if save_debug_images:
+    print(f"Save valid lines JSON: {save_valid_lines_json_enabled}")
+    if save_debug_images or save_valid_lines_json_enabled:
         print(f"Output:      {OUTPUT_DIR}")
     print(f"Selected image filter: {args.image if args.image else 'all'}")
     print()
@@ -426,6 +482,7 @@ def main() -> None:
         raw_overlay = draw_lines(edge_image, line_records, valid_only=False)
         valid_overlay = draw_lines(edge_image, line_records, valid_only=True)
         comparison = make_comparison_view(edge_image, raw_overlay, valid_overlay)
+        valid_line_records = [record for record in line_records if bool(record["is_valid"])]
 
         raw_overlay_output_file = ""
         valid_overlay_output_file = ""
@@ -444,7 +501,19 @@ def main() -> None:
             valid_overlay_output_file = str(valid_overlay_output_path.relative_to(PROJECT_ROOT))
             comparison_output_file = str(comparison_output_path.relative_to(PROJECT_ROOT))
 
-        valid_count = sum(1 for record in line_records if bool(record["is_valid"]))
+        if save_valid_lines_json_enabled:
+            json_output_path = VALID_LINES_JSON_DIR / f"{Path(image_name).stem}.json"
+            save_valid_lines_json(
+                output_path=json_output_path,
+                image_name=image_name,
+                edge_path=edge_path,
+                roi_path=roi_path,
+                image_shape=edge_image.shape[:2],
+                raw_line_count=len(line_records),
+                valid_lines=valid_line_records,
+            )
+
+        valid_count = len(valid_line_records)
         height, width = edge_image.shape[:2]
         roi_config = STEP_CONFIG["roi"]
         hough_config = STEP_CONFIG["hough_lines_p"]
@@ -513,6 +582,8 @@ def main() -> None:
         print(f"Raw lines overlay saved to: {RAW_OVERLAY_DIR}")
         print(f"Valid lines overlay saved to: {VALID_OVERLAY_DIR}")
         print(f"Comparison debug saved to: {COMPARISON_DIR}")
+    if save_valid_lines_json_enabled:
+        print(f"Valid lines JSON saved to: {VALID_LINES_JSON_DIR}")
     if save_metadata_csv:
         print(f"Metadata saved to: {CSV_PATH}")
 

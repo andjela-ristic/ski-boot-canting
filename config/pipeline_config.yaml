@@ -168,6 +168,7 @@ step_05_valid_hough_lines_in_roi:
   save:
     debug_images: true
     metadata_csv: false
+    valid_lines_json: true
 
   roi:
     use_inner_mask: true
@@ -234,3 +235,4 @@ step_05_valid_hough_lines_in_roi:
         roi:
           inner_erode_kernel_size: 21
           inner_erode_iterations: 1
+

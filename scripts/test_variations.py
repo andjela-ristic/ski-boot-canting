@@ -125,6 +125,12 @@ def resolve_image_path(step: int, image_name: str) -> Path:
             image_name
         )
 
+    elif step == 6:
+        image_path = resolve_existing_image_path(
+            WORKING_PNG_DIR,
+            image_name
+        )
+
     elif step == 14:
         step_14_config = CONFIG["step_14_debug_hough_lines"]
         image_path = resolve_existing_image_path(
@@ -241,7 +247,7 @@ def test_image_output_dir(image_path: Path) -> Path:
     return SAVED_TEST_WINDOWS_DIR / f"test_{suffix}"
 
 def step_image_output_dir(step: int, image_path: Path) -> Path:
-    return SAVED_TEST_WINDOWS_DIR / f"{step:02d}xx" / image_path.stem
+    return SAVED_TEST_WINDOWS_DIR / f"step_{step:02d}" / image_path.stem
 
 
 def save_labeled_results(output_dir: Path, results: list[tuple[str, np.ndarray]]) -> None:
@@ -785,13 +791,13 @@ def deep_merge_dict(base: dict, override: dict) -> dict:
     return result
 
 def load_step_06_module():
-    module_path = PROJECT_ROOT / "pipeline" / "06_detect_boot_landmarks.py"
+    module_path = PROJECT_ROOT / "pipeline" / "06_find_axis_fragment_chains.py"
 
     if not module_path.exists():
         raise FileNotFoundError(f"Step 06 file not found: {module_path}")
 
     spec = importlib.util.spec_from_file_location(
-        "step06_landmarks",
+        "step06_axis_fragment_chains",
         str(module_path)
     )
 
@@ -1065,27 +1071,61 @@ def run_step_06_single_preset(
     image_path: Path,
     preset: dict,
 ) -> tuple[str, np.ndarray]:
-    base_step_config = CONFIG["step_06_detect_boot_landmarks"]
+    base_step_config = CONFIG["step_06_axis_fragment_chains"]
     preset_name = str(preset.get("name", "unnamed variation"))
-    preset_without_name = {key: value for key, value in preset.items() if key != "name"}
+    override = copy.deepcopy(preset.get("override", {}))
 
-    lm.STEP = deep_merge_dict(base_step_config, preset_without_name)
+    lm.STEP_CONFIG = deep_merge_dict(base_step_config, override)
 
-    visual = cv2.imread(str(image_path))
+    input_json_dir = PROCESSED_DIR / lm.STEP_CONFIG["input_subdir"] / lm.STEP_CONFIG.get(
+        "input_json_subdir",
+        "valid_lines_json"
+    )
+    json_path = input_json_dir / f"{image_path.stem}.json"
 
-    if visual is None:
-        raise ValueError(f"Could not read image: {image_path}")
+    if not json_path.exists():
+        raise FileNotFoundError(f"Step 06 input JSON not found: {json_path}")
 
-    detection_input, input_mode = lm.prepare_detection_input(image_path, visual)
-    circles, _ = lm.find_circles(detection_input, input_mode)
-    overlay = lm.draw_circles(visual, circles)
-    label = f"{preset_name} | n={len(circles)}"
+    data = lm.load_json(json_path)
+    raw_lines = data.get("valid_lines", [])
+    lines = [lm.normalize_line(line) for line in raw_lines]
+
+    roi_centerline = None
+    roi_mask_path = lm.resolve_project_path(data.get("roi_mask_file"))
+
+    if lm.cfg_get("roi_center_prior", "enabled"):
+        roi_centerline = lm.read_roi_centerline_from_mask(
+            roi_mask_path,
+            sample_count=lm.cfg_get("roi_center_prior", "sample_count"),
+        )
+
+    image_height = int(data.get("height", 0)) or 4032
+    result = lm.find_axis_fragment_chains(
+        lines,
+        image_height=image_height,
+        roi_centerline=roi_centerline,
+    )
+
+    overlay = lm.draw_debug_overlay(
+        lm.load_base_image(data),
+        result["filtered_lines"],
+        result["rejected_lines"],
+        result["candidates"],
+        roi_centerline,
+    )
+
+    best_score = result["candidates"][0]["score"] if result["candidates"] else None
+    label = (
+        f"{preset_name} | in={len(lines)} filt={len(result['filtered_lines'])} "
+        f"cand={len(result['candidates'])} best={best_score:.3f}"
+        if best_score is not None
+        else f"{preset_name} | in={len(lines)} filt={len(result['filtered_lines'])} cand=0"
+    )
 
     return label, overlay
 
 def build_step_06_presets() -> list[dict]:
-    step_config = CONFIG["step_06_detect_boot_landmarks"]
-    hough_config = step_config["hough"]
+    step_config = CONFIG["step_06_axis_fragment_chains"]
     explicit_presets = step_config.get("test_presets", [])
 
     if explicit_presets:
@@ -1093,41 +1133,12 @@ def build_step_06_presets() -> list[dict]:
 
         for preset in explicit_presets:
             preset_copy = copy.deepcopy(preset)
-            preset_copy.setdefault("detection_input", step_config["detection_input"])
+            preset_copy.setdefault("override", {})
             presets.append(preset_copy)
 
         return presets
 
-    presets = [
-        {
-            "name": f"default ({step_config['detection_input']})",
-            "detection_input": step_config["detection_input"],
-        }
-    ]
-
-    for key, value in hough_config.items():
-        if not key.endswith("_test_values"):
-            continue
-
-        base_key = key.removesuffix("_test_values")
-        test_values = value
-
-        if base_key not in hough_config:
-            continue
-
-        for test_value in test_values:
-            if test_value == hough_config[base_key]:
-                continue
-
-            presets.append(
-                {
-                    "name": f"{base_key}={test_value}",
-                    "detection_input": step_config["detection_input"],
-                    "hough": {base_key: test_value},
-                }
-            )
-
-    return presets
+    return [{"name": "default", "override": {}}]
 
 def run_step_06_variations(image_path: Path) -> None:
     presets = build_step_06_presets()
@@ -1135,17 +1146,25 @@ def run_step_06_variations(image_path: Path) -> None:
 
     results = []
 
-    for preset in presets:
+    print("Step 06 test variations:")
+
+    for index, preset in enumerate(presets, start=1):
         label, overlay = run_step_06_single_preset(
             lm=lm,
             image_path=image_path,
             preset=preset
         )
 
-        results.append((label, overlay))
+        print(f"  #{index}: {label}")
+        results.append((f"#{index} | {label}", overlay))
+
+    print()
+
+    output_dir = step_image_output_dir(step=6, image_path=image_path)
+    save_labeled_results(output_dir=output_dir, results=results)
 
     show_variation_pages(
-        title_prefix=f"Step 06 circle variations | {image_path.name}",
+        title_prefix=f"Step 06 axis fragment chains | {image_path.name}",
         results=results
     )
 
