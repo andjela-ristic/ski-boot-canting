@@ -178,6 +178,31 @@ def make_hough_mask(roi_mask: np.ndarray) -> np.ndarray:
     return eroded
 
 
+def build_row_mask_bounds(roi_mask: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray, int]:
+    height, width = roi_mask.shape[:2]
+    left_bounds = np.full(height, width, dtype=np.int32)
+    right_bounds = np.full(height, -1, dtype=np.int32)
+    row_widths = np.zeros(height, dtype=np.int32)
+
+    for y in range(height):
+        row_x = np.flatnonzero(roi_mask[y] > 0)
+        if row_x.size == 0:
+            continue
+        left_bounds[y] = int(row_x[0])
+        right_bounds[y] = int(row_x[-1])
+        row_widths[y] = int(row_x[-1] - row_x[0] + 1)
+
+    valid_row_widths = row_widths[row_widths > 0]
+    if valid_row_widths.size == 0:
+        reference_mask_width = 1
+    else:
+        quantile = float(STEP_CONFIG["validation"].get("reference_mask_width_quantile", 0.25))
+        quantile = min(max(quantile, 0.0), 1.0)
+        reference_mask_width = int(round(float(np.quantile(valid_row_widths, quantile))))
+
+    return left_bounds, right_bounds, row_widths, max(1, reference_mask_width)
+
+
 def detect_hough_lines(masked_edge: np.ndarray) -> list[tuple[int, int, int, int]]:
     hough_config = STEP_CONFIG["hough_lines_p"]
     theta_radians = math.radians(float(hough_config["theta_degrees"]))
@@ -215,6 +240,7 @@ def build_line_record(
     index: int,
     line: tuple[int, int, int, int],
     roi_mask: np.ndarray,
+    row_mask_bounds: tuple[np.ndarray, np.ndarray, np.ndarray, int],
 ) -> dict[str, float | int | bool]:
     x1, y1, x2, y2 = line
     x_coords, y_coords = sample_line_points(x1, y1, x2, y2)
@@ -230,11 +256,38 @@ def build_line_record(
     absolute_angle = abs(angle_degrees)
     normalized_angle = absolute_angle if absolute_angle <= 90.0 else 180.0 - absolute_angle
     vertical_deviation = abs(90.0 - normalized_angle)
+    left_bounds, right_bounds, row_widths, reference_mask_width = row_mask_bounds
+    row_left = left_bounds[y_coords]
+    row_right = right_bounds[y_coords]
+    sample_row_widths = row_widths[y_coords]
+
+    left_clearance = x_coords - row_left
+    right_clearance = row_right - x_coords
+    horizontal_clearance = np.minimum(left_clearance, right_clearance)
+    valid_clearance_samples = inside_mask & (row_right >= row_left)
+    min_horizontal_clearance = (
+        int(np.min(horizontal_clearance[valid_clearance_samples]))
+        if np.any(valid_clearance_samples)
+        else -1
+    )
+    horizontal_clearance_ratio = np.full(len(x_coords), -1.0, dtype=np.float64)
+    effective_widths = np.minimum(sample_row_widths, reference_mask_width)
+    horizontal_clearance_ratio[valid_clearance_samples] = (
+        horizontal_clearance[valid_clearance_samples]
+        / np.maximum(effective_widths[valid_clearance_samples], 1)
+    )
+    min_horizontal_clearance_ratio = (
+        float(np.min(horizontal_clearance_ratio[valid_clearance_samples]))
+        if np.any(valid_clearance_samples)
+        else -1.0
+    )
 
     validation_config = STEP_CONFIG["validation"]
     is_valid = (
         support_ratio >= float(validation_config["min_mask_support_ratio"])
         and points_inside_mask >= int(validation_config["min_points_inside_mask"])
+        and min_horizontal_clearance_ratio
+        >= float(validation_config.get("min_horizontal_clearance_ratio_of_mask_width", 0.0))
         and vertical_deviation <= float(validation_config["max_deviation_from_vertical_degrees"])
     )
 
@@ -250,6 +303,9 @@ def build_line_record(
         "sampled_points": total_points,
         "points_inside_mask": points_inside_mask,
         "mask_support_ratio": round(support_ratio, 4),
+        "mask_reference_width_px": int(reference_mask_width),
+        "min_horizontal_clearance_from_mask_edge_px": min_horizontal_clearance,
+        "min_horizontal_clearance_ratio_of_mask_width": round(min_horizontal_clearance_ratio, 4),
         "is_valid": is_valid,
     }
 
@@ -350,6 +406,8 @@ def save_metadata(rows: list[dict[str, str | int | float]]) -> None:
         "hough_max_line_gap",
         "validation_min_mask_support_ratio",
         "validation_min_points_inside_mask",
+        "validation_reference_mask_width_quantile",
+        "validation_min_horizontal_clearance_ratio_of_mask_width",
         "validation_max_deviation_from_vertical_degrees",
     ]
 
@@ -398,6 +456,12 @@ def save_valid_lines_json(
             "validation": {
                 "min_mask_support_ratio": float(validation_config["min_mask_support_ratio"]),
                 "min_points_inside_mask": int(validation_config["min_points_inside_mask"]),
+                "reference_mask_width_quantile": float(
+                    validation_config.get("reference_mask_width_quantile", 0.25)
+                ),
+                "min_horizontal_clearance_ratio_of_mask_width": float(
+                    validation_config.get("min_horizontal_clearance_ratio_of_mask_width", 0.0)
+                ),
                 "max_deviation_from_vertical_degrees": float(
                     validation_config["max_deviation_from_vertical_degrees"]
                 ),
@@ -472,10 +536,11 @@ def main() -> None:
             continue
 
         hough_mask = make_hough_mask(roi_mask)
+        row_mask_bounds = build_row_mask_bounds(roi_mask)
         masked_edge = cv2.bitwise_and(edge_image, edge_image, mask=hough_mask)
         raw_lines = detect_hough_lines(masked_edge)
         line_records = [
-            build_line_record(record_index, line, roi_mask)
+            build_line_record(record_index, line, roi_mask, row_mask_bounds)
             for record_index, line in enumerate(raw_lines, start=1)
         ]
 
@@ -542,6 +607,12 @@ def main() -> None:
                 "hough_max_line_gap": int(hough_config["max_line_gap"]),
                 "validation_min_mask_support_ratio": float(validation_config["min_mask_support_ratio"]),
                 "validation_min_points_inside_mask": int(validation_config["min_points_inside_mask"]),
+                "validation_reference_mask_width_quantile": float(
+                    validation_config.get("reference_mask_width_quantile", 0.25)
+                ),
+                "validation_min_horizontal_clearance_ratio_of_mask_width": float(
+                    validation_config.get("min_horizontal_clearance_ratio_of_mask_width", 0.0)
+                ),
                 "validation_max_deviation_from_vertical_degrees": float(
                     validation_config["max_deviation_from_vertical_degrees"]
                 ),

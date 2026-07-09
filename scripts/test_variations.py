@@ -3,6 +3,11 @@ import sys
 import argparse
 import itertools
 import re
+import csv
+import json
+import subprocess
+import os
+from concurrent.futures import ProcessPoolExecutor
 
 import cv2
 import numpy as np
@@ -36,6 +41,33 @@ def set_config(config_path: str | None) -> None:
     DISPLAY_CONFIG = CONFIG["display"]
     WORKING_PNG_DIR = PROJECT_ROOT / PATHS_CONFIG["working_png_dir"]
     PROCESSED_DIR = PROJECT_ROOT / PATHS_CONFIG["processed_dir"]
+
+
+def select_combo_results(
+    results: list[tuple[str, np.ndarray]],
+    combo: int | None,
+) -> list[tuple[str, np.ndarray]]:
+    if combo is None:
+        return results
+
+    if combo < 1 or combo > len(results):
+        raise ValueError(
+            f"--combo must be between 1 and {len(results)}. Got: {combo}"
+        )
+
+    return [results[combo - 1]]
+
+
+def select_combo_items(items: list, combo: int | None) -> list:
+    if combo is None:
+        return items
+
+    if combo < 1 or combo > len(items):
+        raise ValueError(
+            f"--combo must be between 1 and {len(items)}. Got: {combo}"
+        )
+
+    return [items[combo - 1]]
 
 
 def resolve_existing_image_path(base_dir: Path, image_name: str) -> Path:
@@ -309,12 +341,41 @@ def show_variation_pages(
     columns: int = 3,
     fit_to_screen: bool = False,
     initial_zoom: float = 1.0,
+    save_dir: Path | None = None,
 ) -> None:
     if not results:
         print("No results to display.")
         return
 
     total_pages = (len(results) + images_per_window - 1) // images_per_window
+
+    if save_dir is not None:
+        save_dir.mkdir(parents=True, exist_ok=True)
+
+        for page_index in range(total_pages):
+            start = page_index * images_per_window
+            end = start + images_per_window
+            page_results = results[start:end]
+            grid = make_grid(
+                page_results,
+                images_per_window=images_per_window,
+                columns=columns,
+            )
+
+            if fit_to_screen:
+                max_height = int(DISPLAY_CONFIG.get("max_height", 800))
+                grid = scale_to_fit(grid, max_width=MAX_PAGE_WIDTH, max_height=max_height)
+
+            grid = scale_image(grid, max(0.25, float(initial_zoom)))
+
+            output_path = save_dir / f"window_{page_index + 1:02d}.png"
+            ok = cv2.imwrite(str(output_path), grid)
+            if not ok:
+                raise RuntimeError(f"Could not save window page: {output_path}")
+
+            print(f"Saved window page {page_index + 1}/{total_pages}: {output_path}")
+
+        return
 
     page_index = 0
     zoom_factor = max(0.25, float(initial_zoom))
@@ -399,7 +460,7 @@ def normalize_illumination_bgr(
 
     return normalized_bgr
 
-def run_step_01_variations(image_path: Path) -> None:
+def run_step_01_variations(image_path: Path, combo: int | None = None) -> None:
     step_config = CONFIG["step_01_illumination_normalization"]
     clahe_config = step_config["clahe"]
 
@@ -427,6 +488,8 @@ def run_step_01_variations(image_path: Path) -> None:
 
         results.append((label, processed))
 
+    results = select_combo_results(results, combo)
+
     show_variation_pages(
         title_prefix=f"Step 01 variations | {image_path.name}",
         results=results
@@ -441,7 +504,7 @@ def ensure_odd_kernel_size(value: int) -> int:
 
     return value
 
-def run_step_02_variations(image_path: Path) -> None:
+def run_step_02_variations(image_path: Path, combo: int | None = None) -> None:
     step_config = CONFIG["step_02_grayscale_and_blur"]
 
     gaussian_config = step_config["gaussian_blur"]
@@ -492,6 +555,9 @@ def run_step_02_variations(image_path: Path) -> None:
 
         label = f"bilateral d={diameter}, sc={sigma_color}, ss={sigma_space}"
         bilateral_results.append((label, bilateral))
+
+    gaussian_results = select_combo_results(gaussian_results, combo)
+    bilateral_results = select_combo_results(bilateral_results, combo)
 
     show_variation_pages(
         title_prefix=f"Step 02 Gaussian variations | {image_path.name}",
@@ -626,8 +692,9 @@ def run_step_03_single_preset(
 
     return label, result_image
 
-def run_step_03_variations(image_path: Path) -> None:
+def run_step_03_variations(image_path: Path, combo: int | None = None) -> None:
     presets = build_step_03_presets()
+    presets = select_combo_items(presets, combo)
     lm = load_step_03_module()
 
     results = []
@@ -644,7 +711,6 @@ def run_step_03_variations(image_path: Path) -> None:
         results.append((f"#{index} | {label}", edge_image))
 
     print()
-
     show_variation_pages(
         title_prefix=f"Step 03 edge variations | {image_path.name}",
         results=results
@@ -722,7 +788,7 @@ def draw_hough_lines_for_test(
 
     return overlay
 
-def run_step_14_variations(image_path: Path) -> None:
+def run_step_14_variations(image_path: Path, combo: int | None = None) -> None:
     step_config = CONFIG["step_14_debug_hough_lines"]
 
     hough_config = step_config["hough_lines_p"]
@@ -740,15 +806,18 @@ def run_step_14_variations(image_path: Path) -> None:
     if edge_image is None:
         raise ValueError(f"Could not read image: {image_path}")
 
-    results = []
-
-    for threshold, min_line_length, max_line_gap, vertical_tolerance, horizontal_tolerance in itertools.product(
+    combinations = list(itertools.product(
         threshold_values,
         min_line_length_values,
         max_line_gap_values,
         vertical_tolerance_values,
         horizontal_tolerance_values
-    ):
+    ))
+    combinations = select_combo_items(combinations, combo)
+
+    results = []
+
+    for threshold, min_line_length, max_line_gap, vertical_tolerance, horizontal_tolerance in combinations:
         threshold = int(threshold)
         min_line_length = int(min_line_length)
         max_line_gap = int(max_line_gap)
@@ -770,7 +839,6 @@ def run_step_14_variations(image_path: Path) -> None:
         )
 
         results.append((label, overlay))
-
     show_variation_pages(
         title_prefix=f"Step 14 Debug Hough lines | {image_path.name}",
         results=results
@@ -791,13 +859,13 @@ def deep_merge_dict(base: dict, override: dict) -> dict:
     return result
 
 def load_step_06_module():
-    module_path = PROJECT_ROOT / "pipeline" / "06_find_axis_fragment_chains.py"
+    module_path = PROJECT_ROOT / "pipeline" / "06_fit_central_axis_from_fragments.py"
 
     if not module_path.exists():
         raise FileNotFoundError(f"Step 06 file not found: {module_path}")
 
     spec = importlib.util.spec_from_file_location(
-        "step06_axis_fragment_chains",
+        "step06_fit_central_axis_from_fragments",
         str(module_path)
     )
 
@@ -906,8 +974,9 @@ def run_step_04_single_preset(
 
     return label, overlay
 
-def run_step_04_variations(image_path: Path) -> None:
+def run_step_04_variations(image_path: Path, combo: int | None = None) -> None:
     presets = build_step_04_presets()
+    presets = select_combo_items(presets, combo)
     lm = load_step_04_module()
 
     results = []
@@ -924,7 +993,6 @@ def run_step_04_variations(image_path: Path) -> None:
         results.append((label, panel))
 
     print()
-
     show_variation_pages(
         title_prefix=f"Step 04 ROI variations | {image_path.name}",
         results=results
@@ -1039,8 +1107,9 @@ def run_step_05_single_preset(
 
     return label, valid_overlay
 
-def run_step_05_variations(image_path: Path) -> None:
+def run_step_05_variations(image_path: Path, combo: int | None = None) -> None:
     presets = build_step_05_presets()
+    presets = select_combo_items(presets, combo)
     lm = load_step_05_module()
 
     results = []
@@ -1057,7 +1126,6 @@ def run_step_05_variations(image_path: Path) -> None:
         results.append((f"#{index} | {label}", panel))
 
     print()
-
     output_dir = step_image_output_dir(step=5, image_path=image_path)
     save_labeled_results(output_dir=output_dir, results=results)
 
@@ -1071,11 +1139,19 @@ def run_step_06_single_preset(
     image_path: Path,
     preset: dict,
 ) -> tuple[str, np.ndarray]:
-    base_step_config = CONFIG["step_06_axis_fragment_chains"]
+    base_step_config = (
+        CONFIG.get("step_06_fit_central_axis_from_fragments")
+        or CONFIG.get("step_06_axis_fragment_chains")
+    )
+    if base_step_config is None:
+        raise KeyError(
+            "Missing Step 06 config. Expected 'step_06_fit_central_axis_from_fragments'."
+        )
+
     preset_name = str(preset.get("name", "unnamed variation"))
     override = copy.deepcopy(preset.get("override", {}))
 
-    lm.STEP_CONFIG = deep_merge_dict(base_step_config, override)
+    lm.STEP_CONFIG = lm.deep_merge(base_step_config, override)
 
     input_json_dir = PROCESSED_DIR / lm.STEP_CONFIG["input_subdir"] / lm.STEP_CONFIG.get(
         "input_json_subdir",
@@ -1088,44 +1164,98 @@ def run_step_06_single_preset(
 
     data = lm.load_json(json_path)
     raw_lines = data.get("valid_lines", [])
-    lines = [lm.normalize_line(line) for line in raw_lines]
+    lines = [lm.normalize_line(line, i) for i, line in enumerate(raw_lines)]
 
-    roi_centerline = None
     roi_mask_path = lm.resolve_project_path(data.get("roi_mask_file"))
-
-    if lm.cfg_get("roi_center_prior", "enabled"):
-        roi_centerline = lm.read_roi_centerline_from_mask(
-            roi_mask_path,
-            sample_count=lm.cfg_get("roi_center_prior", "sample_count"),
-        )
+    roi_mask = lm.load_roi_mask(roi_mask_path)
+    prior = lm.robust_roi_axis_prior(roi_mask)
 
     image_height = int(data.get("height", 0)) or 4032
-    result = lm.find_axis_fragment_chains(
-        lines,
-        image_height=image_height,
-        roi_centerline=roi_centerline,
-    )
+    filtered_lines, rejected_lines = lm.filter_fragments(lines)
+    fit_result = lm.fit_central_axis(filtered_lines, image_height, prior, roi_mask=roi_mask)
+    best_candidate = fit_result["best_candidate"]
 
-    overlay = lm.draw_debug_overlay(
+    overlay = lm.draw_overlay(
         lm.load_base_image(data),
-        result["filtered_lines"],
-        result["rejected_lines"],
-        result["candidates"],
-        roi_centerline,
+        filtered_lines,
+        rejected_lines,
+        best_candidate,
+        prior,
+        data.get("image_name", image_path.name),
     )
 
-    best_score = result["candidates"][0]["score"] if result["candidates"] else None
+    best_score = best_candidate["score"] if best_candidate else None
     label = (
-        f"{preset_name} | in={len(lines)} filt={len(result['filtered_lines'])} "
-        f"cand={len(result['candidates'])} best={best_score:.3f}"
+        f"{preset_name} | in={len(lines)} filt={len(filtered_lines)} "
+        f"cand={len(fit_result['candidates'])} best={best_score:.3f}"
         if best_score is not None
-        else f"{preset_name} | in={len(lines)} filt={len(result['filtered_lines'])} cand=0"
+        else f"{preset_name} | in={len(lines)} filt={len(filtered_lines)} cand=0"
+    )
+
+    return label, overlay
+
+def run_step_06_single_preset_worker(
+    image_path_str: str,
+    preset: dict,
+    base_step_config: dict,
+) -> tuple[str, np.ndarray]:
+    lm = load_step_06_module()
+    image_path = Path(image_path_str)
+    preset_name = str(preset.get("name", "unnamed variation"))
+    override = copy.deepcopy(preset.get("override", {}))
+
+    lm.STEP_CONFIG = lm.deep_merge(base_step_config, override)
+
+    input_json_dir = PROCESSED_DIR / lm.STEP_CONFIG["input_subdir"] / lm.STEP_CONFIG.get(
+        "input_json_subdir",
+        "valid_lines_json"
+    )
+    json_path = input_json_dir / f"{image_path.stem}.json"
+
+    if not json_path.exists():
+        raise FileNotFoundError(f"Step 06 input JSON not found: {json_path}")
+
+    data = lm.load_json(json_path)
+    raw_lines = data.get("valid_lines", [])
+    lines = [lm.normalize_line(line, i) for i, line in enumerate(raw_lines)]
+
+    roi_mask_path = lm.resolve_project_path(data.get("roi_mask_file"))
+    roi_mask = lm.load_roi_mask(roi_mask_path)
+    prior = lm.robust_roi_axis_prior(roi_mask)
+
+    image_height = int(data.get("height", 0)) or 4032
+    filtered_lines, rejected_lines = lm.filter_fragments(lines)
+    fit_result = lm.fit_central_axis(filtered_lines, image_height, prior, roi_mask=roi_mask)
+    best_candidate = fit_result["best_candidate"]
+
+    overlay = lm.draw_overlay(
+        lm.load_base_image(data),
+        filtered_lines,
+        rejected_lines,
+        best_candidate,
+        prior,
+        data.get("image_name", image_path.name),
+    )
+
+    best_score = best_candidate["score"] if best_candidate else None
+    label = (
+        f"{preset_name} | in={len(lines)} filt={len(filtered_lines)} "
+        f"cand={len(fit_result['candidates'])} best={best_score:.3f}"
+        if best_score is not None
+        else f"{preset_name} | in={len(lines)} filt={len(filtered_lines)} cand=0"
     )
 
     return label, overlay
 
 def build_step_06_presets() -> list[dict]:
-    step_config = CONFIG["step_06_axis_fragment_chains"]
+    step_config = (
+        CONFIG.get("step_06_fit_central_axis_from_fragments")
+        or CONFIG.get("step_06_axis_fragment_chains")
+    )
+    if step_config is None:
+        raise KeyError(
+            "Missing Step 06 config. Expected 'step_06_fit_central_axis_from_fragments'."
+        )
     explicit_presets = step_config.get("test_presets", [])
 
     if explicit_presets:
@@ -1140,33 +1270,177 @@ def build_step_06_presets() -> list[dict]:
 
     return [{"name": "default", "override": {}}]
 
-def run_step_06_variations(image_path: Path) -> None:
+def run_step_06_variations(
+    image_path: Path,
+    workers: int | None = None,
+    combo: int | None = None,
+) -> None:
     presets = build_step_06_presets()
-    lm = load_step_06_module()
+    presets = select_combo_items(presets, combo)
+    base_step_config = (
+        CONFIG.get("step_06_fit_central_axis_from_fragments")
+        or CONFIG.get("step_06_axis_fragment_chains")
+    )
+    if base_step_config is None:
+        raise KeyError(
+            "Missing Step 06 config. Expected 'step_06_fit_central_axis_from_fragments'."
+        )
 
     results = []
 
     print("Step 06 test variations:")
+    worker_count = workers
+    if worker_count is None:
+        cpu_count = os.cpu_count() or 1
+        worker_count = max(1, min(len(presets), cpu_count, 2))
+    else:
+        worker_count = max(1, min(int(workers), len(presets)))
 
-    for index, preset in enumerate(presets, start=1):
-        label, overlay = run_step_06_single_preset(
-            lm=lm,
-            image_path=image_path,
-            preset=preset
-        )
+    print(f"Using workers: {worker_count}")
 
-        print(f"  #{index}: {label}")
-        results.append((f"#{index} | {label}", overlay))
+    if worker_count == 1:
+        lm = load_step_06_module()
+        for index, preset in enumerate(presets, start=1):
+            label, overlay = run_step_06_single_preset(
+                lm=lm,
+                image_path=image_path,
+                preset=preset
+            )
+
+            print(f"  #{index}: {label}")
+            results.append((f"#{index} | {label}", overlay))
+    else:
+        with ProcessPoolExecutor(max_workers=worker_count) as executor:
+            futures = [
+                executor.submit(
+                    run_step_06_single_preset_worker,
+                    str(image_path),
+                    preset,
+                    base_step_config,
+                )
+                for preset in presets
+            ]
+
+            for index, future in enumerate(futures, start=1):
+                label, overlay = future.result()
+                print(f"  #{index}: {label}")
+                results.append((f"#{index} | {label}", overlay))
 
     print()
-
     output_dir = step_image_output_dir(step=6, image_path=image_path)
     save_labeled_results(output_dir=output_dir, results=results)
-
     show_variation_pages(
         title_prefix=f"Step 06 axis fragment chains | {image_path.name}",
-        results=results
+        results=results,
+        save_dir=output_dir,
     )
+
+def get_axis_fit_test_presets() -> list[str]:
+    step_config = CONFIG.get("step_06_fit_central_axis_from_fragments", {})
+    presets = step_config.get("test_presets", [])
+    preset_names = [
+        str(preset.get("name")).strip()
+        for preset in presets
+        if str(preset.get("name", "")).strip()
+    ]
+
+    if preset_names:
+        return preset_names
+
+    return [
+        "stricter_center_fast",
+        "stricter_center",
+        "strict_center_narrow",
+        "strict_center_wider",
+        "strict_low_residual",
+        "strict_more_support",
+        "strict_prior_heavy",
+    ]
+
+def run_axis_fit_preset(preset: str, image: str | None = None) -> None:
+    step_script = PROJECT_ROOT / "pipeline" / "06_fit_central_axis_from_fragments.py"
+    cmd = [sys.executable, str(step_script), "--preset", preset]
+
+    if image:
+        cmd += ["--image", image]
+
+    print("RUN", " ".join(cmd))
+    completed = subprocess.run(cmd, check=False)
+
+    if completed.returncode != 0:
+        raise RuntimeError(
+            f"Axis preset run failed for preset '{preset}' with exit code {completed.returncode}."
+        )
+
+def collect_axis_fit_preset_summary(presets: list[str]) -> Path:
+    rows = []
+
+    for preset in presets:
+        base_dir = (
+            PROCESSED_DIR
+            / "06_fit_central_axis_from_fragments"
+            / preset
+            / "metadata"
+        )
+
+        if not base_dir.exists():
+            continue
+
+        for path in sorted(base_dir.glob("*_central_axis.json")):
+            data = json.loads(path.read_text(encoding="utf-8"))
+            best = data.get("best_candidate") or {}
+            fit = best.get("axis_fit") or {}
+            rows.append({
+                "preset": preset,
+                "image": data.get("image_name"),
+                "accepted": best.get("accepted"),
+                "score": best.get("score"),
+                "fragments": best.get("num_support_fragments"),
+                "coverage_px": best.get("observed_y_coverage_px"),
+                "mean_residual_px": fit.get("mean_residual_px"),
+                "median_residual_px": fit.get("median_residual_px"),
+                "tilt_deg": fit.get("tilt_deg"),
+            })
+
+    output_path = (
+        PROCESSED_DIR
+        / "06_fit_central_axis_from_fragments"
+        / "axis_preset_test_summary.csv"
+    )
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    with output_path.open("w", newline="", encoding="utf-8") as output_file:
+        fieldnames = [
+            "preset",
+            "image",
+            "accepted",
+            "score",
+            "fragments",
+            "coverage_px",
+            "mean_residual_px",
+            "median_residual_px",
+            "tilt_deg",
+        ]
+        writer = csv.DictWriter(output_file, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(rows)
+
+    print(f"Saved {output_path}")
+    return output_path
+
+def run_axis_fit_preset_tests(
+    presets: list[str],
+    image: str | None = None,
+) -> None:
+    print("Running step 06 central-axis preset tests")
+    print(f"Presets: {', '.join(presets)}")
+    print(f"Image filter: {image or 'all'}")
+    print()
+
+    for preset in presets:
+        run_axis_fit_preset(preset=preset, image=image)
+
+    collect_axis_fit_preset_summary(presets)
 
 def collect_step_07_test_presets(
     current_value,
@@ -1284,8 +1558,9 @@ def run_step_07_single_preset(
 
     return label, completed_overlay
 
-def run_step_07_variations(image_path: Path) -> None:
+def run_step_07_variations(image_path: Path, combo: int | None = None) -> None:
     presets = build_step_07_presets()
+    presets = select_combo_items(presets, combo)
     lm = load_step_07_module()
 
     results = []
@@ -1297,7 +1572,6 @@ def run_step_07_variations(image_path: Path) -> None:
             preset=preset
         )
         results.append((label, panel))
-
     output_dir = test_image_output_dir(image_path)
     save_labeled_results(output_dir=output_dir, results=results)
 
@@ -1317,7 +1591,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--image",
         type=str,
-        required=True,
+        default=None,
         help="Image filename, for example IMG_0502.png."
     )
 
@@ -1328,11 +1602,54 @@ def parse_args() -> argparse.Namespace:
         help="Optional config path relative to project root, for example config/pipeline_config_step06_test.yaml."
     )
 
+    parser.add_argument(
+        "--axis-preset-tests",
+        action="store_true",
+        help="Run batch preset tests for pipeline/06_fit_central_axis_from_fragments.py and save a CSV summary."
+    )
+
+    parser.add_argument(
+        "--presets",
+        nargs="*",
+        default=None,
+        help="Optional preset names for --axis-preset-tests. Defaults to configured step_06_fit_central_axis_from_fragments.test_presets."
+    )
+
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=None,
+        help="Optional worker count for Step 06 processing. Defaults to min(number of presets, CPU cores)."
+    )
+
+    parser.add_argument(
+        "--combo",
+        type=int,
+        default=None,
+        help="Optional 1-based variation index. Example: --combo 1 runs only the first variation."
+    )
+
     return parser.parse_args()
 
 def main() -> None:
     args = parse_args()
     set_config(args.config)
+
+    if args.axis_preset_tests:
+        if args.step != 6:
+            raise ValueError("--axis-preset-tests supports only --step 6.")
+        if args.config is not None:
+            raise ValueError("--axis-preset-tests currently uses the pipeline script's default config and does not support --config.")
+
+        presets = args.presets if args.presets else get_axis_fit_test_presets()
+        run_axis_fit_preset_tests(
+            presets=presets,
+            image=args.image
+        )
+        return
+
+    if not args.image:
+        raise ValueError("--image is required unless --axis-preset-tests is used.")
 
     image_path = resolve_image_path(
         step=args.step,
@@ -1348,27 +1665,27 @@ def main() -> None:
     print()
 
     if args.step == 1:
-        run_step_01_variations(image_path)
+        run_step_01_variations(image_path, combo=args.combo)
 
     elif args.step == 2:
-        run_step_02_variations(image_path)
+        run_step_02_variations(image_path, combo=args.combo)
 
     elif args.step == 3:
-        run_step_03_variations(image_path)
+        run_step_03_variations(image_path, combo=args.combo)
 
     elif args.step == 4:
-        run_step_04_variations(image_path)
+        run_step_04_variations(image_path, combo=args.combo)
 
     elif args.step == 5:
-        run_step_05_variations(image_path)
+        run_step_05_variations(image_path, combo=args.combo)
 
     elif args.step == 14:
-        run_step_14_variations(image_path)
+        run_step_14_variations(image_path, combo=args.combo)
 
     elif args.step == 6:
-        run_step_06_variations(image_path)
+        run_step_06_variations(image_path, workers=args.workers, combo=args.combo)
     elif args.step == 7:
-        run_step_07_variations(image_path)
+        run_step_07_variations(image_path, combo=args.combo)
 
     cv2.destroyAllWindows()
 

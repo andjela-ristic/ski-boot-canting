@@ -6,7 +6,7 @@
   "width": 3024,
   "height": 4032,
   "raw_line_count": 604,
-  "valid_line_count": 507,
+  "valid_line_count": 231,
   "parameters": {
     "roi": {
       "use_inner_mask": true,
@@ -23,6 +23,8 @@
     "validation": {
       "min_mask_support_ratio": 0.92,
       "min_points_inside_mask": 60,
+      "reference_mask_width_quantile": 0.25,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.4,
       "max_deviation_from_vertical_degrees": 20.0
     }
   },
@@ -39,6 +41,9 @@
       "sampled_points": 507,
       "points_inside_mask": 507,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 370,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.496,
       "is_valid": true
     },
     {
@@ -53,6 +58,9 @@
       "sampled_points": 320,
       "points_inside_mask": 320,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 435,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5831,
       "is_valid": true
     },
     {
@@ -67,6 +75,9 @@
       "sampled_points": 102,
       "points_inside_mask": 102,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 438,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5871,
       "is_valid": true
     },
     {
@@ -81,6 +92,9 @@
       "sampled_points": 138,
       "points_inside_mask": 138,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 437,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5858,
       "is_valid": true
     },
     {
@@ -95,20 +109,9 @@
       "sampled_points": 201,
       "points_inside_mask": 201,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 6,
-      "x1": 1323,
-      "y1": 1997,
-      "x2": 1337,
-      "y2": 2193,
-      "length": 196.5,
-      "angle_degrees": 85.91,
-      "vertical_deviation_degrees": 4.09,
-      "sampled_points": 197,
-      "points_inside_mask": 197,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 484,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.6488,
       "is_valid": true
     },
     {
@@ -123,6 +126,9 @@
       "sampled_points": 126,
       "points_inside_mask": 126,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 460,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.6166,
       "is_valid": true
     },
     {
@@ -137,20 +143,9 @@
       "sampled_points": 101,
       "points_inside_mask": 101,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 9,
-      "x1": 1319,
-      "y1": 1970,
-      "x2": 1335,
-      "y2": 2209,
-      "length": 239.53,
-      "angle_degrees": 86.17,
-      "vertical_deviation_degrees": 3.83,
-      "sampled_points": 240,
-      "points_inside_mask": 240,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 439,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5885,
       "is_valid": true
     },
     {
@@ -165,6 +160,9 @@
       "sampled_points": 321,
       "points_inside_mask": 321,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 434,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5818,
       "is_valid": true
     },
     {
@@ -179,6 +177,9 @@
       "sampled_points": 113,
       "points_inside_mask": 113,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 403,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5402,
       "is_valid": true
     },
     {
@@ -193,6 +194,9 @@
       "sampled_points": 128,
       "points_inside_mask": 128,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 492,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.6595,
       "is_valid": true
     },
     {
@@ -207,6 +211,9 @@
       "sampled_points": 354,
       "points_inside_mask": 354,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 400,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5362,
       "is_valid": true
     },
     {
@@ -221,6 +228,9 @@
       "sampled_points": 203,
       "points_inside_mask": 203,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 393,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5268,
       "is_valid": true
     },
     {
@@ -235,6 +245,9 @@
       "sampled_points": 110,
       "points_inside_mask": 110,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 483,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.6475,
       "is_valid": true
     },
     {
@@ -249,76 +262,9 @@
       "sampled_points": 345,
       "points_inside_mask": 345,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 17,
-      "x1": 1326,
-      "y1": 2000,
-      "x2": 1340,
-      "y2": 2199,
-      "length": 199.49,
-      "angle_degrees": 85.98,
-      "vertical_deviation_degrees": 4.02,
-      "sampled_points": 200,
-      "points_inside_mask": 200,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 18,
-      "x1": 2030,
-      "y1": 2006,
-      "x2": 2044,
-      "y2": 1175,
-      "length": 831.12,
-      "angle_degrees": -89.03,
-      "vertical_deviation_degrees": 0.97,
-      "sampled_points": 832,
-      "points_inside_mask": 832,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 19,
-      "x1": 1325,
-      "y1": 1999,
-      "x2": 1339,
-      "y2": 2200,
-      "length": 201.49,
-      "angle_degrees": 86.02,
-      "vertical_deviation_degrees": 3.98,
-      "sampled_points": 202,
-      "points_inside_mask": 202,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 20,
-      "x1": 1256,
-      "y1": 1685,
-      "x2": 1278,
-      "y2": 1846,
-      "length": 162.5,
-      "angle_degrees": 82.22,
-      "vertical_deviation_degrees": 7.78,
-      "sampled_points": 162,
-      "points_inside_mask": 162,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 21,
-      "x1": 1737,
-      "y1": 1945,
-      "x2": 1799,
-      "y2": 2164,
-      "length": 227.61,
-      "angle_degrees": 74.19,
-      "vertical_deviation_degrees": 15.81,
-      "sampled_points": 220,
-      "points_inside_mask": 220,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 399,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5349,
       "is_valid": true
     },
     {
@@ -333,90 +279,9 @@
       "sampled_points": 193,
       "points_inside_mask": 193,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 23,
-      "x1": 1748,
-      "y1": 1971,
-      "x2": 1805,
-      "y2": 2155,
-      "length": 192.63,
-      "angle_degrees": 72.79,
-      "vertical_deviation_degrees": 17.21,
-      "sampled_points": 185,
-      "points_inside_mask": 185,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 24,
-      "x1": 1695,
-      "y1": 1814,
-      "x2": 1752,
-      "y2": 2029,
-      "length": 222.43,
-      "angle_degrees": 75.15,
-      "vertical_deviation_degrees": 14.85,
-      "sampled_points": 216,
-      "points_inside_mask": 216,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 25,
-      "x1": 1789,
-      "y1": 2075,
-      "x2": 1839,
-      "y2": 2249,
-      "length": 181.04,
-      "angle_degrees": 73.97,
-      "vertical_deviation_degrees": 16.03,
-      "sampled_points": 175,
-      "points_inside_mask": 175,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 26,
-      "x1": 1343,
-      "y1": 2222,
-      "x2": 1351,
-      "y2": 2329,
-      "length": 107.3,
-      "angle_degrees": 85.72,
-      "vertical_deviation_degrees": 4.28,
-      "sampled_points": 108,
-      "points_inside_mask": 108,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 27,
-      "x1": 1409,
-      "y1": 754,
-      "x2": 1442,
-      "y2": 877,
-      "length": 127.35,
-      "angle_degrees": 74.98,
-      "vertical_deviation_degrees": 15.02,
-      "sampled_points": 124,
-      "points_inside_mask": 124,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 28,
-      "x1": 1318,
-      "y1": 1971,
-      "x2": 1335,
-      "y2": 2217,
-      "length": 246.59,
-      "angle_degrees": 86.05,
-      "vertical_deviation_degrees": 3.95,
-      "sampled_points": 247,
-      "points_inside_mask": 247,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 448,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.6005,
       "is_valid": true
     },
     {
@@ -431,20 +296,9 @@
       "sampled_points": 245,
       "points_inside_mask": 245,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 30,
-      "x1": 1252,
-      "y1": 1741,
-      "x2": 1268,
-      "y2": 1843,
-      "length": 103.25,
-      "angle_degrees": 81.09,
-      "vertical_deviation_degrees": 8.91,
-      "sampled_points": 103,
-      "points_inside_mask": 103,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 365,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.4893,
       "is_valid": true
     },
     {
@@ -459,34 +313,9 @@
       "sampled_points": 114,
       "points_inside_mask": 114,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 32,
-      "x1": 1763,
-      "y1": 1976,
-      "x2": 1839,
-      "y2": 2243,
-      "length": 277.61,
-      "angle_degrees": 74.11,
-      "vertical_deviation_degrees": 15.89,
-      "sampled_points": 268,
-      "points_inside_mask": 268,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 33,
-      "x1": 1785,
-      "y1": 2067,
-      "x2": 1847,
-      "y2": 2298,
-      "length": 239.18,
-      "angle_degrees": 74.98,
-      "vertical_deviation_degrees": 15.02,
-      "sampled_points": 232,
-      "points_inside_mask": 232,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 456,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.6113,
       "is_valid": true
     },
     {
@@ -501,48 +330,9 @@
       "sampled_points": 103,
       "points_inside_mask": 103,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 35,
-      "x1": 1250,
-      "y1": 1746,
-      "x2": 1266,
-      "y2": 1879,
-      "length": 133.96,
-      "angle_degrees": 83.14,
-      "vertical_deviation_degrees": 6.86,
-      "sampled_points": 134,
-      "points_inside_mask": 134,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 36,
-      "x1": 1148,
-      "y1": 966,
-      "x2": 1167,
-      "y2": 1122,
-      "length": 157.15,
-      "angle_degrees": 83.06,
-      "vertical_deviation_degrees": 6.94,
-      "sampled_points": 157,
-      "points_inside_mask": 157,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 37,
-      "x1": 1320,
-      "y1": 2235,
-      "x2": 1346,
-      "y2": 2396,
-      "length": 163.09,
-      "angle_degrees": 80.83,
-      "vertical_deviation_degrees": 9.17,
-      "sampled_points": 162,
-      "points_inside_mask": 162,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 361,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.4839,
       "is_valid": true
     },
     {
@@ -557,20 +347,9 @@
       "sampled_points": 166,
       "points_inside_mask": 166,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 39,
-      "x1": 1815,
-      "y1": 2251,
-      "x2": 1845,
-      "y2": 2002,
-      "length": 250.8,
-      "angle_degrees": -83.13,
-      "vertical_deviation_degrees": 6.87,
-      "sampled_points": 250,
-      "points_inside_mask": 250,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 472,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.6327,
       "is_valid": true
     },
     {
@@ -585,20 +364,9 @@
       "sampled_points": 159,
       "points_inside_mask": 159,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 41,
-      "x1": 1738,
-      "y1": 1946,
-      "x2": 1782,
-      "y2": 2153,
-      "length": 211.62,
-      "angle_degrees": 78.0,
-      "vertical_deviation_degrees": 12.0,
-      "sampled_points": 208,
-      "points_inside_mask": 208,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 390,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5228,
       "is_valid": true
     },
     {
@@ -613,6 +381,9 @@
       "sampled_points": 102,
       "points_inside_mask": 102,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 402,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5389,
       "is_valid": true
     },
     {
@@ -627,48 +398,9 @@
       "sampled_points": 183,
       "points_inside_mask": 183,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 44,
-      "x1": 1342,
-      "y1": 2071,
-      "x2": 1352,
-      "y2": 2212,
-      "length": 141.35,
-      "angle_degrees": 85.94,
-      "vertical_deviation_degrees": 4.06,
-      "sampled_points": 142,
-      "points_inside_mask": 142,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 45,
-      "x1": 1805,
-      "y1": 2502,
-      "x2": 1821,
-      "y2": 2351,
-      "length": 151.85,
-      "angle_degrees": -83.95,
-      "vertical_deviation_degrees": 6.05,
-      "sampled_points": 152,
-      "points_inside_mask": 152,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 46,
-      "x1": 1335,
-      "y1": 2059,
-      "x2": 1349,
-      "y2": 2266,
-      "length": 207.47,
-      "angle_degrees": 86.13,
-      "vertical_deviation_degrees": 3.87,
-      "sampled_points": 208,
-      "points_inside_mask": 208,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 447,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5992,
       "is_valid": true
     },
     {
@@ -683,20 +415,9 @@
       "sampled_points": 122,
       "points_inside_mask": 122,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 48,
-      "x1": 1781,
-      "y1": 2058,
-      "x2": 1845,
-      "y2": 2296,
-      "length": 246.45,
-      "angle_degrees": 74.95,
-      "vertical_deviation_degrees": 15.05,
-      "sampled_points": 239,
-      "points_inside_mask": 239,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 356,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.4772,
       "is_valid": true
     },
     {
@@ -711,20 +432,9 @@
       "sampled_points": 109,
       "points_inside_mask": 109,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 50,
-      "x1": 1334,
-      "y1": 2061,
-      "x2": 1341,
-      "y2": 2198,
-      "length": 137.18,
-      "angle_degrees": 87.08,
-      "vertical_deviation_degrees": 2.92,
-      "sampled_points": 138,
-      "points_inside_mask": 138,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 498,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.6676,
       "is_valid": true
     },
     {
@@ -739,6 +449,9 @@
       "sampled_points": 119,
       "points_inside_mask": 119,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 404,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5416,
       "is_valid": true
     },
     {
@@ -753,6 +466,9 @@
       "sampled_points": 118,
       "points_inside_mask": 118,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 444,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5952,
       "is_valid": true
     },
     {
@@ -767,20 +483,9 @@
       "sampled_points": 169,
       "points_inside_mask": 169,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 54,
-      "x1": 1251,
-      "y1": 1744,
-      "x2": 1266,
-      "y2": 1874,
-      "length": 130.86,
-      "angle_degrees": 83.42,
-      "vertical_deviation_degrees": 6.58,
-      "sampled_points": 131,
-      "points_inside_mask": 131,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 429,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5751,
       "is_valid": true
     },
     {
@@ -795,6 +500,9 @@
       "sampled_points": 173,
       "points_inside_mask": 173,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 423,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.567,
       "is_valid": true
     },
     {
@@ -809,6 +517,9 @@
       "sampled_points": 193,
       "points_inside_mask": 193,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 391,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5241,
       "is_valid": true
     },
     {
@@ -823,6 +534,9 @@
       "sampled_points": 171,
       "points_inside_mask": 171,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 559,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.7493,
       "is_valid": true
     },
     {
@@ -837,34 +551,9 @@
       "sampled_points": 224,
       "points_inside_mask": 224,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 60,
-      "x1": 1230,
-      "y1": 769,
-      "x2": 1235,
-      "y2": 870,
-      "length": 101.12,
-      "angle_degrees": 87.17,
-      "vertical_deviation_degrees": 2.83,
-      "sampled_points": 102,
-      "points_inside_mask": 102,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 61,
-      "x1": 1325,
-      "y1": 2119,
-      "x2": 1334,
-      "y2": 2231,
-      "length": 112.36,
-      "angle_degrees": 85.41,
-      "vertical_deviation_degrees": 4.59,
-      "sampled_points": 113,
-      "points_inside_mask": 113,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 360,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.4826,
       "is_valid": true
     },
     {
@@ -879,20 +568,9 @@
       "sampled_points": 128,
       "points_inside_mask": 128,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 63,
-      "x1": 2028,
-      "y1": 2011,
-      "x2": 2043,
-      "y2": 1169,
-      "length": 842.13,
-      "angle_degrees": -88.98,
-      "vertical_deviation_degrees": 1.02,
-      "sampled_points": 843,
-      "points_inside_mask": 843,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 402,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5389,
       "is_valid": true
     },
     {
@@ -907,20 +585,9 @@
       "sampled_points": 196,
       "points_inside_mask": 196,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 65,
-      "x1": 1306,
-      "y1": 2245,
-      "x2": 1306,
-      "y2": 2096,
-      "length": 149.0,
-      "angle_degrees": -90.0,
-      "vertical_deviation_degrees": 0.0,
-      "sampled_points": 150,
-      "points_inside_mask": 150,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 248,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.4732,
       "is_valid": true
     },
     {
@@ -935,20 +602,9 @@
       "sampled_points": 248,
       "points_inside_mask": 248,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 67,
-      "x1": 1154,
-      "y1": 999,
-      "x2": 1171,
-      "y2": 1119,
-      "length": 121.2,
-      "angle_degrees": 81.94,
-      "vertical_deviation_degrees": 8.06,
-      "sampled_points": 121,
-      "points_inside_mask": 121,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 449,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.6019,
       "is_valid": true
     },
     {
@@ -963,20 +619,9 @@
       "sampled_points": 113,
       "points_inside_mask": 113,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 69,
-      "x1": 2032,
-      "y1": 1999,
-      "x2": 2045,
-      "y2": 1205,
-      "length": 794.11,
-      "angle_degrees": -89.06,
-      "vertical_deviation_degrees": 0.94,
-      "sampled_points": 795,
-      "points_inside_mask": 795,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 440,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5898,
       "is_valid": true
     },
     {
@@ -991,6 +636,9 @@
       "sampled_points": 127,
       "points_inside_mask": 127,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 416,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5576,
       "is_valid": true
     },
     {
@@ -1005,6 +653,9 @@
       "sampled_points": 116,
       "points_inside_mask": 116,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 378,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5067,
       "is_valid": true
     },
     {
@@ -1019,34 +670,9 @@
       "sampled_points": 103,
       "points_inside_mask": 103,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 73,
-      "x1": 1245,
-      "y1": 785,
-      "x2": 1250,
-      "y2": 927,
-      "length": 142.09,
-      "angle_degrees": 87.98,
-      "vertical_deviation_degrees": 2.02,
-      "sampled_points": 143,
-      "points_inside_mask": 143,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 74,
-      "x1": 1877,
-      "y1": 1345,
-      "x2": 1888,
-      "y2": 1149,
-      "length": 196.31,
-      "angle_degrees": -86.79,
-      "vertical_deviation_degrees": 3.21,
-      "sampled_points": 197,
-      "points_inside_mask": 197,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 412,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5523,
       "is_valid": true
     },
     {
@@ -1061,6 +687,9 @@
       "sampled_points": 168,
       "points_inside_mask": 168,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 337,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.4517,
       "is_valid": true
     },
     {
@@ -1075,6 +704,9 @@
       "sampled_points": 119,
       "points_inside_mask": 119,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 448,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.6005,
       "is_valid": true
     },
     {
@@ -1089,34 +721,9 @@
       "sampled_points": 206,
       "points_inside_mask": 206,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 78,
-      "x1": 1278,
-      "y1": 1721,
-      "x2": 1290,
-      "y2": 1834,
-      "length": 113.64,
-      "angle_degrees": 83.94,
-      "vertical_deviation_degrees": 6.06,
-      "sampled_points": 114,
-      "points_inside_mask": 114,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 79,
-      "x1": 2027,
-      "y1": 2010,
-      "x2": 2042,
-      "y2": 1163,
-      "length": 847.13,
-      "angle_degrees": -88.99,
-      "vertical_deviation_degrees": 1.01,
-      "sampled_points": 848,
-      "points_inside_mask": 848,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 445,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5965,
       "is_valid": true
     },
     {
@@ -1131,20 +738,9 @@
       "sampled_points": 207,
       "points_inside_mask": 207,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 81,
-      "x1": 1971,
-      "y1": 999,
-      "x2": 1984,
-      "y2": 893,
-      "length": 106.79,
-      "angle_degrees": -83.01,
-      "vertical_deviation_degrees": 6.99,
-      "sampled_points": 107,
-      "points_inside_mask": 107,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 480,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.6434,
       "is_valid": true
     },
     {
@@ -1159,76 +755,9 @@
       "sampled_points": 222,
       "points_inside_mask": 222,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 83,
-      "x1": 2033,
-      "y1": 1995,
-      "x2": 2040,
-      "y2": 1616,
-      "length": 379.06,
-      "angle_degrees": -88.94,
-      "vertical_deviation_degrees": 1.06,
-      "sampled_points": 380,
-      "points_inside_mask": 380,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 84,
-      "x1": 1243,
-      "y1": 1775,
-      "x2": 1256,
-      "y2": 1887,
-      "length": 112.75,
-      "angle_degrees": 83.38,
-      "vertical_deviation_degrees": 6.62,
-      "sampled_points": 113,
-      "points_inside_mask": 113,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 85,
-      "x1": 1280,
-      "y1": 2251,
-      "x2": 1288,
-      "y2": 2099,
-      "length": 152.21,
-      "angle_degrees": -86.99,
-      "vertical_deviation_degrees": 3.01,
-      "sampled_points": 153,
-      "points_inside_mask": 153,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 86,
-      "x1": 1328,
-      "y1": 2230,
-      "x2": 1334,
-      "y2": 2330,
-      "length": 100.18,
-      "angle_degrees": 86.57,
-      "vertical_deviation_degrees": 3.43,
-      "sampled_points": 101,
-      "points_inside_mask": 101,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 87,
-      "x1": 1964,
-      "y1": 1067,
-      "x2": 1983,
-      "y2": 905,
-      "length": 163.11,
-      "angle_degrees": -83.31,
-      "vertical_deviation_degrees": 6.69,
-      "sampled_points": 163,
-      "points_inside_mask": 163,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 356,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.4772,
       "is_valid": true
     },
     {
@@ -1243,6 +772,9 @@
       "sampled_points": 311,
       "points_inside_mask": 311,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 400,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5362,
       "is_valid": true
     },
     {
@@ -1257,6 +789,9 @@
       "sampled_points": 174,
       "points_inside_mask": 174,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 382,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5121,
       "is_valid": true
     },
     {
@@ -1271,6 +806,9 @@
       "sampled_points": 266,
       "points_inside_mask": 266,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 397,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5322,
       "is_valid": true
     },
     {
@@ -1285,6 +823,9 @@
       "sampled_points": 343,
       "points_inside_mask": 343,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 398,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5335,
       "is_valid": true
     },
     {
@@ -1299,48 +840,9 @@
       "sampled_points": 317,
       "points_inside_mask": 317,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 93,
-      "x1": 1295,
-      "y1": 2293,
-      "x2": 1295,
-      "y2": 2156,
-      "length": 137.0,
-      "angle_degrees": -90.0,
-      "vertical_deviation_degrees": 0.0,
-      "sampled_points": 138,
-      "points_inside_mask": 138,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 94,
-      "x1": 1805,
-      "y1": 2525,
-      "x2": 1838,
-      "y2": 2220,
-      "length": 306.78,
-      "angle_degrees": -83.82,
-      "vertical_deviation_degrees": 6.18,
-      "sampled_points": 306,
-      "points_inside_mask": 306,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 95,
-      "x1": 1871,
-      "y1": 1452,
-      "x2": 1881,
-      "y2": 1659,
-      "length": 207.24,
-      "angle_degrees": 87.23,
-      "vertical_deviation_degrees": 2.77,
-      "sampled_points": 208,
-      "points_inside_mask": 208,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 397,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5322,
       "is_valid": true
     },
     {
@@ -1355,34 +857,9 @@
       "sampled_points": 111,
       "points_inside_mask": 111,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 97,
-      "x1": 1258,
-      "y1": 1733,
-      "x2": 1272,
-      "y2": 1834,
-      "length": 101.97,
-      "angle_degrees": 82.11,
-      "vertical_deviation_degrees": 7.89,
-      "sampled_points": 102,
-      "points_inside_mask": 102,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 98,
-      "x1": 1276,
-      "y1": 1720,
-      "x2": 1282,
-      "y2": 1837,
-      "length": 117.15,
-      "angle_degrees": 87.06,
-      "vertical_deviation_degrees": 2.94,
-      "sampled_points": 118,
-      "points_inside_mask": 118,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 467,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.626,
       "is_valid": true
     },
     {
@@ -1397,6 +874,9 @@
       "sampled_points": 192,
       "points_inside_mask": 192,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 382,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5121,
       "is_valid": true
     },
     {
@@ -1411,20 +891,9 @@
       "sampled_points": 138,
       "points_inside_mask": 138,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 101,
-      "x1": 1871,
-      "y1": 1923,
-      "x2": 1895,
-      "y2": 1692,
-      "length": 232.24,
-      "angle_degrees": -84.07,
-      "vertical_deviation_degrees": 5.93,
-      "sampled_points": 232,
-      "points_inside_mask": 232,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 529,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.7091,
       "is_valid": true
     },
     {
@@ -1439,6 +908,9 @@
       "sampled_points": 206,
       "points_inside_mask": 206,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 444,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5952,
       "is_valid": true
     },
     {
@@ -1453,6 +925,9 @@
       "sampled_points": 105,
       "points_inside_mask": 105,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 456,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.6113,
       "is_valid": true
     },
     {
@@ -1467,6 +942,9 @@
       "sampled_points": 299,
       "points_inside_mask": 299,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 383,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5134,
       "is_valid": true
     },
     {
@@ -1481,20 +959,9 @@
       "sampled_points": 270,
       "points_inside_mask": 270,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 106,
-      "x1": 1827,
-      "y1": 2355,
-      "x2": 1840,
-      "y2": 2231,
-      "length": 124.68,
-      "angle_degrees": -84.02,
-      "vertical_deviation_degrees": 5.98,
-      "sampled_points": 125,
-      "points_inside_mask": 125,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 397,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5322,
       "is_valid": true
     },
     {
@@ -1509,48 +976,9 @@
       "sampled_points": 112,
       "points_inside_mask": 112,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 108,
-      "x1": 1356,
-      "y1": 2592,
-      "x2": 1358,
-      "y2": 2693,
-      "length": 101.02,
-      "angle_degrees": 88.87,
-      "vertical_deviation_degrees": 1.13,
-      "sampled_points": 102,
-      "points_inside_mask": 102,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 109,
-      "x1": 1876,
-      "y1": 1931,
-      "x2": 1891,
-      "y2": 1787,
-      "length": 144.78,
-      "angle_degrees": -84.05,
-      "vertical_deviation_degrees": 5.95,
-      "sampled_points": 145,
-      "points_inside_mask": 145,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 110,
-      "x1": 1960,
-      "y1": 1160,
-      "x2": 1982,
-      "y2": 945,
-      "length": 216.12,
-      "angle_degrees": -84.16,
-      "vertical_deviation_degrees": 5.84,
-      "sampled_points": 216,
-      "points_inside_mask": 216,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 524,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.7024,
       "is_valid": true
     },
     {
@@ -1565,34 +993,9 @@
       "sampled_points": 203,
       "points_inside_mask": 203,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 112,
-      "x1": 1959,
-      "y1": 1160,
-      "x2": 1985,
-      "y2": 908,
-      "length": 253.34,
-      "angle_degrees": -84.11,
-      "vertical_deviation_degrees": 5.89,
-      "sampled_points": 253,
-      "points_inside_mask": 253,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 113,
-      "x1": 1297,
-      "y1": 911,
-      "x2": 1297,
-      "y2": 734,
-      "length": 177.0,
-      "angle_degrees": -90.0,
-      "vertical_deviation_degrees": 0.0,
-      "sampled_points": 178,
-      "points_inside_mask": 178,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 473,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.634,
       "is_valid": true
     },
     {
@@ -1607,6 +1010,9 @@
       "sampled_points": 305,
       "points_inside_mask": 305,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 558,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.748,
       "is_valid": true
     },
     {
@@ -1621,6 +1027,9 @@
       "sampled_points": 162,
       "points_inside_mask": 162,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 407,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5456,
       "is_valid": true
     },
     {
@@ -1635,6 +1044,9 @@
       "sampled_points": 162,
       "points_inside_mask": 162,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 274,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.4824,
       "is_valid": true
     },
     {
@@ -1649,20 +1061,9 @@
       "sampled_points": 112,
       "points_inside_mask": 112,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 118,
-      "x1": 1336,
-      "y1": 2058,
-      "x2": 1346,
-      "y2": 2158,
-      "length": 100.5,
-      "angle_degrees": 84.29,
-      "vertical_deviation_degrees": 5.71,
-      "sampled_points": 101,
-      "points_inside_mask": 101,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 231,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.4334,
       "is_valid": true
     },
     {
@@ -1677,48 +1078,9 @@
       "sampled_points": 242,
       "points_inside_mask": 242,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 120,
-      "x1": 1312,
-      "y1": 905,
-      "x2": 1315,
-      "y2": 768,
-      "length": 137.03,
-      "angle_degrees": -88.75,
-      "vertical_deviation_degrees": 1.25,
-      "sampled_points": 138,
-      "points_inside_mask": 138,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 121,
-      "x1": 1800,
-      "y1": 2454,
-      "x2": 1800,
-      "y2": 2211,
-      "length": 243.0,
-      "angle_degrees": -90.0,
-      "vertical_deviation_degrees": 0.0,
-      "sampled_points": 244,
-      "points_inside_mask": 244,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 122,
-      "x1": 1337,
-      "y1": 2241,
-      "x2": 1346,
-      "y2": 2343,
-      "length": 102.4,
-      "angle_degrees": 84.96,
-      "vertical_deviation_degrees": 5.04,
-      "sampled_points": 103,
-      "points_inside_mask": 103,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 449,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.6019,
       "is_valid": true
     },
     {
@@ -1733,6 +1095,9 @@
       "sampled_points": 275,
       "points_inside_mask": 275,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 403,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5402,
       "is_valid": true
     },
     {
@@ -1747,6 +1112,9 @@
       "sampled_points": 209,
       "points_inside_mask": 209,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 450,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.6032,
       "is_valid": true
     },
     {
@@ -1761,6 +1129,9 @@
       "sampled_points": 117,
       "points_inside_mask": 117,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 520,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.6971,
       "is_valid": true
     },
     {
@@ -1775,20 +1146,9 @@
       "sampled_points": 239,
       "points_inside_mask": 239,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 127,
-      "x1": 1322,
-      "y1": 2167,
-      "x2": 1336,
-      "y2": 2284,
-      "length": 117.83,
-      "angle_degrees": 83.18,
-      "vertical_deviation_degrees": 6.82,
-      "sampled_points": 118,
-      "points_inside_mask": 118,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 367,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.492,
       "is_valid": true
     },
     {
@@ -1803,34 +1163,9 @@
       "sampled_points": 224,
       "points_inside_mask": 224,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 131,
-      "x1": 1340,
-      "y1": 1966,
-      "x2": 1353,
-      "y2": 2079,
-      "length": 113.75,
-      "angle_degrees": 83.44,
-      "vertical_deviation_degrees": 6.56,
-      "sampled_points": 114,
-      "points_inside_mask": 114,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 132,
-      "x1": 1302,
-      "y1": 909,
-      "x2": 1302,
-      "y2": 719,
-      "length": 190.0,
-      "angle_degrees": -90.0,
-      "vertical_deviation_degrees": 0.0,
-      "sampled_points": 191,
-      "points_inside_mask": 191,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 377,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5054,
       "is_valid": true
     },
     {
@@ -1845,6 +1180,9 @@
       "sampled_points": 111,
       "points_inside_mask": 111,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 442,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5925,
       "is_valid": true
     },
     {
@@ -1859,6 +1197,9 @@
       "sampled_points": 119,
       "points_inside_mask": 119,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 387,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5188,
       "is_valid": true
     },
     {
@@ -1873,6 +1214,9 @@
       "sampled_points": 176,
       "points_inside_mask": 176,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 266,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.4793,
       "is_valid": true
     },
     {
@@ -1887,76 +1231,9 @@
       "sampled_points": 120,
       "points_inside_mask": 120,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 137,
-      "x1": 1333,
-      "y1": 1946,
-      "x2": 1353,
-      "y2": 2115,
-      "length": 170.18,
-      "angle_degrees": 83.25,
-      "vertical_deviation_degrees": 6.75,
-      "sampled_points": 170,
-      "points_inside_mask": 170,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 138,
-      "x1": 1299,
-      "y1": 910,
-      "x2": 1299,
-      "y2": 728,
-      "length": 182.0,
-      "angle_degrees": -90.0,
-      "vertical_deviation_degrees": 0.0,
-      "sampled_points": 183,
-      "points_inside_mask": 183,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 141,
-      "x1": 1895,
-      "y1": 1833,
-      "x2": 1900,
-      "y2": 1942,
-      "length": 109.11,
-      "angle_degrees": 87.37,
-      "vertical_deviation_degrees": 2.63,
-      "sampled_points": 110,
-      "points_inside_mask": 110,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 142,
-      "x1": 1400,
-      "y1": 754,
-      "x2": 1423,
-      "y2": 886,
-      "length": 133.99,
-      "angle_degrees": 80.12,
-      "vertical_deviation_degrees": 9.88,
-      "sampled_points": 133,
-      "points_inside_mask": 133,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 144,
-      "x1": 1338,
-      "y1": 827,
-      "x2": 1342,
-      "y2": 726,
-      "length": 101.08,
-      "angle_degrees": -87.73,
-      "vertical_deviation_degrees": 2.27,
-      "sampled_points": 102,
-      "points_inside_mask": 102,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 446,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5979,
       "is_valid": true
     },
     {
@@ -1971,6 +1248,9 @@
       "sampled_points": 176,
       "points_inside_mask": 176,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 493,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.6609,
       "is_valid": true
     },
     {
@@ -1985,6 +1265,9 @@
       "sampled_points": 278,
       "points_inside_mask": 278,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 450,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.6032,
       "is_valid": true
     },
     {
@@ -1999,6 +1282,9 @@
       "sampled_points": 233,
       "points_inside_mask": 233,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 372,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.4987,
       "is_valid": true
     },
     {
@@ -2013,20 +1299,9 @@
       "sampled_points": 243,
       "points_inside_mask": 243,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 149,
-      "x1": 1229,
-      "y1": 1692,
-      "x2": 1232,
-      "y2": 1865,
-      "length": 173.03,
-      "angle_degrees": 89.01,
-      "vertical_deviation_degrees": 0.99,
-      "sampled_points": 174,
-      "points_inside_mask": 174,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 405,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5429,
       "is_valid": true
     },
     {
@@ -2041,62 +1316,9 @@
       "sampled_points": 111,
       "points_inside_mask": 111,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 151,
-      "x1": 1355,
-      "y1": 887,
-      "x2": 1364,
-      "y2": 721,
-      "length": 166.24,
-      "angle_degrees": -86.9,
-      "vertical_deviation_degrees": 3.1,
-      "sampled_points": 167,
-      "points_inside_mask": 167,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 152,
-      "x1": 1806,
-      "y1": 2501,
-      "x2": 1837,
-      "y2": 2206,
-      "length": 296.62,
-      "angle_degrees": -84.0,
-      "vertical_deviation_degrees": 6.0,
-      "sampled_points": 296,
-      "points_inside_mask": 296,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 153,
-      "x1": 1907,
-      "y1": 1169,
-      "x2": 1925,
-      "y2": 1055,
-      "length": 115.41,
-      "angle_degrees": -81.03,
-      "vertical_deviation_degrees": 8.97,
-      "sampled_points": 115,
-      "points_inside_mask": 115,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 154,
-      "x1": 1296,
-      "y1": 911,
-      "x2": 1296,
-      "y2": 734,
-      "length": 177.0,
-      "angle_degrees": -90.0,
-      "vertical_deviation_degrees": 0.0,
-      "sampled_points": 178,
-      "points_inside_mask": 178,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 458,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.6139,
       "is_valid": true
     },
     {
@@ -2111,6 +1333,9 @@
       "sampled_points": 160,
       "points_inside_mask": 160,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 418,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5603,
       "is_valid": true
     },
     {
@@ -2125,6 +1350,9 @@
       "sampled_points": 208,
       "points_inside_mask": 208,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 393,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5268,
       "is_valid": true
     },
     {
@@ -2139,6 +1367,9 @@
       "sampled_points": 184,
       "points_inside_mask": 184,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 462,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.6193,
       "is_valid": true
     },
     {
@@ -2153,34 +1384,9 @@
       "sampled_points": 128,
       "points_inside_mask": 128,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 159,
-      "x1": 1313,
-      "y1": 905,
-      "x2": 1315,
-      "y2": 798,
-      "length": 107.02,
-      "angle_degrees": -88.93,
-      "vertical_deviation_degrees": 1.07,
-      "sampled_points": 108,
-      "points_inside_mask": 108,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 160,
-      "x1": 1343,
-      "y1": 2223,
-      "x2": 1349,
-      "y2": 2341,
-      "length": 118.15,
-      "angle_degrees": 87.09,
-      "vertical_deviation_degrees": 2.91,
-      "sampled_points": 119,
-      "points_inside_mask": 119,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 305,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.4088,
       "is_valid": true
     },
     {
@@ -2195,6 +1401,9 @@
       "sampled_points": 154,
       "points_inside_mask": 154,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 574,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.7694,
       "is_valid": true
     },
     {
@@ -2209,6 +1418,9 @@
       "sampled_points": 162,
       "points_inside_mask": 162,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 528,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.7078,
       "is_valid": true
     },
     {
@@ -2223,6 +1435,9 @@
       "sampled_points": 257,
       "points_inside_mask": 257,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 398,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5335,
       "is_valid": true
     },
     {
@@ -2237,6 +1452,9 @@
       "sampled_points": 117,
       "points_inside_mask": 117,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 391,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5241,
       "is_valid": true
     },
     {
@@ -2251,20 +1469,9 @@
       "sampled_points": 112,
       "points_inside_mask": 112,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 166,
-      "x1": 1808,
-      "y1": 2560,
-      "x2": 1824,
-      "y2": 2384,
-      "length": 176.73,
-      "angle_degrees": -84.81,
-      "vertical_deviation_degrees": 5.19,
-      "sampled_points": 177,
-      "points_inside_mask": 177,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 425,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5697,
       "is_valid": true
     },
     {
@@ -2279,6 +1486,9 @@
       "sampled_points": 118,
       "points_inside_mask": 118,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 513,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.6877,
       "is_valid": true
     },
     {
@@ -2293,20 +1503,9 @@
       "sampled_points": 114,
       "points_inside_mask": 114,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 169,
-      "x1": 1816,
-      "y1": 2225,
-      "x2": 1843,
-      "y2": 2005,
-      "length": 221.65,
-      "angle_degrees": -83.0,
-      "vertical_deviation_degrees": 7.0,
-      "sampled_points": 221,
-      "points_inside_mask": 221,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 481,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.6448,
       "is_valid": true
     },
     {
@@ -2321,34 +1520,9 @@
       "sampled_points": 180,
       "points_inside_mask": 180,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 171,
-      "x1": 1752,
-      "y1": 2438,
-      "x2": 1762,
-      "y2": 2540,
-      "length": 102.49,
-      "angle_degrees": 84.4,
-      "vertical_deviation_degrees": 5.6,
-      "sampled_points": 103,
-      "points_inside_mask": 103,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 172,
-      "x1": 2045,
-      "y1": 1497,
-      "x2": 2049,
-      "y2": 1297,
-      "length": 200.04,
-      "angle_degrees": -88.85,
-      "vertical_deviation_degrees": 1.15,
-      "sampled_points": 201,
-      "points_inside_mask": 201,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 412,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5523,
       "is_valid": true
     },
     {
@@ -2363,6 +1537,9 @@
       "sampled_points": 152,
       "points_inside_mask": 152,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 393,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5268,
       "is_valid": true
     },
     {
@@ -2377,34 +1554,9 @@
       "sampled_points": 150,
       "points_inside_mask": 150,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 175,
-      "x1": 1254,
-      "y1": 1759,
-      "x2": 1268,
-      "y2": 1871,
-      "length": 112.87,
-      "angle_degrees": 82.87,
-      "vertical_deviation_degrees": 7.13,
-      "sampled_points": 113,
-      "points_inside_mask": 113,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 177,
-      "x1": 1310,
-      "y1": 906,
-      "x2": 1313,
-      "y2": 765,
-      "length": 141.03,
-      "angle_degrees": -88.78,
-      "vertical_deviation_degrees": 1.22,
-      "sampled_points": 142,
-      "points_inside_mask": 142,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 419,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5617,
       "is_valid": true
     },
     {
@@ -2419,20 +1571,9 @@
       "sampled_points": 110,
       "points_inside_mask": 110,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 179,
-      "x1": 1339,
-      "y1": 834,
-      "x2": 1343,
-      "y2": 726,
-      "length": 108.07,
-      "angle_degrees": -87.88,
-      "vertical_deviation_degrees": 2.12,
-      "sampled_points": 109,
-      "points_inside_mask": 109,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 425,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5697,
       "is_valid": true
     },
     {
@@ -2447,6 +1588,9 @@
       "sampled_points": 114,
       "points_inside_mask": 114,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 547,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.7332,
       "is_valid": true
     },
     {
@@ -2461,6 +1605,9 @@
       "sampled_points": 104,
       "points_inside_mask": 104,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 545,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.7306,
       "is_valid": true
     },
     {
@@ -2475,20 +1622,9 @@
       "sampled_points": 152,
       "points_inside_mask": 152,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 183,
-      "x1": 1251,
-      "y1": 1689,
-      "x2": 1269,
-      "y2": 1836,
-      "length": 148.1,
-      "angle_degrees": 83.02,
-      "vertical_deviation_degrees": 6.98,
-      "sampled_points": 148,
-      "points_inside_mask": 148,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 395,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5295,
       "is_valid": true
     },
     {
@@ -2503,6 +1639,9 @@
       "sampled_points": 106,
       "points_inside_mask": 106,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 403,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5402,
       "is_valid": true
     },
     {
@@ -2517,34 +1656,9 @@
       "sampled_points": 127,
       "points_inside_mask": 127,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 186,
-      "x1": 1794,
-      "y1": 2168,
-      "x2": 1794,
-      "y2": 2005,
-      "length": 163.0,
-      "angle_degrees": -90.0,
-      "vertical_deviation_degrees": 0.0,
-      "sampled_points": 164,
-      "points_inside_mask": 164,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 187,
-      "x1": 1283,
-      "y1": 2252,
-      "x2": 1287,
-      "y2": 2129,
-      "length": 123.07,
-      "angle_degrees": -88.14,
-      "vertical_deviation_degrees": 1.86,
-      "sampled_points": 124,
-      "points_inside_mask": 124,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 325,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.4357,
       "is_valid": true
     },
     {
@@ -2559,20 +1673,9 @@
       "sampled_points": 102,
       "points_inside_mask": 102,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 189,
-      "x1": 1871,
-      "y1": 1486,
-      "x2": 1880,
-      "y2": 1660,
-      "length": 174.23,
-      "angle_degrees": 87.04,
-      "vertical_deviation_degrees": 2.96,
-      "sampled_points": 175,
-      "points_inside_mask": 175,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 384,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5147,
       "is_valid": true
     },
     {
@@ -2587,34 +1690,9 @@
       "sampled_points": 111,
       "points_inside_mask": 111,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 191,
-      "x1": 1229,
-      "y1": 770,
-      "x2": 1231,
-      "y2": 915,
-      "length": 145.01,
-      "angle_degrees": 89.21,
-      "vertical_deviation_degrees": 0.79,
-      "sampled_points": 146,
-      "points_inside_mask": 146,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 192,
-      "x1": 1799,
-      "y1": 2455,
-      "x2": 1799,
-      "y2": 2209,
-      "length": 246.0,
-      "angle_degrees": -90.0,
-      "vertical_deviation_degrees": 0.0,
-      "sampled_points": 247,
-      "points_inside_mask": 247,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 583,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.7815,
       "is_valid": true
     },
     {
@@ -2629,6 +1707,9 @@
       "sampled_points": 104,
       "points_inside_mask": 104,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 364,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.4879,
       "is_valid": true
     },
     {
@@ -2643,6 +1724,9 @@
       "sampled_points": 171,
       "points_inside_mask": 171,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 527,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.7064,
       "is_valid": true
     },
     {
@@ -2657,20 +1741,9 @@
       "sampled_points": 118,
       "points_inside_mask": 118,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 196,
-      "x1": 1825,
-      "y1": 2296,
-      "x2": 1836,
-      "y2": 2191,
-      "length": 105.57,
-      "angle_degrees": -84.02,
-      "vertical_deviation_degrees": 5.98,
-      "sampled_points": 106,
-      "points_inside_mask": 106,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 470,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.63,
       "is_valid": true
     },
     {
@@ -2685,6 +1758,9 @@
       "sampled_points": 123,
       "points_inside_mask": 123,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 348,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.4665,
       "is_valid": true
     },
     {
@@ -2699,6 +1775,9 @@
       "sampled_points": 206,
       "points_inside_mask": 206,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 389,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5214,
       "is_valid": true
     },
     {
@@ -2713,20 +1792,9 @@
       "sampled_points": 142,
       "points_inside_mask": 142,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 201,
-      "x1": 1792,
-      "y1": 2452,
-      "x2": 1797,
-      "y2": 2208,
-      "length": 244.05,
-      "angle_degrees": -88.83,
-      "vertical_deviation_degrees": 1.17,
-      "sampled_points": 245,
-      "points_inside_mask": 245,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 574,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.7694,
       "is_valid": true
     },
     {
@@ -2741,6 +1809,9 @@
       "sampled_points": 124,
       "points_inside_mask": 124,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 518,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.6944,
       "is_valid": true
     },
     {
@@ -2755,6 +1826,9 @@
       "sampled_points": 122,
       "points_inside_mask": 122,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 511,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.685,
       "is_valid": true
     },
     {
@@ -2769,6 +1843,9 @@
       "sampled_points": 157,
       "points_inside_mask": 157,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 391,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5241,
       "is_valid": true
     },
     {
@@ -2783,34 +1860,9 @@
       "sampled_points": 111,
       "points_inside_mask": 111,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 206,
-      "x1": 1240,
-      "y1": 870,
-      "x2": 1240,
-      "y2": 763,
-      "length": 107.0,
-      "angle_degrees": -90.0,
-      "vertical_deviation_degrees": 0.0,
-      "sampled_points": 108,
-      "points_inside_mask": 108,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 207,
-      "x1": 2043,
-      "y1": 1490,
-      "x2": 2047,
-      "y2": 1278,
-      "length": 212.04,
-      "angle_degrees": -88.92,
-      "vertical_deviation_degrees": 1.08,
-      "sampled_points": 213,
-      "points_inside_mask": 213,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 233,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.4371,
       "is_valid": true
     },
     {
@@ -2825,34 +1877,9 @@
       "sampled_points": 118,
       "points_inside_mask": 118,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 209,
-      "x1": 1340,
-      "y1": 2014,
-      "x2": 1352,
-      "y2": 2118,
-      "length": 104.69,
-      "angle_degrees": 83.42,
-      "vertical_deviation_degrees": 6.58,
-      "sampled_points": 105,
-      "points_inside_mask": 105,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 210,
-      "x1": 2030,
-      "y1": 1722,
-      "x2": 2036,
-      "y2": 1362,
-      "length": 360.05,
-      "angle_degrees": -89.05,
-      "vertical_deviation_degrees": 0.95,
-      "sampled_points": 361,
-      "points_inside_mask": 361,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 472,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.6327,
       "is_valid": true
     },
     {
@@ -2867,6 +1894,9 @@
       "sampled_points": 145,
       "points_inside_mask": 145,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 385,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5161,
       "is_valid": true
     },
     {
@@ -2881,6 +1911,9 @@
       "sampled_points": 102,
       "points_inside_mask": 102,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 381,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5107,
       "is_valid": true
     },
     {
@@ -2895,34 +1928,9 @@
       "sampled_points": 121,
       "points_inside_mask": 121,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 214,
-      "x1": 1217,
-      "y1": 1655,
-      "x2": 1223,
-      "y2": 1542,
-      "length": 113.16,
-      "angle_degrees": -86.96,
-      "vertical_deviation_degrees": 3.04,
-      "sampled_points": 114,
-      "points_inside_mask": 114,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 215,
-      "x1": 1353,
-      "y1": 766,
-      "x2": 1380,
-      "y2": 894,
-      "length": 130.82,
-      "angle_degrees": 78.09,
-      "vertical_deviation_degrees": 11.91,
-      "sampled_points": 129,
-      "points_inside_mask": 129,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 509,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.6823,
       "is_valid": true
     },
     {
@@ -2937,6 +1945,9 @@
       "sampled_points": 199,
       "points_inside_mask": 199,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 470,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.63,
       "is_valid": true
     },
     {
@@ -2951,6 +1962,9 @@
       "sampled_points": 105,
       "points_inside_mask": 105,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 387,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5188,
       "is_valid": true
     },
     {
@@ -2965,20 +1979,9 @@
       "sampled_points": 110,
       "points_inside_mask": 110,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 219,
-      "x1": 1242,
-      "y1": 891,
-      "x2": 1242,
-      "y2": 763,
-      "length": 128.0,
-      "angle_degrees": -90.0,
-      "vertical_deviation_degrees": 0.0,
-      "sampled_points": 129,
-      "points_inside_mask": 129,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 450,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.6032,
       "is_valid": true
     },
     {
@@ -2993,76 +1996,9 @@
       "sampled_points": 105,
       "points_inside_mask": 105,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 221,
-      "x1": 1850,
-      "y1": 742,
-      "x2": 1856,
-      "y2": 915,
-      "length": 173.1,
-      "angle_degrees": 88.01,
-      "vertical_deviation_degrees": 1.99,
-      "sampled_points": 174,
-      "points_inside_mask": 174,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 222,
-      "x1": 1303,
-      "y1": 894,
-      "x2": 1306,
-      "y2": 706,
-      "length": 188.02,
-      "angle_degrees": -89.09,
-      "vertical_deviation_degrees": 0.91,
-      "sampled_points": 189,
-      "points_inside_mask": 189,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 224,
-      "x1": 1365,
-      "y1": 884,
-      "x2": 1373,
-      "y2": 765,
-      "length": 119.27,
-      "angle_degrees": -86.15,
-      "vertical_deviation_degrees": 3.85,
-      "sampled_points": 120,
-      "points_inside_mask": 120,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 225,
-      "x1": 1277,
-      "y1": 1722,
-      "x2": 1286,
-      "y2": 1832,
-      "length": 110.37,
-      "angle_degrees": 85.32,
-      "vertical_deviation_degrees": 4.68,
-      "sampled_points": 111,
-      "points_inside_mask": 111,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 226,
-      "x1": 1340,
-      "y1": 848,
-      "x2": 1344,
-      "y2": 727,
-      "length": 121.07,
-      "angle_degrees": -88.11,
-      "vertical_deviation_degrees": 1.89,
-      "sampled_points": 122,
-      "points_inside_mask": 122,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 546,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.7319,
       "is_valid": true
     },
     {
@@ -3077,34 +2013,9 @@
       "sampled_points": 102,
       "points_inside_mask": 102,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 228,
-      "x1": 1326,
-      "y1": 900,
-      "x2": 1328,
-      "y2": 791,
-      "length": 109.02,
-      "angle_degrees": -88.95,
-      "vertical_deviation_degrees": 1.05,
-      "sampled_points": 110,
-      "points_inside_mask": 110,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 229,
-      "x1": 1393,
-      "y1": 892,
-      "x2": 1405,
-      "y2": 753,
-      "length": 139.52,
-      "angle_degrees": -85.07,
-      "vertical_deviation_degrees": 4.93,
-      "sampled_points": 140,
-      "points_inside_mask": 140,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 547,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.7332,
       "is_valid": true
     },
     {
@@ -3119,6 +2030,9 @@
       "sampled_points": 126,
       "points_inside_mask": 126,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 528,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.7078,
       "is_valid": true
     },
     {
@@ -3133,6 +2047,9 @@
       "sampled_points": 234,
       "points_inside_mask": 234,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 404,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5416,
       "is_valid": true
     },
     {
@@ -3147,20 +2064,9 @@
       "sampled_points": 121,
       "points_inside_mask": 121,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 233,
-      "x1": 1795,
-      "y1": 2168,
-      "x2": 1797,
-      "y2": 2040,
-      "length": 128.02,
-      "angle_degrees": -89.1,
-      "vertical_deviation_degrees": 0.9,
-      "sampled_points": 129,
-      "points_inside_mask": 129,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 525,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.7038,
       "is_valid": true
     },
     {
@@ -3175,118 +2081,9 @@
       "sampled_points": 102,
       "points_inside_mask": 102,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 235,
-      "x1": 1356,
-      "y1": 731,
-      "x2": 1390,
-      "y2": 892,
-      "length": 164.55,
-      "angle_degrees": 78.08,
-      "vertical_deviation_degrees": 11.92,
-      "sampled_points": 162,
-      "points_inside_mask": 162,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 236,
-      "x1": 1298,
-      "y1": 910,
-      "x2": 1298,
-      "y2": 733,
-      "length": 177.0,
-      "angle_degrees": -90.0,
-      "vertical_deviation_degrees": 0.0,
-      "sampled_points": 178,
-      "points_inside_mask": 178,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 238,
-      "x1": 1393,
-      "y1": 756,
-      "x2": 1416,
-      "y2": 887,
-      "length": 133.0,
-      "angle_degrees": 80.04,
-      "vertical_deviation_degrees": 9.96,
-      "sampled_points": 132,
-      "points_inside_mask": 132,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 239,
-      "x1": 1407,
-      "y1": 754,
-      "x2": 1433,
-      "y2": 887,
-      "length": 135.52,
-      "angle_degrees": 78.94,
-      "vertical_deviation_degrees": 11.06,
-      "sampled_points": 134,
-      "points_inside_mask": 134,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 242,
-      "x1": 1879,
-      "y1": 1578,
-      "x2": 1886,
-      "y2": 1701,
-      "length": 123.2,
-      "angle_degrees": 86.74,
-      "vertical_deviation_degrees": 3.26,
-      "sampled_points": 124,
-      "points_inside_mask": 124,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 243,
-      "x1": 1359,
-      "y1": 886,
-      "x2": 1364,
-      "y2": 777,
-      "length": 109.11,
-      "angle_degrees": -87.37,
-      "vertical_deviation_degrees": 2.63,
-      "sampled_points": 110,
-      "points_inside_mask": 110,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 244,
-      "x1": 1257,
-      "y1": 1733,
-      "x2": 1270,
-      "y2": 1835,
-      "length": 102.83,
-      "angle_degrees": 82.74,
-      "vertical_deviation_degrees": 7.26,
-      "sampled_points": 103,
-      "points_inside_mask": 103,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 245,
-      "x1": 1801,
-      "y1": 2453,
-      "x2": 1801,
-      "y2": 2212,
-      "length": 241.0,
-      "angle_degrees": -90.0,
-      "vertical_deviation_degrees": 0.0,
-      "sampled_points": 242,
-      "points_inside_mask": 242,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 363,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.4866,
       "is_valid": true
     },
     {
@@ -3301,20 +2098,9 @@
       "sampled_points": 114,
       "points_inside_mask": 114,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 247,
-      "x1": 1384,
-      "y1": 2139,
-      "x2": 1430,
-      "y2": 2005,
-      "length": 141.68,
-      "angle_degrees": -71.05,
-      "vertical_deviation_degrees": 18.95,
-      "sampled_points": 135,
-      "points_inside_mask": 135,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 499,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.6689,
       "is_valid": true
     },
     {
@@ -3329,6 +2115,9 @@
       "sampled_points": 127,
       "points_inside_mask": 127,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 574,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.7694,
       "is_valid": true
     },
     {
@@ -3343,6 +2132,9 @@
       "sampled_points": 173,
       "points_inside_mask": 173,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 495,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.6635,
       "is_valid": true
     },
     {
@@ -3357,6 +2149,9 @@
       "sampled_points": 101,
       "points_inside_mask": 101,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 484,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.6488,
       "is_valid": true
     },
     {
@@ -3371,34 +2166,9 @@
       "sampled_points": 178,
       "points_inside_mask": 178,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 252,
-      "x1": 1887,
-      "y1": 1635,
-      "x2": 1907,
-      "y2": 1866,
-      "length": 231.86,
-      "angle_degrees": 85.05,
-      "vertical_deviation_degrees": 4.95,
-      "sampled_points": 232,
-      "points_inside_mask": 232,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 253,
-      "x1": 1273,
-      "y1": 1710,
-      "x2": 1281,
-      "y2": 1836,
-      "length": 126.25,
-      "angle_degrees": 86.37,
-      "vertical_deviation_degrees": 3.63,
-      "sampled_points": 127,
-      "points_inside_mask": 127,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 348,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.4665,
       "is_valid": true
     },
     {
@@ -3413,20 +2183,9 @@
       "sampled_points": 112,
       "points_inside_mask": 112,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 255,
-      "x1": 1375,
-      "y1": 894,
-      "x2": 1391,
-      "y2": 714,
-      "length": 180.71,
-      "angle_degrees": -84.92,
-      "vertical_deviation_degrees": 5.08,
-      "sampled_points": 181,
-      "points_inside_mask": 181,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 427,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5724,
       "is_valid": true
     },
     {
@@ -3441,34 +2200,9 @@
       "sampled_points": 142,
       "points_inside_mask": 142,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 259,
-      "x1": 1338,
-      "y1": 1967,
-      "x2": 1352,
-      "y2": 2088,
-      "length": 121.81,
-      "angle_degrees": 83.4,
-      "vertical_deviation_degrees": 6.6,
-      "sampled_points": 122,
-      "points_inside_mask": 122,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 260,
-      "x1": 1300,
-      "y1": 910,
-      "x2": 1300,
-      "y2": 725,
-      "length": 185.0,
-      "angle_degrees": -90.0,
-      "vertical_deviation_degrees": 0.0,
-      "sampled_points": 186,
-      "points_inside_mask": 186,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 405,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5429,
       "is_valid": true
     },
     {
@@ -3483,34 +2217,9 @@
       "sampled_points": 183,
       "points_inside_mask": 183,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 262,
-      "x1": 1897,
-      "y1": 1797,
-      "x2": 1904,
-      "y2": 1905,
-      "length": 108.23,
-      "angle_degrees": 86.29,
-      "vertical_deviation_degrees": 3.71,
-      "sampled_points": 109,
-      "points_inside_mask": 109,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 263,
-      "x1": 1735,
-      "y1": 2432,
-      "x2": 1745,
-      "y2": 2536,
-      "length": 104.48,
-      "angle_degrees": 84.51,
-      "vertical_deviation_degrees": 5.49,
-      "sampled_points": 105,
-      "points_inside_mask": 105,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 412,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5523,
       "is_valid": true
     },
     {
@@ -3525,6 +2234,9 @@
       "sampled_points": 119,
       "points_inside_mask": 119,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 367,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.492,
       "is_valid": true
     },
     {
@@ -3539,6 +2251,9 @@
       "sampled_points": 135,
       "points_inside_mask": 135,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 515,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.6903,
       "is_valid": true
     },
     {
@@ -3553,6 +2268,9 @@
       "sampled_points": 102,
       "points_inside_mask": 102,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 457,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.6126,
       "is_valid": true
     },
     {
@@ -3567,6 +2285,9 @@
       "sampled_points": 139,
       "points_inside_mask": 139,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 481,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.6448,
       "is_valid": true
     },
     {
@@ -3581,6 +2302,9 @@
       "sampled_points": 103,
       "points_inside_mask": 103,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 481,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.6448,
       "is_valid": true
     },
     {
@@ -3595,34 +2319,9 @@
       "sampled_points": 103,
       "points_inside_mask": 103,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 272,
-      "x1": 1843,
-      "y1": 808,
-      "x2": 1848,
-      "y2": 911,
-      "length": 103.12,
-      "angle_degrees": 87.22,
-      "vertical_deviation_degrees": 2.78,
-      "sampled_points": 104,
-      "points_inside_mask": 104,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 274,
-      "x1": 1802,
-      "y1": 2143,
-      "x2": 1802,
-      "y2": 1998,
-      "length": 145.0,
-      "angle_degrees": -90.0,
-      "vertical_deviation_degrees": 0.0,
-      "sampled_points": 146,
-      "points_inside_mask": 146,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 480,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.6434,
       "is_valid": true
     },
     {
@@ -3637,34 +2336,9 @@
       "sampled_points": 117,
       "points_inside_mask": 117,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 276,
-      "x1": 1268,
-      "y1": 1742,
-      "x2": 1276,
-      "y2": 1853,
-      "length": 111.29,
-      "angle_degrees": 85.88,
-      "vertical_deviation_degrees": 4.12,
-      "sampled_points": 112,
-      "points_inside_mask": 112,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 277,
-      "x1": 1772,
-      "y1": 2114,
-      "x2": 1787,
-      "y2": 2006,
-      "length": 109.04,
-      "angle_degrees": -82.09,
-      "vertical_deviation_degrees": 7.91,
-      "sampled_points": 109,
-      "points_inside_mask": 109,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 473,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.634,
       "is_valid": true
     },
     {
@@ -3679,6 +2353,9 @@
       "sampled_points": 204,
       "points_inside_mask": 204,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 457,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.6126,
       "is_valid": true
     },
     {
@@ -3693,20 +2370,9 @@
       "sampled_points": 119,
       "points_inside_mask": 119,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 280,
-      "x1": 1754,
-      "y1": 2427,
-      "x2": 1766,
-      "y2": 2540,
-      "length": 113.64,
-      "angle_degrees": 83.94,
-      "vertical_deviation_degrees": 6.06,
-      "sampled_points": 114,
-      "points_inside_mask": 114,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 403,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5402,
       "is_valid": true
     },
     {
@@ -3721,6 +2387,9 @@
       "sampled_points": 118,
       "points_inside_mask": 118,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 472,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.6327,
       "is_valid": true
     },
     {
@@ -3735,6 +2404,9 @@
       "sampled_points": 168,
       "points_inside_mask": 168,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 504,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.6756,
       "is_valid": true
     },
     {
@@ -3749,34 +2421,9 @@
       "sampled_points": 152,
       "points_inside_mask": 152,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 284,
-      "x1": 1271,
-      "y1": 1710,
-      "x2": 1280,
-      "y2": 1837,
-      "length": 127.32,
-      "angle_degrees": 85.95,
-      "vertical_deviation_degrees": 4.05,
-      "sampled_points": 128,
-      "points_inside_mask": 128,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 285,
-      "x1": 1396,
-      "y1": 756,
-      "x2": 1419,
-      "y2": 886,
-      "length": 132.02,
-      "angle_degrees": 79.97,
-      "vertical_deviation_degrees": 10.03,
-      "sampled_points": 131,
-      "points_inside_mask": 131,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 432,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5791,
       "is_valid": true
     },
     {
@@ -3791,6 +2438,9 @@
       "sampled_points": 127,
       "points_inside_mask": 127,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 400,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5362,
       "is_valid": true
     },
     {
@@ -3805,104 +2455,9 @@
       "sampled_points": 221,
       "points_inside_mask": 221,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 289,
-      "x1": 1830,
-      "y1": 906,
-      "x2": 1833,
-      "y2": 760,
-      "length": 146.03,
-      "angle_degrees": -88.82,
-      "vertical_deviation_degrees": 1.18,
-      "sampled_points": 147,
-      "points_inside_mask": 147,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 290,
-      "x1": 1384,
-      "y1": 715,
-      "x2": 1415,
-      "y2": 890,
-      "length": 177.72,
-      "angle_degrees": 79.95,
-      "vertical_deviation_degrees": 10.05,
-      "sampled_points": 176,
-      "points_inside_mask": 176,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 291,
-      "x1": 1417,
-      "y1": 757,
-      "x2": 1436,
-      "y2": 888,
-      "length": 132.37,
-      "angle_degrees": 81.75,
-      "vertical_deviation_degrees": 8.25,
-      "sampled_points": 132,
-      "points_inside_mask": 132,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 292,
-      "x1": 1716,
-      "y1": 2576,
-      "x2": 1722,
-      "y2": 2702,
-      "length": 126.14,
-      "angle_degrees": 87.27,
-      "vertical_deviation_degrees": 2.73,
-      "sampled_points": 127,
-      "points_inside_mask": 127,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 293,
-      "x1": 1734,
-      "y1": 2432,
-      "x2": 1743,
-      "y2": 2537,
-      "length": 105.39,
-      "angle_degrees": 85.1,
-      "vertical_deviation_degrees": 4.9,
-      "sampled_points": 106,
-      "points_inside_mask": 106,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 294,
-      "x1": 1153,
-      "y1": 997,
-      "x2": 1173,
-      "y2": 1104,
-      "length": 108.85,
-      "angle_degrees": 79.41,
-      "vertical_deviation_degrees": 10.59,
-      "sampled_points": 108,
-      "points_inside_mask": 108,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 295,
-      "x1": 1889,
-      "y1": 1648,
-      "x2": 1908,
-      "y2": 1858,
-      "length": 210.86,
-      "angle_degrees": 84.83,
-      "vertical_deviation_degrees": 5.17,
-      "sampled_points": 211,
-      "points_inside_mask": 211,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 464,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.622,
       "is_valid": true
     },
     {
@@ -3917,6 +2472,9 @@
       "sampled_points": 108,
       "points_inside_mask": 108,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 475,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.6367,
       "is_valid": true
     },
     {
@@ -3931,20 +2489,9 @@
       "sampled_points": 143,
       "points_inside_mask": 143,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 298,
-      "x1": 1803,
-      "y1": 2145,
-      "x2": 1803,
-      "y2": 1999,
-      "length": 146.0,
-      "angle_degrees": -90.0,
-      "vertical_deviation_degrees": 0.0,
-      "sampled_points": 147,
-      "points_inside_mask": 147,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 324,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.4343,
       "is_valid": true
     },
     {
@@ -3959,62 +2506,9 @@
       "sampled_points": 284,
       "points_inside_mask": 284,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 300,
-      "x1": 1217,
-      "y1": 917,
-      "x2": 1223,
-      "y2": 810,
-      "length": 107.17,
-      "angle_degrees": -86.79,
-      "vertical_deviation_degrees": 3.21,
-      "sampled_points": 108,
-      "points_inside_mask": 108,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 301,
-      "x1": 1961,
-      "y1": 1094,
-      "x2": 1984,
-      "y2": 906,
-      "length": 189.4,
-      "angle_degrees": -83.03,
-      "vertical_deviation_degrees": 6.97,
-      "sampled_points": 189,
-      "points_inside_mask": 189,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 302,
-      "x1": 1799,
-      "y1": 2165,
-      "x2": 1801,
-      "y2": 2003,
-      "length": 162.01,
-      "angle_degrees": -89.29,
-      "vertical_deviation_degrees": 0.71,
-      "sampled_points": 163,
-      "points_inside_mask": 163,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 303,
-      "x1": 1340,
-      "y1": 894,
-      "x2": 1346,
-      "y2": 771,
-      "length": 123.15,
-      "angle_degrees": -87.21,
-      "vertical_deviation_degrees": 2.79,
-      "sampled_points": 124,
-      "points_inside_mask": 124,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 399,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5349,
       "is_valid": true
     },
     {
@@ -4029,76 +2523,9 @@
       "sampled_points": 225,
       "points_inside_mask": 225,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 305,
-      "x1": 1244,
-      "y1": 893,
-      "x2": 1244,
-      "y2": 781,
-      "length": 112.0,
-      "angle_degrees": -90.0,
-      "vertical_deviation_degrees": 0.0,
-      "sampled_points": 113,
-      "points_inside_mask": 113,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 306,
-      "x1": 1356,
-      "y1": 852,
-      "x2": 1360,
-      "y2": 723,
-      "length": 129.06,
-      "angle_degrees": -88.22,
-      "vertical_deviation_degrees": 1.78,
-      "sampled_points": 130,
-      "points_inside_mask": 130,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 307,
-      "x1": 1814,
-      "y1": 2205,
-      "x2": 1814,
-      "y2": 2048,
-      "length": 157.0,
-      "angle_degrees": -90.0,
-      "vertical_deviation_degrees": 0.0,
-      "sampled_points": 158,
-      "points_inside_mask": 158,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 308,
-      "x1": 1805,
-      "y1": 2154,
-      "x2": 1805,
-      "y2": 2004,
-      "length": 150.0,
-      "angle_degrees": -90.0,
-      "vertical_deviation_degrees": 0.0,
-      "sampled_points": 151,
-      "points_inside_mask": 151,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 311,
-      "x1": 1965,
-      "y1": 1143,
-      "x2": 1977,
-      "y2": 1023,
-      "length": 120.6,
-      "angle_degrees": -84.29,
-      "vertical_deviation_degrees": 5.71,
-      "sampled_points": 121,
-      "points_inside_mask": 121,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 590,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.7909,
       "is_valid": true
     },
     {
@@ -4113,34 +2540,9 @@
       "sampled_points": 162,
       "points_inside_mask": 162,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 313,
-      "x1": 1341,
-      "y1": 893,
-      "x2": 1347,
-      "y2": 774,
-      "length": 119.15,
-      "angle_degrees": -87.11,
-      "vertical_deviation_degrees": 2.89,
-      "sampled_points": 120,
-      "points_inside_mask": 120,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 314,
-      "x1": 1792,
-      "y1": 2168,
-      "x2": 1792,
-      "y2": 2003,
-      "length": 165.0,
-      "angle_degrees": -90.0,
-      "vertical_deviation_degrees": 0.0,
-      "sampled_points": 166,
-      "points_inside_mask": 166,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 405,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5429,
       "is_valid": true
     },
     {
@@ -4155,34 +2557,9 @@
       "sampled_points": 134,
       "points_inside_mask": 134,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 317,
-      "x1": 1239,
-      "y1": 869,
-      "x2": 1239,
-      "y2": 763,
-      "length": 106.0,
-      "angle_degrees": -90.0,
-      "vertical_deviation_degrees": 0.0,
-      "sampled_points": 107,
-      "points_inside_mask": 107,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 318,
-      "x1": 1372,
-      "y1": 882,
-      "x2": 1380,
-      "y2": 761,
-      "length": 121.26,
-      "angle_degrees": -86.22,
-      "vertical_deviation_degrees": 3.78,
-      "sampled_points": 122,
-      "points_inside_mask": 122,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 428,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5737,
       "is_valid": true
     },
     {
@@ -4197,76 +2574,9 @@
       "sampled_points": 107,
       "points_inside_mask": 107,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 320,
-      "x1": 2045,
-      "y1": 1483,
-      "x2": 2047,
-      "y2": 1327,
-      "length": 156.01,
-      "angle_degrees": -89.27,
-      "vertical_deviation_degrees": 0.73,
-      "sampled_points": 157,
-      "points_inside_mask": 157,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 321,
-      "x1": 1367,
-      "y1": 884,
-      "x2": 1375,
-      "y2": 764,
-      "length": 120.27,
-      "angle_degrees": -86.19,
-      "vertical_deviation_degrees": 3.81,
-      "sampled_points": 121,
-      "points_inside_mask": 121,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 324,
-      "x1": 1806,
-      "y1": 937,
-      "x2": 1806,
-      "y2": 827,
-      "length": 110.0,
-      "angle_degrees": -90.0,
-      "vertical_deviation_degrees": 0.0,
-      "sampled_points": 111,
-      "points_inside_mask": 111,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 325,
-      "x1": 1743,
-      "y1": 2428,
-      "x2": 1755,
-      "y2": 2530,
-      "length": 102.7,
-      "angle_degrees": 83.29,
-      "vertical_deviation_degrees": 6.71,
-      "sampled_points": 103,
-      "points_inside_mask": 103,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 326,
-      "x1": 1730,
-      "y1": 2433,
-      "x2": 1739,
-      "y2": 2534,
-      "length": 101.4,
-      "angle_degrees": 84.91,
-      "vertical_deviation_degrees": 5.09,
-      "sampled_points": 102,
-      "points_inside_mask": 102,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 372,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.4987,
       "is_valid": true
     },
     {
@@ -4281,90 +2591,9 @@
       "sampled_points": 212,
       "points_inside_mask": 212,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 328,
-      "x1": 1245,
-      "y1": 916,
-      "x2": 1245,
-      "y2": 804,
-      "length": 112.0,
-      "angle_degrees": -90.0,
-      "vertical_deviation_degrees": 0.0,
-      "sampled_points": 113,
-      "points_inside_mask": 113,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 331,
-      "x1": 1765,
-      "y1": 1925,
-      "x2": 1768,
-      "y2": 2052,
-      "length": 127.04,
-      "angle_degrees": 88.65,
-      "vertical_deviation_degrees": 1.35,
-      "sampled_points": 128,
-      "points_inside_mask": 128,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 332,
-      "x1": 1368,
-      "y1": 884,
-      "x2": 1376,
-      "y2": 764,
-      "length": 120.27,
-      "angle_degrees": -86.19,
-      "vertical_deviation_degrees": 3.81,
-      "sampled_points": 121,
-      "points_inside_mask": 121,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 333,
-      "x1": 1878,
-      "y1": 1897,
-      "x2": 1887,
-      "y2": 1783,
-      "length": 114.35,
-      "angle_degrees": -85.49,
-      "vertical_deviation_degrees": 4.51,
-      "sampled_points": 115,
-      "points_inside_mask": 115,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 334,
-      "x1": 1877,
-      "y1": 1554,
-      "x2": 1883,
-      "y2": 1663,
-      "length": 109.17,
-      "angle_degrees": 86.85,
-      "vertical_deviation_degrees": 3.15,
-      "sampled_points": 110,
-      "points_inside_mask": 110,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 335,
-      "x1": 1356,
-      "y1": 887,
-      "x2": 1362,
-      "y2": 779,
-      "length": 108.17,
-      "angle_degrees": -86.82,
-      "vertical_deviation_degrees": 3.18,
-      "sampled_points": 109,
-      "points_inside_mask": 109,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 461,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.618,
       "is_valid": true
     },
     {
@@ -4379,20 +2608,9 @@
       "sampled_points": 207,
       "points_inside_mask": 207,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 337,
-      "x1": 1825,
-      "y1": 2289,
-      "x2": 1835,
-      "y2": 2189,
-      "length": 100.5,
-      "angle_degrees": -84.29,
-      "vertical_deviation_degrees": 5.71,
-      "sampled_points": 101,
-      "points_inside_mask": 101,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 384,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5147,
       "is_valid": true
     },
     {
@@ -4407,20 +2625,9 @@
       "sampled_points": 120,
       "points_inside_mask": 120,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 339,
-      "x1": 1360,
-      "y1": 886,
-      "x2": 1368,
-      "y2": 773,
-      "length": 113.28,
-      "angle_degrees": -85.95,
-      "vertical_deviation_degrees": 4.05,
-      "sampled_points": 114,
-      "points_inside_mask": 114,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 507,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.6796,
       "is_valid": true
     },
     {
@@ -4435,20 +2642,9 @@
       "sampled_points": 150,
       "points_inside_mask": 150,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 341,
-      "x1": 1733,
-      "y1": 2432,
-      "x2": 1742,
-      "y2": 2537,
-      "length": 105.39,
-      "angle_degrees": 85.1,
-      "vertical_deviation_degrees": 4.9,
-      "sampled_points": 106,
-      "points_inside_mask": 106,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 339,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.4544,
       "is_valid": true
     },
     {
@@ -4463,34 +2659,9 @@
       "sampled_points": 124,
       "points_inside_mask": 124,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 343,
-      "x1": 1770,
-      "y1": 2114,
-      "x2": 1787,
-      "y2": 1987,
-      "length": 128.13,
-      "angle_degrees": -82.38,
-      "vertical_deviation_degrees": 7.62,
-      "sampled_points": 128,
-      "points_inside_mask": 128,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 346,
-      "x1": 1265,
-      "y1": 1712,
-      "x2": 1273,
-      "y2": 1834,
-      "length": 122.26,
-      "angle_degrees": 86.25,
-      "vertical_deviation_degrees": 3.75,
-      "sampled_points": 123,
-      "points_inside_mask": 123,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 524,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.7024,
       "is_valid": true
     },
     {
@@ -4505,20 +2676,9 @@
       "sampled_points": 199,
       "points_inside_mask": 199,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 348,
-      "x1": 1896,
-      "y1": 1080,
-      "x2": 1908,
-      "y2": 976,
-      "length": 104.69,
-      "angle_degrees": -83.42,
-      "vertical_deviation_degrees": 6.58,
-      "sampled_points": 105,
-      "points_inside_mask": 105,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 465,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.6233,
       "is_valid": true
     },
     {
@@ -4533,132 +2693,9 @@
       "sampled_points": 109,
       "points_inside_mask": 109,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 350,
-      "x1": 1220,
-      "y1": 1654,
-      "x2": 1226,
-      "y2": 1542,
-      "length": 112.16,
-      "angle_degrees": -86.93,
-      "vertical_deviation_degrees": 3.07,
-      "sampled_points": 113,
-      "points_inside_mask": 113,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 351,
-      "x1": 1816,
-      "y1": 2044,
-      "x2": 1823,
-      "y2": 2239,
-      "length": 195.13,
-      "angle_degrees": 87.94,
-      "vertical_deviation_degrees": 2.06,
-      "sampled_points": 196,
-      "points_inside_mask": 196,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 352,
-      "x1": 1815,
-      "y1": 2525,
-      "x2": 1815,
-      "y2": 2383,
-      "length": 142.0,
-      "angle_degrees": -90.0,
-      "vertical_deviation_degrees": 0.0,
-      "sampled_points": 143,
-      "points_inside_mask": 143,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 353,
-      "x1": 1357,
-      "y1": 886,
-      "x2": 1363,
-      "y2": 778,
-      "length": 108.17,
-      "angle_degrees": -86.82,
-      "vertical_deviation_degrees": 3.18,
-      "sampled_points": 109,
-      "points_inside_mask": 109,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 354,
-      "x1": 1371,
-      "y1": 883,
-      "x2": 1379,
-      "y2": 765,
-      "length": 118.27,
-      "angle_degrees": -86.12,
-      "vertical_deviation_degrees": 3.88,
-      "sampled_points": 119,
-      "points_inside_mask": 119,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 355,
-      "x1": 1829,
-      "y1": 873,
-      "x2": 1831,
-      "y2": 759,
-      "length": 114.02,
-      "angle_degrees": -88.99,
-      "vertical_deviation_degrees": 1.01,
-      "sampled_points": 115,
-      "points_inside_mask": 115,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 356,
-      "x1": 1839,
-      "y1": 1871,
-      "x2": 1870,
-      "y2": 1988,
-      "length": 121.04,
-      "angle_degrees": 75.16,
-      "vertical_deviation_degrees": 14.84,
-      "sampled_points": 118,
-      "points_inside_mask": 118,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 358,
-      "x1": 1307,
-      "y1": 907,
-      "x2": 1307,
-      "y2": 730,
-      "length": 177.0,
-      "angle_degrees": -90.0,
-      "vertical_deviation_degrees": 0.0,
-      "sampled_points": 178,
-      "points_inside_mask": 178,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 360,
-      "x1": 1414,
-      "y1": 754,
-      "x2": 1435,
-      "y2": 887,
-      "length": 134.65,
-      "angle_degrees": 81.03,
-      "vertical_deviation_degrees": 8.97,
-      "sampled_points": 134,
-      "points_inside_mask": 134,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 407,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5456,
       "is_valid": true
     },
     {
@@ -4673,20 +2710,9 @@
       "sampled_points": 252,
       "points_inside_mask": 252,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 362,
-      "x1": 1807,
-      "y1": 927,
-      "x2": 1807,
-      "y2": 826,
-      "length": 101.0,
-      "angle_degrees": -90.0,
-      "vertical_deviation_degrees": 0.0,
-      "sampled_points": 102,
-      "points_inside_mask": 102,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 481,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.6448,
       "is_valid": true
     },
     {
@@ -4701,6 +2727,9 @@
       "sampled_points": 120,
       "points_inside_mask": 120,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 523,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.7011,
       "is_valid": true
     },
     {
@@ -4715,34 +2744,9 @@
       "sampled_points": 105,
       "points_inside_mask": 105,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 366,
-      "x1": 1376,
-      "y1": 716,
-      "x2": 1411,
-      "y2": 892,
-      "length": 179.45,
-      "angle_degrees": 78.75,
-      "vertical_deviation_degrees": 11.25,
-      "sampled_points": 177,
-      "points_inside_mask": 177,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 367,
-      "x1": 1731,
-      "y1": 2433,
-      "x2": 1740,
-      "y2": 2535,
-      "length": 102.4,
-      "angle_degrees": 84.96,
-      "vertical_deviation_degrees": 5.04,
-      "sampled_points": 103,
-      "points_inside_mask": 103,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 440,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5898,
       "is_valid": true
     },
     {
@@ -4757,20 +2761,9 @@
       "sampled_points": 194,
       "points_inside_mask": 194,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 370,
-      "x1": 1247,
-      "y1": 1724,
-      "x2": 1290,
-      "y2": 1593,
-      "length": 137.88,
-      "angle_degrees": -71.83,
-      "vertical_deviation_degrees": 18.17,
-      "sampled_points": 132,
-      "points_inside_mask": 132,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 359,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.4812,
       "is_valid": true
     },
     {
@@ -4785,6 +2778,9 @@
       "sampled_points": 367,
       "points_inside_mask": 367,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 469,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.6287,
       "is_valid": true
     },
     {
@@ -4799,6 +2795,9 @@
       "sampled_points": 122,
       "points_inside_mask": 122,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 412,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5523,
       "is_valid": true
     },
     {
@@ -4813,132 +2812,9 @@
       "sampled_points": 110,
       "points_inside_mask": 110,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 377,
-      "x1": 1736,
-      "y1": 2431,
-      "x2": 1745,
-      "y2": 2535,
-      "length": 104.39,
-      "angle_degrees": 85.05,
-      "vertical_deviation_degrees": 4.95,
-      "sampled_points": 105,
-      "points_inside_mask": 105,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 378,
-      "x1": 1791,
-      "y1": 2444,
-      "x2": 1795,
-      "y2": 2207,
-      "length": 237.03,
-      "angle_degrees": -89.03,
-      "vertical_deviation_degrees": 0.97,
-      "sampled_points": 238,
-      "points_inside_mask": 238,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 379,
-      "x1": 1888,
-      "y1": 1650,
-      "x2": 1905,
-      "y2": 1895,
-      "length": 245.59,
-      "angle_degrees": 86.03,
-      "vertical_deviation_degrees": 3.97,
-      "sampled_points": 246,
-      "points_inside_mask": 246,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 380,
-      "x1": 1822,
-      "y1": 2173,
-      "x2": 1829,
-      "y2": 2036,
-      "length": 137.18,
-      "angle_degrees": -87.08,
-      "vertical_deviation_degrees": 2.92,
-      "sampled_points": 138,
-      "points_inside_mask": 138,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 381,
-      "x1": 1256,
-      "y1": 1737,
-      "x2": 1267,
-      "y2": 1845,
-      "length": 108.56,
-      "angle_degrees": 84.18,
-      "vertical_deviation_degrees": 5.82,
-      "sampled_points": 109,
-      "points_inside_mask": 109,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 382,
-      "x1": 1773,
-      "y1": 908,
-      "x2": 1785,
-      "y2": 770,
-      "length": 138.52,
-      "angle_degrees": -85.03,
-      "vertical_deviation_degrees": 4.97,
-      "sampled_points": 139,
-      "points_inside_mask": 139,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 384,
-      "x1": 1821,
-      "y1": 2148,
-      "x2": 1826,
-      "y2": 2036,
-      "length": 112.11,
-      "angle_degrees": -87.44,
-      "vertical_deviation_degrees": 2.56,
-      "sampled_points": 113,
-      "points_inside_mask": 113,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 385,
-      "x1": 1335,
-      "y1": 2281,
-      "x2": 1362,
-      "y2": 2164,
-      "length": 120.07,
-      "angle_degrees": -77.01,
-      "vertical_deviation_degrees": 12.99,
-      "sampled_points": 118,
-      "points_inside_mask": 118,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 386,
-      "x1": 1798,
-      "y1": 927,
-      "x2": 1798,
-      "y2": 801,
-      "length": 126.0,
-      "angle_degrees": -90.0,
-      "vertical_deviation_degrees": 0.0,
-      "sampled_points": 127,
-      "points_inside_mask": 127,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 514,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.689,
       "is_valid": true
     },
     {
@@ -4953,20 +2829,9 @@
       "sampled_points": 210,
       "points_inside_mask": 210,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 389,
-      "x1": 1804,
-      "y1": 2146,
-      "x2": 1804,
-      "y2": 2003,
-      "length": 143.0,
-      "angle_degrees": -90.0,
-      "vertical_deviation_degrees": 0.0,
-      "sampled_points": 144,
-      "points_inside_mask": 144,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 459,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.6153,
       "is_valid": true
     },
     {
@@ -4981,20 +2846,9 @@
       "sampled_points": 108,
       "points_inside_mask": 108,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 392,
-      "x1": 1961,
-      "y1": 1158,
-      "x2": 1975,
-      "y2": 1019,
-      "length": 139.7,
-      "angle_degrees": -84.25,
-      "vertical_deviation_degrees": 5.75,
-      "sampled_points": 140,
-      "points_inside_mask": 140,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 246,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.4881,
       "is_valid": true
     },
     {
@@ -5009,6 +2863,9 @@
       "sampled_points": 113,
       "points_inside_mask": 113,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 302,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.4048,
       "is_valid": true
     },
     {
@@ -5023,6 +2880,9 @@
       "sampled_points": 104,
       "points_inside_mask": 104,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 420,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.563,
       "is_valid": true
     },
     {
@@ -5037,34 +2897,9 @@
       "sampled_points": 125,
       "points_inside_mask": 125,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 398,
-      "x1": 1238,
-      "y1": 1748,
-      "x2": 1275,
-      "y2": 1634,
-      "length": 119.85,
-      "angle_degrees": -72.02,
-      "vertical_deviation_degrees": 17.98,
-      "sampled_points": 115,
-      "points_inside_mask": 115,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 401,
-      "x1": 1376,
-      "y1": 895,
-      "x2": 1393,
-      "y2": 707,
-      "length": 188.77,
-      "angle_degrees": -84.83,
-      "vertical_deviation_degrees": 5.17,
-      "sampled_points": 189,
-      "points_inside_mask": 189,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 586,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.7855,
       "is_valid": true
     },
     {
@@ -5079,6 +2914,9 @@
       "sampled_points": 108,
       "points_inside_mask": 108,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 443,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5938,
       "is_valid": true
     },
     {
@@ -5093,6 +2931,9 @@
       "sampled_points": 108,
       "points_inside_mask": 108,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 381,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5107,
       "is_valid": true
     },
     {
@@ -5107,48 +2948,9 @@
       "sampled_points": 139,
       "points_inside_mask": 139,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 405,
-      "x1": 1361,
-      "y1": 886,
-      "x2": 1369,
-      "y2": 772,
-      "length": 114.28,
-      "angle_degrees": -85.99,
-      "vertical_deviation_degrees": 4.01,
-      "sampled_points": 115,
-      "points_inside_mask": 115,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 407,
-      "x1": 1382,
-      "y1": 717,
-      "x2": 1413,
-      "y2": 890,
-      "length": 175.76,
-      "angle_degrees": 79.84,
-      "vertical_deviation_degrees": 10.16,
-      "sampled_points": 174,
-      "points_inside_mask": 174,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 408,
-      "x1": 1771,
-      "y1": 2111,
-      "x2": 1788,
-      "y2": 1989,
-      "length": 123.18,
-      "angle_degrees": -82.07,
-      "vertical_deviation_degrees": 7.93,
-      "sampled_points": 123,
-      "points_inside_mask": 123,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 474,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.6354,
       "is_valid": true
     },
     {
@@ -5163,34 +2965,9 @@
       "sampled_points": 101,
       "points_inside_mask": 101,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 413,
-      "x1": 1334,
-      "y1": 1946,
-      "x2": 1352,
-      "y2": 2095,
-      "length": 150.08,
-      "angle_degrees": 83.11,
-      "vertical_deviation_degrees": 6.89,
-      "sampled_points": 150,
-      "points_inside_mask": 150,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 414,
-      "x1": 1962,
-      "y1": 1153,
-      "x2": 1976,
-      "y2": 1022,
-      "length": 131.75,
-      "angle_degrees": -83.9,
-      "vertical_deviation_degrees": 6.1,
-      "sampled_points": 132,
-      "points_inside_mask": 132,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 586,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.7855,
       "is_valid": true
     },
     {
@@ -5205,34 +2982,9 @@
       "sampled_points": 110,
       "points_inside_mask": 110,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 417,
-      "x1": 1406,
-      "y1": 754,
-      "x2": 1427,
-      "y2": 871,
-      "length": 118.87,
-      "angle_degrees": 79.82,
-      "vertical_deviation_degrees": 10.18,
-      "sampled_points": 118,
-      "points_inside_mask": 118,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 418,
-      "x1": 1309,
-      "y1": 907,
-      "x2": 1309,
-      "y2": 730,
-      "length": 177.0,
-      "angle_degrees": -90.0,
-      "vertical_deviation_degrees": 0.0,
-      "sampled_points": 178,
-      "points_inside_mask": 178,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 404,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5416,
       "is_valid": true
     },
     {
@@ -5247,6 +2999,9 @@
       "sampled_points": 120,
       "points_inside_mask": 120,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 555,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.744,
       "is_valid": true
     },
     {
@@ -5261,20 +3016,9 @@
       "sampled_points": 207,
       "points_inside_mask": 207,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 421,
-      "x1": 1414,
-      "y1": 778,
-      "x2": 1432,
-      "y2": 887,
-      "length": 110.48,
-      "angle_degrees": 80.62,
-      "vertical_deviation_degrees": 9.38,
-      "sampled_points": 110,
-      "points_inside_mask": 110,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 388,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5201,
       "is_valid": true
     },
     {
@@ -5289,62 +3033,9 @@
       "sampled_points": 108,
       "points_inside_mask": 108,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 423,
-      "x1": 1813,
-      "y1": 2548,
-      "x2": 1813,
-      "y2": 2412,
-      "length": 136.0,
-      "angle_degrees": -90.0,
-      "vertical_deviation_degrees": 0.0,
-      "sampled_points": 137,
-      "points_inside_mask": 137,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 424,
-      "x1": 1752,
-      "y1": 2427,
-      "x2": 1764,
-      "y2": 2540,
-      "length": 113.64,
-      "angle_degrees": 83.94,
-      "vertical_deviation_degrees": 6.06,
-      "sampled_points": 114,
-      "points_inside_mask": 114,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 425,
-      "x1": 1896,
-      "y1": 1807,
-      "x2": 1904,
-      "y2": 1917,
-      "length": 110.29,
-      "angle_degrees": 85.84,
-      "vertical_deviation_degrees": 4.16,
-      "sampled_points": 111,
-      "points_inside_mask": 111,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 427,
-      "x1": 1815,
-      "y1": 2201,
-      "x2": 1823,
-      "y2": 2036,
-      "length": 165.19,
-      "angle_degrees": -87.22,
-      "vertical_deviation_degrees": 2.78,
-      "sampled_points": 166,
-      "points_inside_mask": 166,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 374,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5013,
       "is_valid": true
     },
     {
@@ -5359,6 +3050,9 @@
       "sampled_points": 152,
       "points_inside_mask": 152,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 338,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.4531,
       "is_valid": true
     },
     {
@@ -5373,48 +3067,9 @@
       "sampled_points": 145,
       "points_inside_mask": 145,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 431,
-      "x1": 1904,
-      "y1": 1034,
-      "x2": 1909,
-      "y2": 903,
-      "length": 131.1,
-      "angle_degrees": -87.81,
-      "vertical_deviation_degrees": 2.19,
-      "sampled_points": 132,
-      "points_inside_mask": 132,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 432,
-      "x1": 1339,
-      "y1": 1969,
-      "x2": 1353,
-      "y2": 2087,
-      "length": 118.83,
-      "angle_degrees": 83.23,
-      "vertical_deviation_degrees": 6.77,
-      "sampled_points": 119,
-      "points_inside_mask": 119,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 433,
-      "x1": 1373,
-      "y1": 882,
-      "x2": 1388,
-      "y2": 714,
-      "length": 168.67,
-      "angle_degrees": -84.9,
-      "vertical_deviation_degrees": 5.1,
-      "sampled_points": 169,
-      "points_inside_mask": 169,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 479,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.6421,
       "is_valid": true
     },
     {
@@ -5429,6 +3084,9 @@
       "sampled_points": 116,
       "points_inside_mask": 116,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 510,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.6836,
       "is_valid": true
     },
     {
@@ -5443,48 +3101,9 @@
       "sampled_points": 166,
       "points_inside_mask": 166,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 438,
-      "x1": 1804,
-      "y1": 2699,
-      "x2": 1815,
-      "y2": 2599,
-      "length": 100.6,
-      "angle_degrees": -83.72,
-      "vertical_deviation_degrees": 6.28,
-      "sampled_points": 101,
-      "points_inside_mask": 101,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 439,
-      "x1": 1870,
-      "y1": 1504,
-      "x2": 1876,
-      "y2": 1608,
-      "length": 104.17,
-      "angle_degrees": 86.7,
-      "vertical_deviation_degrees": 3.3,
-      "sampled_points": 105,
-      "points_inside_mask": 105,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 443,
-      "x1": 1341,
-      "y1": 2098,
-      "x2": 1349,
-      "y2": 2251,
-      "length": 153.21,
-      "angle_degrees": 87.01,
-      "vertical_deviation_degrees": 2.99,
-      "sampled_points": 154,
-      "points_inside_mask": 154,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 395,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5295,
       "is_valid": true
     },
     {
@@ -5499,48 +3118,9 @@
       "sampled_points": 112,
       "points_inside_mask": 112,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 446,
-      "x1": 1303,
-      "y1": 830,
-      "x2": 1303,
-      "y2": 716,
-      "length": 114.0,
-      "angle_degrees": -90.0,
-      "vertical_deviation_degrees": 0.0,
-      "sampled_points": 115,
-      "points_inside_mask": 115,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 447,
-      "x1": 1963,
-      "y1": 1096,
-      "x2": 1982,
-      "y2": 934,
-      "length": 163.11,
-      "angle_degrees": -83.31,
-      "vertical_deviation_degrees": 6.69,
-      "sampled_points": 163,
-      "points_inside_mask": 163,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 448,
-      "x1": 1413,
-      "y1": 754,
-      "x2": 1433,
-      "y2": 881,
-      "length": 128.57,
-      "angle_degrees": 81.05,
-      "vertical_deviation_degrees": 8.95,
-      "sampled_points": 128,
-      "points_inside_mask": 128,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 404,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5416,
       "is_valid": true
     },
     {
@@ -5555,20 +3135,9 @@
       "sampled_points": 145,
       "points_inside_mask": 145,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 452,
-      "x1": 1255,
-      "y1": 1686,
-      "x2": 1271,
-      "y2": 1822,
-      "length": 136.94,
-      "angle_degrees": 83.29,
-      "vertical_deviation_degrees": 6.71,
-      "sampled_points": 137,
-      "points_inside_mask": 137,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 384,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5147,
       "is_valid": true
     },
     {
@@ -5583,20 +3152,9 @@
       "sampled_points": 149,
       "points_inside_mask": 149,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 455,
-      "x1": 1893,
-      "y1": 1673,
-      "x2": 1908,
-      "y2": 1851,
-      "length": 178.63,
-      "angle_degrees": 85.18,
-      "vertical_deviation_degrees": 4.82,
-      "sampled_points": 179,
-      "points_inside_mask": 179,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 393,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5268,
       "is_valid": true
     },
     {
@@ -5611,6 +3169,9 @@
       "sampled_points": 122,
       "points_inside_mask": 122,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 393,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5268,
       "is_valid": true
     },
     {
@@ -5625,34 +3186,9 @@
       "sampled_points": 221,
       "points_inside_mask": 221,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 458,
-      "x1": 2047,
-      "y1": 1454,
-      "x2": 2050,
-      "y2": 1282,
-      "length": 172.03,
-      "angle_degrees": -89.0,
-      "vertical_deviation_degrees": 1.0,
-      "sampled_points": 173,
-      "points_inside_mask": 173,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 459,
-      "x1": 1243,
-      "y1": 892,
-      "x2": 1243,
-      "y2": 762,
-      "length": 130.0,
-      "angle_degrees": -90.0,
-      "vertical_deviation_degrees": 0.0,
-      "sampled_points": 131,
-      "points_inside_mask": 131,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 463,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.6206,
       "is_valid": true
     },
     {
@@ -5667,20 +3203,9 @@
       "sampled_points": 115,
       "points_inside_mask": 115,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 461,
-      "x1": 1894,
-      "y1": 1834,
-      "x2": 1900,
-      "y2": 1943,
-      "length": 109.17,
-      "angle_degrees": 86.85,
-      "vertical_deviation_degrees": 3.15,
-      "sampled_points": 110,
-      "points_inside_mask": 110,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 381,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5107,
       "is_valid": true
     },
     {
@@ -5695,48 +3220,9 @@
       "sampled_points": 147,
       "points_inside_mask": 147,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 463,
-      "x1": 1777,
-      "y1": 906,
-      "x2": 1790,
-      "y2": 753,
-      "length": 153.55,
-      "angle_degrees": -85.14,
-      "vertical_deviation_degrees": 4.86,
-      "sampled_points": 154,
-      "points_inside_mask": 154,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 464,
-      "x1": 1876,
-      "y1": 1928,
-      "x2": 1888,
-      "y2": 1784,
-      "length": 144.5,
-      "angle_degrees": -85.24,
-      "vertical_deviation_degrees": 4.76,
-      "sampled_points": 145,
-      "points_inside_mask": 145,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 465,
-      "x1": 1769,
-      "y1": 902,
-      "x2": 1769,
-      "y2": 774,
-      "length": 128.0,
-      "angle_degrees": -90.0,
-      "vertical_deviation_degrees": 0.0,
-      "sampled_points": 129,
-      "points_inside_mask": 129,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 385,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5161,
       "is_valid": true
     },
     {
@@ -5751,6 +3237,9 @@
       "sampled_points": 110,
       "points_inside_mask": 110,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 476,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.6381,
       "is_valid": true
     },
     {
@@ -5765,48 +3254,9 @@
       "sampled_points": 348,
       "points_inside_mask": 348,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 470,
-      "x1": 1791,
-      "y1": 2167,
-      "x2": 1791,
-      "y2": 2004,
-      "length": 163.0,
-      "angle_degrees": -90.0,
-      "vertical_deviation_degrees": 0.0,
-      "sampled_points": 164,
-      "points_inside_mask": 164,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 471,
-      "x1": 1392,
-      "y1": 893,
-      "x2": 1402,
-      "y2": 776,
-      "length": 117.43,
-      "angle_degrees": -85.11,
-      "vertical_deviation_degrees": 4.89,
-      "sampled_points": 118,
-      "points_inside_mask": 118,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 472,
-      "x1": 1842,
-      "y1": 808,
-      "x2": 1847,
-      "y2": 910,
-      "length": 102.12,
-      "angle_degrees": 87.19,
-      "vertical_deviation_degrees": 2.81,
-      "sampled_points": 103,
-      "points_inside_mask": 103,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 400,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5362,
       "is_valid": true
     },
     {
@@ -5821,20 +3271,9 @@
       "sampled_points": 132,
       "points_inside_mask": 132,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 475,
-      "x1": 1795,
-      "y1": 918,
-      "x2": 1797,
-      "y2": 800,
-      "length": 118.02,
-      "angle_degrees": -89.03,
-      "vertical_deviation_degrees": 0.97,
-      "sampled_points": 119,
-      "points_inside_mask": 119,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 470,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.63,
       "is_valid": true
     },
     {
@@ -5849,6 +3288,9 @@
       "sampled_points": 109,
       "points_inside_mask": 109,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 582,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.7802,
       "is_valid": true
     },
     {
@@ -5863,20 +3305,9 @@
       "sampled_points": 159,
       "points_inside_mask": 159,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 479,
-      "x1": 1785,
-      "y1": 2000,
-      "x2": 1787,
-      "y2": 2154,
-      "length": 154.01,
-      "angle_degrees": 89.26,
-      "vertical_deviation_degrees": 0.74,
-      "sampled_points": 155,
-      "points_inside_mask": 155,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 472,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.6327,
       "is_valid": true
     },
     {
@@ -5891,20 +3322,9 @@
       "sampled_points": 350,
       "points_inside_mask": 350,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 481,
-      "x1": 1324,
-      "y1": 2080,
-      "x2": 1334,
-      "y2": 2221,
-      "length": 141.35,
-      "angle_degrees": 85.94,
-      "vertical_deviation_degrees": 4.06,
-      "sampled_points": 142,
-      "points_inside_mask": 142,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 399,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5349,
       "is_valid": true
     },
     {
@@ -5919,20 +3339,9 @@
       "sampled_points": 190,
       "points_inside_mask": 190,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 483,
-      "x1": 1873,
-      "y1": 1894,
-      "x2": 1886,
-      "y2": 1744,
-      "length": 150.56,
-      "angle_degrees": -85.05,
-      "vertical_deviation_degrees": 4.95,
-      "sampled_points": 151,
-      "points_inside_mask": 151,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 435,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5831,
       "is_valid": true
     },
     {
@@ -5947,62 +3356,9 @@
       "sampled_points": 177,
       "points_inside_mask": 177,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 486,
-      "x1": 1254,
-      "y1": 1737,
-      "x2": 1266,
-      "y2": 1848,
-      "length": 111.65,
-      "angle_degrees": 83.83,
-      "vertical_deviation_degrees": 6.17,
-      "sampled_points": 112,
-      "points_inside_mask": 112,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 487,
-      "x1": 1308,
-      "y1": 907,
-      "x2": 1308,
-      "y2": 730,
-      "length": 177.0,
-      "angle_degrees": -90.0,
-      "vertical_deviation_degrees": 0.0,
-      "sampled_points": 178,
-      "points_inside_mask": 178,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 488,
-      "x1": 1826,
-      "y1": 2297,
-      "x2": 1836,
-      "y2": 2196,
-      "length": 101.49,
-      "angle_degrees": -84.35,
-      "vertical_deviation_degrees": 5.65,
-      "sampled_points": 102,
-      "points_inside_mask": 102,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 490,
-      "x1": 1816,
-      "y1": 2206,
-      "x2": 1825,
-      "y2": 2035,
-      "length": 171.24,
-      "angle_degrees": -86.99,
-      "vertical_deviation_degrees": 3.01,
-      "sampled_points": 172,
-      "points_inside_mask": 172,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 258,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.4804,
       "is_valid": true
     },
     {
@@ -6017,20 +3373,9 @@
       "sampled_points": 164,
       "points_inside_mask": 164,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 492,
-      "x1": 1893,
-      "y1": 1109,
-      "x2": 1908,
-      "y2": 998,
-      "length": 112.01,
-      "angle_degrees": -82.3,
-      "vertical_deviation_degrees": 7.7,
-      "sampled_points": 112,
-      "points_inside_mask": 112,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 396,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5308,
       "is_valid": true
     },
     {
@@ -6045,48 +3390,9 @@
       "sampled_points": 183,
       "points_inside_mask": 183,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 495,
-      "x1": 2050,
-      "y1": 1349,
-      "x2": 2052,
-      "y2": 1238,
-      "length": 111.02,
-      "angle_degrees": -88.97,
-      "vertical_deviation_degrees": 1.03,
-      "sampled_points": 112,
-      "points_inside_mask": 112,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 498,
-      "x1": 1770,
-      "y1": 907,
-      "x2": 1770,
-      "y2": 774,
-      "length": 133.0,
-      "angle_degrees": -90.0,
-      "vertical_deviation_degrees": 0.0,
-      "sampled_points": 134,
-      "points_inside_mask": 134,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 499,
-      "x1": 1821,
-      "y1": 2177,
-      "x2": 1828,
-      "y2": 2037,
-      "length": 140.17,
-      "angle_degrees": -87.14,
-      "vertical_deviation_degrees": 2.86,
-      "sampled_points": 141,
-      "points_inside_mask": 141,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 460,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.6166,
       "is_valid": true
     },
     {
@@ -6101,6 +3407,9 @@
       "sampled_points": 103,
       "points_inside_mask": 103,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 408,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5469,
       "is_valid": true
     },
     {
@@ -6115,76 +3424,9 @@
       "sampled_points": 108,
       "points_inside_mask": 108,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 502,
-      "x1": 1778,
-      "y1": 909,
-      "x2": 1792,
-      "y2": 754,
-      "length": 155.63,
-      "angle_degrees": -84.84,
-      "vertical_deviation_degrees": 5.16,
-      "sampled_points": 156,
-      "points_inside_mask": 156,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 503,
-      "x1": 1738,
-      "y1": 1955,
-      "x2": 1763,
-      "y2": 2072,
-      "length": 119.64,
-      "angle_degrees": 77.94,
-      "vertical_deviation_degrees": 12.06,
-      "sampled_points": 118,
-      "points_inside_mask": 118,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 504,
-      "x1": 1370,
-      "y1": 883,
-      "x2": 1378,
-      "y2": 763,
-      "length": 120.27,
-      "angle_degrees": -86.19,
-      "vertical_deviation_degrees": 3.81,
-      "sampled_points": 121,
-      "points_inside_mask": 121,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 505,
-      "x1": 1871,
-      "y1": 1474,
-      "x2": 1878,
-      "y2": 1618,
-      "length": 144.17,
-      "angle_degrees": 87.22,
-      "vertical_deviation_degrees": 2.78,
-      "sampled_points": 145,
-      "points_inside_mask": 145,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 506,
-      "x1": 1394,
-      "y1": 756,
-      "x2": 1417,
-      "y2": 886,
-      "length": 132.02,
-      "angle_degrees": 79.97,
-      "vertical_deviation_degrees": 10.03,
-      "sampled_points": 131,
-      "points_inside_mask": 131,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 482,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.6461,
       "is_valid": true
     },
     {
@@ -6199,20 +3441,9 @@
       "sampled_points": 154,
       "points_inside_mask": 154,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 509,
-      "x1": 1341,
-      "y1": 849,
-      "x2": 1345,
-      "y2": 727,
-      "length": 122.07,
-      "angle_degrees": -88.12,
-      "vertical_deviation_degrees": 1.88,
-      "sampled_points": 123,
-      "points_inside_mask": 123,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 470,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.63,
       "is_valid": true
     },
     {
@@ -6227,20 +3458,9 @@
       "sampled_points": 212,
       "points_inside_mask": 212,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 513,
-      "x1": 1375,
-      "y1": 882,
-      "x2": 1389,
-      "y2": 715,
-      "length": 167.59,
-      "angle_degrees": -85.21,
-      "vertical_deviation_degrees": 4.79,
-      "sampled_points": 168,
-      "points_inside_mask": 168,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 466,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.6247,
       "is_valid": true
     },
     {
@@ -6255,20 +3475,9 @@
       "sampled_points": 133,
       "points_inside_mask": 133,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 516,
-      "x1": 1792,
-      "y1": 916,
-      "x2": 1794,
-      "y2": 755,
-      "length": 161.01,
-      "angle_degrees": -89.29,
-      "vertical_deviation_degrees": 0.71,
-      "sampled_points": 162,
-      "points_inside_mask": 162,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 474,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.6354,
       "is_valid": true
     },
     {
@@ -6283,20 +3492,9 @@
       "sampled_points": 108,
       "points_inside_mask": 108,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 518,
-      "x1": 1259,
-      "y1": 1685,
-      "x2": 1270,
-      "y2": 1806,
-      "length": 121.5,
-      "angle_degrees": 84.81,
-      "vertical_deviation_degrees": 5.19,
-      "sampled_points": 122,
-      "points_inside_mask": 122,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 480,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.6434,
       "is_valid": true
     },
     {
@@ -6311,34 +3509,9 @@
       "sampled_points": 108,
       "points_inside_mask": 108,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 521,
-      "x1": 1398,
-      "y1": 754,
-      "x2": 1421,
-      "y2": 885,
-      "length": 133.0,
-      "angle_degrees": 80.04,
-      "vertical_deviation_degrees": 9.96,
-      "sampled_points": 132,
-      "points_inside_mask": 132,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 522,
-      "x1": 1811,
-      "y1": 2555,
-      "x2": 1811,
-      "y2": 2424,
-      "length": 131.0,
-      "angle_degrees": -90.0,
-      "vertical_deviation_degrees": 0.0,
-      "sampled_points": 132,
-      "points_inside_mask": 132,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 483,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.6475,
       "is_valid": true
     },
     {
@@ -6353,6 +3526,9 @@
       "sampled_points": 116,
       "points_inside_mask": 116,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 390,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5228,
       "is_valid": true
     },
     {
@@ -6367,6 +3543,9 @@
       "sampled_points": 117,
       "points_inside_mask": 117,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 495,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.6635,
       "is_valid": true
     },
     {
@@ -6381,20 +3560,9 @@
       "sampled_points": 124,
       "points_inside_mask": 124,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 531,
-      "x1": 1340,
-      "y1": 2092,
-      "x2": 1346,
-      "y2": 2208,
-      "length": 116.16,
-      "angle_degrees": 87.04,
-      "vertical_deviation_degrees": 2.96,
-      "sampled_points": 117,
-      "points_inside_mask": 117,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 355,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.4759,
       "is_valid": true
     },
     {
@@ -6409,132 +3577,9 @@
       "sampled_points": 101,
       "points_inside_mask": 101,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 536,
-      "x1": 1825,
-      "y1": 2357,
-      "x2": 1839,
-      "y2": 2227,
-      "length": 130.75,
-      "angle_degrees": -83.85,
-      "vertical_deviation_degrees": 6.15,
-      "sampled_points": 131,
-      "points_inside_mask": 131,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 537,
-      "x1": 1808,
-      "y1": 928,
-      "x2": 1808,
-      "y2": 825,
-      "length": 103.0,
-      "angle_degrees": -90.0,
-      "vertical_deviation_degrees": 0.0,
-      "sampled_points": 104,
-      "points_inside_mask": 104,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 539,
-      "x1": 1363,
-      "y1": 885,
-      "x2": 1371,
-      "y2": 770,
-      "length": 115.28,
-      "angle_degrees": -86.02,
-      "vertical_deviation_degrees": 3.98,
-      "sampled_points": 116,
-      "points_inside_mask": 116,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 540,
-      "x1": 1788,
-      "y1": 2154,
-      "x2": 1790,
-      "y2": 2020,
-      "length": 134.01,
-      "angle_degrees": -89.14,
-      "vertical_deviation_degrees": 0.86,
-      "sampled_points": 135,
-      "points_inside_mask": 135,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 541,
-      "x1": 1817,
-      "y1": 2256,
-      "x2": 1829,
-      "y2": 2153,
-      "length": 103.7,
-      "angle_degrees": -83.35,
-      "vertical_deviation_degrees": 6.65,
-      "sampled_points": 104,
-      "points_inside_mask": 104,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 542,
-      "x1": 1369,
-      "y1": 884,
-      "x2": 1377,
-      "y2": 763,
-      "length": 121.26,
-      "angle_degrees": -86.22,
-      "vertical_deviation_degrees": 3.78,
-      "sampled_points": 122,
-      "points_inside_mask": 122,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 543,
-      "x1": 1816,
-      "y1": 2255,
-      "x2": 1829,
-      "y2": 2149,
-      "length": 106.79,
-      "angle_degrees": -83.01,
-      "vertical_deviation_degrees": 6.99,
-      "sampled_points": 107,
-      "points_inside_mask": 107,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 545,
-      "x1": 1333,
-      "y1": 2061,
-      "x2": 1339,
-      "y2": 2176,
-      "length": 115.16,
-      "angle_degrees": 87.01,
-      "vertical_deviation_degrees": 2.99,
-      "sampled_points": 116,
-      "points_inside_mask": 116,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 546,
-      "x1": 1806,
-      "y1": 2156,
-      "x2": 1806,
-      "y2": 2005,
-      "length": 151.0,
-      "angle_degrees": -90.0,
-      "vertical_deviation_degrees": 0.0,
-      "sampled_points": 152,
-      "points_inside_mask": 152,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 404,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5416,
       "is_valid": true
     },
     {
@@ -6549,48 +3594,9 @@
       "sampled_points": 102,
       "points_inside_mask": 102,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 549,
-      "x1": 1900,
-      "y1": 1920,
-      "x2": 1907,
-      "y2": 1809,
-      "length": 111.22,
-      "angle_degrees": -86.39,
-      "vertical_deviation_degrees": 3.61,
-      "sampled_points": 112,
-      "points_inside_mask": 112,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 554,
-      "x1": 1874,
-      "y1": 1900,
-      "x2": 1887,
-      "y2": 1782,
-      "length": 118.71,
-      "angle_degrees": -83.71,
-      "vertical_deviation_degrees": 6.29,
-      "sampled_points": 119,
-      "points_inside_mask": 119,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 555,
-      "x1": 1824,
-      "y1": 2151,
-      "x2": 1841,
-      "y2": 2007,
-      "length": 145.0,
-      "angle_degrees": -83.27,
-      "vertical_deviation_degrees": 6.73,
-      "sampled_points": 145,
-      "points_inside_mask": 145,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 482,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.6461,
       "is_valid": true
     },
     {
@@ -6605,6 +3611,9 @@
       "sampled_points": 114,
       "points_inside_mask": 114,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 473,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.634,
       "is_valid": true
     },
     {
@@ -6619,6 +3628,9 @@
       "sampled_points": 109,
       "points_inside_mask": 109,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 461,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.618,
       "is_valid": true
     },
     {
@@ -6633,34 +3645,9 @@
       "sampled_points": 136,
       "points_inside_mask": 136,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 559,
-      "x1": 1812,
-      "y1": 902,
-      "x2": 1812,
-      "y2": 783,
-      "length": 119.0,
-      "angle_degrees": -90.0,
-      "vertical_deviation_degrees": 0.0,
-      "sampled_points": 120,
-      "points_inside_mask": 120,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 560,
-      "x1": 1373,
-      "y1": 881,
-      "x2": 1384,
-      "y2": 752,
-      "length": 129.47,
-      "angle_degrees": -85.13,
-      "vertical_deviation_degrees": 4.87,
-      "sampled_points": 130,
-      "points_inside_mask": 130,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 558,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.748,
       "is_valid": true
     },
     {
@@ -6675,6 +3662,9 @@
       "sampled_points": 110,
       "points_inside_mask": 110,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 390,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5228,
       "is_valid": true
     },
     {
@@ -6689,6 +3679,9 @@
       "sampled_points": 105,
       "points_inside_mask": 105,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 390,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5228,
       "is_valid": true
     },
     {
@@ -6703,6 +3696,9 @@
       "sampled_points": 103,
       "points_inside_mask": 103,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 389,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5214,
       "is_valid": true
     },
     {
@@ -6717,34 +3713,9 @@
       "sampled_points": 117,
       "points_inside_mask": 117,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 568,
-      "x1": 1816,
-      "y1": 2251,
-      "x2": 1828,
-      "y2": 2148,
-      "length": 103.7,
-      "angle_degrees": -83.35,
-      "vertical_deviation_degrees": 6.65,
-      "sampled_points": 104,
-      "points_inside_mask": 104,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 569,
-      "x1": 1815,
-      "y1": 2181,
-      "x2": 1818,
-      "y2": 2074,
-      "length": 107.04,
-      "angle_degrees": -88.39,
-      "vertical_deviation_degrees": 1.61,
-      "sampled_points": 108,
-      "points_inside_mask": 108,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 330,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.4424,
       "is_valid": true
     },
     {
@@ -6759,6 +3730,9 @@
       "sampled_points": 101,
       "points_inside_mask": 101,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 482,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.6461,
       "is_valid": true
     },
     {
@@ -6773,6 +3747,9 @@
       "sampled_points": 131,
       "points_inside_mask": 131,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 384,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5147,
       "is_valid": true
     },
     {
@@ -6787,20 +3764,9 @@
       "sampled_points": 104,
       "points_inside_mask": 104,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 576,
-      "x1": 1335,
-      "y1": 2076,
-      "x2": 1342,
-      "y2": 2197,
-      "length": 121.2,
-      "angle_degrees": 86.69,
-      "vertical_deviation_degrees": 3.31,
-      "sampled_points": 122,
-      "points_inside_mask": 122,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 395,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5295,
       "is_valid": true
     },
     {
@@ -6815,20 +3781,9 @@
       "sampled_points": 104,
       "points_inside_mask": 104,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 579,
-      "x1": 1797,
-      "y1": 917,
-      "x2": 1797,
-      "y2": 814,
-      "length": 103.0,
-      "angle_degrees": -90.0,
-      "vertical_deviation_degrees": 0.0,
-      "sampled_points": 104,
-      "points_inside_mask": 104,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 393,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5268,
       "is_valid": true
     },
     {
@@ -6843,6 +3798,9 @@
       "sampled_points": 116,
       "points_inside_mask": 116,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 415,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5563,
       "is_valid": true
     },
     {
@@ -6857,20 +3815,9 @@
       "sampled_points": 115,
       "points_inside_mask": 115,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 583,
-      "x1": 1254,
-      "y1": 1743,
-      "x2": 1265,
-      "y2": 1843,
-      "length": 100.6,
-      "angle_degrees": 83.72,
-      "vertical_deviation_degrees": 6.28,
-      "sampled_points": 101,
-      "points_inside_mask": 101,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 385,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5161,
       "is_valid": true
     },
     {
@@ -6885,76 +3832,9 @@
       "sampled_points": 160,
       "points_inside_mask": 160,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 587,
-      "x1": 1817,
-      "y1": 2208,
-      "x2": 1822,
-      "y2": 2104,
-      "length": 104.12,
-      "angle_degrees": -87.25,
-      "vertical_deviation_degrees": 2.75,
-      "sampled_points": 105,
-      "points_inside_mask": 105,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 588,
-      "x1": 2030,
-      "y1": 1804,
-      "x2": 2039,
-      "y2": 1250,
-      "length": 554.07,
-      "angle_degrees": -89.07,
-      "vertical_deviation_degrees": 0.93,
-      "sampled_points": 555,
-      "points_inside_mask": 555,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 589,
-      "x1": 2034,
-      "y1": 1992,
-      "x2": 2037,
-      "y2": 1892,
-      "length": 100.04,
-      "angle_degrees": -88.28,
-      "vertical_deviation_degrees": 1.72,
-      "sampled_points": 101,
-      "points_inside_mask": 101,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 590,
-      "x1": 1826,
-      "y1": 2309,
-      "x2": 1837,
-      "y2": 2205,
-      "length": 104.58,
-      "angle_degrees": -83.96,
-      "vertical_deviation_degrees": 6.04,
-      "sampled_points": 105,
-      "points_inside_mask": 105,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 591,
-      "x1": 2031,
-      "y1": 1608,
-      "x2": 2034,
-      "y2": 1408,
-      "length": 200.02,
-      "angle_degrees": -89.14,
-      "vertical_deviation_degrees": 0.86,
-      "sampled_points": 201,
-      "points_inside_mask": 201,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 471,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.6314,
       "is_valid": true
     },
     {
@@ -6969,48 +3849,9 @@
       "sampled_points": 257,
       "points_inside_mask": 257,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 593,
-      "x1": 2044,
-      "y1": 1387,
-      "x2": 2047,
-      "y2": 1244,
-      "length": 143.03,
-      "angle_degrees": -88.8,
-      "vertical_deviation_degrees": 1.2,
-      "sampled_points": 144,
-      "points_inside_mask": 144,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 595,
-      "x1": 2040,
-      "y1": 1725,
-      "x2": 2043,
-      "y2": 1561,
-      "length": 164.03,
-      "angle_degrees": -88.95,
-      "vertical_deviation_degrees": 1.05,
-      "sampled_points": 165,
-      "points_inside_mask": 165,
-      "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 596,
-      "x1": 1366,
-      "y1": 884,
-      "x2": 1374,
-      "y2": 764,
-      "length": 120.27,
-      "angle_degrees": -86.19,
-      "vertical_deviation_degrees": 3.81,
-      "sampled_points": 121,
-      "points_inside_mask": 121,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 398,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5335,
       "is_valid": true
     },
     {
@@ -7025,6 +3866,9 @@
       "sampled_points": 103,
       "points_inside_mask": 103,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 405,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5429,
       "is_valid": true
     },
     {
@@ -7039,6 +3883,9 @@
       "sampled_points": 264,
       "points_inside_mask": 264,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 401,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5375,
       "is_valid": true
     },
     {
@@ -7053,6 +3900,9 @@
       "sampled_points": 112,
       "points_inside_mask": 112,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 476,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.6381,
       "is_valid": true
     },
     {
@@ -7067,6 +3917,9 @@
       "sampled_points": 103,
       "points_inside_mask": 103,
       "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 393,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5268,
       "is_valid": true
     },
     {
@@ -7081,20 +3934,9 @@
       "sampled_points": 151,
       "points_inside_mask": 151,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 602,
-      "x1": 2042,
-      "y1": 1721,
-      "x2": 2044,
-      "y2": 1578,
-      "length": 143.01,
-      "angle_degrees": -89.2,
-      "vertical_deviation_degrees": 0.8,
-      "sampled_points": 144,
-      "points_inside_mask": 144,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 404,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5416,
       "is_valid": true
     },
     {
@@ -7109,20 +3951,9 @@
       "sampled_points": 110,
       "points_inside_mask": 110,
       "mask_support_ratio": 1.0,
-      "is_valid": true
-    },
-    {
-      "line_index": 604,
-      "x1": 2041,
-      "y1": 1666,
-      "x2": 2042,
-      "y2": 1563,
-      "length": 103.0,
-      "angle_degrees": -89.44,
-      "vertical_deviation_degrees": 0.56,
-      "sampled_points": 104,
-      "points_inside_mask": 104,
-      "mask_support_ratio": 1.0,
+      "mask_reference_width_px": 746,
+      "min_horizontal_clearance_from_mask_edge_px": 407,
+      "min_horizontal_clearance_ratio_of_mask_width": 0.5456,
       "is_valid": true
     }
   ]
