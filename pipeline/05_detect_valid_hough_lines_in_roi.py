@@ -18,12 +18,25 @@ CONFIG = load_config()
 
 PATHS_CONFIG = CONFIG["paths"]
 DISPLAY_CONFIG = CONFIG["display"]
+STEP_03_CONFIG = CONFIG["step_03_edge_detection"]
+STEP_04_CONFIG = CONFIG["step_04_boot_roi_from_edges"]
 STEP_CONFIG = CONFIG["step_05_valid_hough_lines_in_roi"]
 
 PROCESSED_DIR = PROJECT_ROOT / PATHS_CONFIG["processed_dir"]
 
-EDGE_INPUT_DIR = PROCESSED_DIR / STEP_CONFIG["edge_input_subdir"]
-ROI_MASK_DIR = PROCESSED_DIR / STEP_CONFIG["roi_mask_subdir"]
+if bool(STEP_CONFIG.get("inherit_step_03_output", True)):
+    edge_input_name = str(
+        STEP_CONFIG.get("edge_input_name", STEP_03_CONFIG.get("selected_output", "cleaned"))
+    ).strip()
+    EDGE_INPUT_DIR = PROCESSED_DIR / STEP_03_CONFIG["output_subdir"] / edge_input_name
+else:
+    EDGE_INPUT_DIR = PROCESSED_DIR / STEP_CONFIG["edge_input_subdir"]
+
+if bool(STEP_CONFIG.get("inherit_step_04_output", True)):
+    roi_mask_subdir_name = str(STEP_CONFIG.get("roi_mask_subdir_name", "mask")).strip()
+    ROI_MASK_DIR = PROCESSED_DIR / STEP_04_CONFIG["output_subdir"] / roi_mask_subdir_name
+else:
+    ROI_MASK_DIR = PROCESSED_DIR / STEP_CONFIG["roi_mask_subdir"]
 OUTPUT_DIR = PROCESSED_DIR / STEP_CONFIG["output_subdir"]
 
 MASKED_EDGE_DIR = OUTPUT_DIR / "masked_edges"

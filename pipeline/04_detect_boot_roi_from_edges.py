@@ -15,11 +15,15 @@ CONFIG = load_config()
 
 PATHS_CONFIG = CONFIG["paths"]
 DISPLAY_CONFIG = CONFIG["display"]
+STEP_03_CONFIG = CONFIG["step_03_edge_detection"]
 STEP_CONFIG = CONFIG["step_04_boot_roi_from_edges"]
 
 PROCESSED_DIR = PROJECT_ROOT / PATHS_CONFIG["processed_dir"]
 
-INPUT_ROOT_DIR = PROCESSED_DIR / STEP_CONFIG["input_subdir"]
+if bool(STEP_CONFIG.get("inherit_step_03_output", True)):
+    INPUT_ROOT_DIR = PROCESSED_DIR / STEP_03_CONFIG["output_subdir"]
+else:
+    INPUT_ROOT_DIR = PROCESSED_DIR / STEP_CONFIG["input_subdir"]
 SELECTED_INPUT = STEP_CONFIG.get("selected_input")
 INPUT_DIR = (
     INPUT_ROOT_DIR / str(SELECTED_INPUT).strip()

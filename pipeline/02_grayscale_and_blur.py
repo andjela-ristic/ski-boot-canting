@@ -13,12 +13,16 @@ CONFIG = load_config()
 
 PATHS_CONFIG = CONFIG["paths"]
 DISPLAY_CONFIG = CONFIG["display"]
+STEP_01_CONFIG = CONFIG["step_01_illumination_normalization"]
 STEP_CONFIG = CONFIG["step_02_grayscale_and_blur"]
 
 PROCESSED_DIR = PROJECT_ROOT / PATHS_CONFIG["processed_dir"]
 METADATA_DIR = PROJECT_ROOT / PATHS_CONFIG["metadata_dir"]
 
-INPUT_DIR = PROCESSED_DIR / STEP_CONFIG["input_subdir"]
+if bool(STEP_CONFIG.get("inherit_step_01_output", True)):
+    INPUT_DIR = PROCESSED_DIR / STEP_01_CONFIG["output_subdir"]
+else:
+    INPUT_DIR = PROCESSED_DIR / STEP_CONFIG["input_subdir"]
 OUTPUT_DIR = PROCESSED_DIR / STEP_CONFIG["output_subdir"]
 
 GRAYSCALE_DIR = OUTPUT_DIR / "grayscale"

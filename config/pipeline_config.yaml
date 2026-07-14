@@ -29,6 +29,7 @@ step_01_illumination_normalization:
   output_subdir: 01_illumination_normalized
 step_02_grayscale_and_blur:
   enabled: true
+  inherit_step_01_output: true
   input_subdir: 01_illumination_normalized
   output_subdir: 02_grayscale_blur
   selected_output: bilateral_filter
@@ -94,6 +95,7 @@ step_03_edge_detection:
         threshold_2: 140
 step_04_boot_roi_from_edges:
   enabled: true
+  inherit_step_03_output: true
   input_subdir: 03_edges
   selected_input: roi_edges
   output_subdir: 04_boot_roi_from_edges
@@ -146,6 +148,8 @@ step_04_boot_roi_from_edges:
         second_close_kernel_size: 85
 step_05_valid_hough_lines_in_roi:
   enabled: true
+  inherit_step_03_output: true
+  inherit_step_04_output: true
   edge_input_subdir: 03_edges/cleaned
   roi_mask_subdir: 04_boot_roi_from_edges/mask
   output_subdir: 05_valid_hough_lines_in_roi
@@ -172,7 +176,7 @@ step_05_valid_hough_lines_in_roi:
     - 35
     - 45
     - 55
-    min_line_length: 100
+    min_line_length: 70
     min_line_length_test_values:
     - 60
     - 80
@@ -206,7 +210,7 @@ step_05_valid_hough_lines_in_roi:
     max_deviation_from_vertical_degrees: 20
   drawing:
     raw_line_thickness: 2
-    valid_line_thickness: 3
+    valid_line_thickness: 2
   test_presets:
   - name: default
     override: {}
@@ -248,9 +252,9 @@ step_05_valid_hough_lines_in_roi:
       roi:
         inner_erode_kernel_size: 21
         inner_erode_iterations: 1
-
 step_06_fit_central_axis_from_fragments:
   enabled: true
+  inherit_step_05_output: true
   input_subdir: 05_valid_hough_lines_in_roi
   input_json_subdir: valid_lines_json
   output_subdir: 06_fit_central_axis_from_fragments
@@ -732,3 +736,117 @@ step_06_fit_central_axis_from_fragments:
           max_endpoint_error_px: 210
           max_top_bottom_error_difference_px: 145
           require_top_bottom_reasonable: false
+step_07_search_central_ruler:
+  enabled: true
+  inherit_step_05_output: true
+  input_subdir: 05_valid_hough_lines_in_roi
+  input_json_subdir: valid_lines_json
+  input_visual_subdir: 05_valid_hough_lines_in_roi/valid_lines_overlay
+  input_overlay_subdir: valid_lines_overlay
+  output_subdir: 07_search_central_ruler
+  cleanup_output_on_start: true
+  fragment_filter:
+    min_length_px: 90
+    max_vertical_deviation_deg: 18
+    min_mask_support_ratio: 0.94
+    min_points_inside_mask: 60
+  roi_profile:
+    trim_top_ratio: 0.06
+    trim_bottom_ratio: 0.06
+    min_row_width_px: 140
+    sample_step_px: 10
+    center_width_quantile: 0.35
+  search:
+    max_candidate_tilt_deg: 12
+    coarse_angle_step_deg: 1.0
+    fine_angle_step_deg: 0.2
+    coarse_x_step_px: 14
+    fine_x_step_px: 2
+    coarse_band_half_width_px: 16
+    final_band_half_width_px: 9
+    coarse_max_angle_error_deg: 6
+    final_max_angle_error_deg: 4
+    top_coarse_candidates: 10
+    fine_window_x_px: 28
+    fine_window_angle_deg: 1.6
+    min_support_fragments: 2
+  coverage:
+    bin_count: 12
+    min_supported_bins: 4
+  gaps:
+    soft_gap_px: 80
+    hard_gap_px: 260
+  endpoint_support:
+    band_ratio: 0.15
+    min_band_px: 80
+    max_band_px: 160
+  final_fit:
+    sample_step_px: 22
+    huber_delta_px: 10
+    huber_iterations: 4
+    max_fit_tilt_deg: 12
+  support_adjustment:
+    enabled: true
+    max_midpoint_shift_px: 6
+    max_tilt_delta_deg: 2
+    max_mean_shift_px: 6
+    max_endpoint_shift_px: 9
+    require_axis_intersection_for_tilt_adjustment: true
+    min_support_strength_scale: 0.62
+  support_extension:
+    enabled: true
+    trigger_gap_px: 180
+    max_added_fragments: 6
+    min_vertical_advance_px: 18
+    max_connection_dx_px: 34
+    max_connection_gap_px: 360
+    max_axis_distance_px: 55
+    max_center_distance_px: 70
+    max_vertical_deviation_deg: 10
+  candidate_deduplication:
+    max_mean_axis_distance_px: 8
+    max_angle_difference_deg: 0.45
+    max_saved_candidates: 8
+  scoring:
+    fragment_support_weight: 0.34
+    vertical_coverage_weight: 0.22
+    symmetry_weight: 0.24
+    roi_center_weight: 0.08
+    gap_penalty_weight: 0.14
+    endpoint_anchor_weight: 0.10
+    outside_mask_penalty_weight: 0.16
+    support_adjustment_penalty_weight: 0.08
+    low_support_penalty: 0.20
+    low_coverage_penalty: 0.20
+  drawing:
+    background_alpha: 0.78
+    all_fragment_thickness: 2
+    candidate_thickness: 2
+    selected_fragment_thickness: 3
+    final_line_thickness: 4
+    show_candidate_lines: true
+    candidate_count_to_draw: 3
+    label_candidates: true
+    font_scale: 0.64
+  test_presets:
+  - name: default
+    override: {}
+  - name: wider_band
+    override:
+      search:
+        coarse_band_half_width_px: 20
+        final_band_half_width_px: 11
+        coarse_max_angle_error_deg: 7
+        final_max_angle_error_deg: 5
+  - name: stricter_symmetry
+    override:
+      scoring:
+        symmetry_weight: 0.30
+        gap_penalty_weight: 0.16
+        outside_mask_penalty_weight: 0.18
+  - name: wider_search
+    override:
+      search:
+        max_candidate_tilt_deg: 15
+        coarse_x_step_px: 12
+        fine_window_x_px: 34

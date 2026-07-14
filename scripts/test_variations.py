@@ -43,6 +43,62 @@ def set_config(config_path: str | None) -> None:
     PROCESSED_DIR = PROJECT_ROOT / PATHS_CONFIG["processed_dir"]
 
 
+def get_step_02_input_dir(step_config: dict | None = None) -> Path:
+    step_config = CONFIG["step_02_grayscale_and_blur"] if step_config is None else step_config
+    if step_config.get("inherit_step_01_output", True):
+        step_01_config = CONFIG["step_01_illumination_normalization"]
+        return PROCESSED_DIR / step_01_config["output_subdir"]
+    return PROCESSED_DIR / step_config["input_subdir"]
+
+
+def get_step_04_input_dir(step_config: dict | None = None) -> Path:
+    step_config = CONFIG["step_04_boot_roi_from_edges"] if step_config is None else step_config
+    if step_config.get("inherit_step_03_output", True):
+        step_03_config = CONFIG["step_03_edge_detection"]
+        input_root_dir = PROCESSED_DIR / step_03_config["output_subdir"]
+    else:
+        input_root_dir = PROCESSED_DIR / step_config["input_subdir"]
+
+    selected_input = step_config.get("selected_input")
+    return input_root_dir / str(selected_input).strip() if selected_input is not None else input_root_dir
+
+
+def get_step_05_edge_input_dir(step_config: dict | None = None) -> Path:
+    step_config = CONFIG["step_05_valid_hough_lines_in_roi"] if step_config is None else step_config
+    if step_config.get("inherit_step_03_output", True):
+        step_03_config = CONFIG["step_03_edge_detection"]
+        edge_input_name = str(
+            step_config.get("edge_input_name", step_03_config.get("selected_output", "cleaned"))
+        ).strip()
+        return PROCESSED_DIR / step_03_config["output_subdir"] / edge_input_name
+    return PROCESSED_DIR / step_config["edge_input_subdir"]
+
+
+def get_step_05_roi_dir(step_config: dict | None = None) -> Path:
+    step_config = CONFIG["step_05_valid_hough_lines_in_roi"] if step_config is None else step_config
+    if step_config.get("inherit_step_04_output", True):
+        step_04_config = CONFIG["step_04_boot_roi_from_edges"]
+        roi_mask_subdir_name = str(step_config.get("roi_mask_subdir_name", "mask")).strip()
+        return PROCESSED_DIR / step_04_config["output_subdir"] / roi_mask_subdir_name
+    return PROCESSED_DIR / step_config["roi_mask_subdir"]
+
+
+def get_step_06_input_dir(step_config: dict | None = None) -> Path:
+    step_config = CONFIG["step_06_fit_central_axis_from_fragments"] if step_config is None else step_config
+    if step_config.get("inherit_step_05_output", True):
+        step_05_config = CONFIG["step_05_valid_hough_lines_in_roi"]
+        return PROCESSED_DIR / step_05_config["output_subdir"]
+    return PROCESSED_DIR / step_config["input_subdir"]
+
+
+def get_step_07_input_dir(step_config: dict | None = None) -> Path:
+    step_config = CONFIG["step_07_search_central_ruler"] if step_config is None else step_config
+    if step_config.get("inherit_step_05_output", True):
+        step_05_config = CONFIG["step_05_valid_hough_lines_in_roi"]
+        return PROCESSED_DIR / step_05_config["output_subdir"]
+    return PROCESSED_DIR / step_config["input_subdir"]
+
+
 def select_combo_results(
     results: list[tuple[str, np.ndarray]],
     combo: int | None,
@@ -122,7 +178,7 @@ def resolve_image_path(step: int, image_name: str) -> Path:
     elif step == 2:
         step_config = CONFIG["step_02_grayscale_and_blur"]
         image_path = resolve_existing_image_path(
-            PROCESSED_DIR / step_config["input_subdir"],
+            get_step_02_input_dir(step_config),
             image_name
         )
 
@@ -138,22 +194,15 @@ def resolve_image_path(step: int, image_name: str) -> Path:
 
     elif step == 4:
         step_config = CONFIG["step_04_boot_roi_from_edges"]
-        input_root_dir = PROCESSED_DIR / step_config["input_subdir"]
-        selected_input = step_config.get("selected_input")
-        image_dir = (
-            input_root_dir / str(selected_input).strip()
-            if selected_input is not None
-            else input_root_dir
-        )
         image_path = resolve_existing_image_path(
-            image_dir,
+            get_step_04_input_dir(step_config),
             image_name
         )
 
     elif step == 5:
         step_config = CONFIG["step_05_valid_hough_lines_in_roi"]
         image_path = resolve_existing_image_path(
-            PROCESSED_DIR / step_config["edge_input_subdir"],
+            get_step_05_edge_input_dir(step_config),
             image_name
         )
 
@@ -171,9 +220,11 @@ def resolve_image_path(step: int, image_name: str) -> Path:
         )
 
     elif step == 7:
-        step_config = CONFIG["step_07_complete_line_fragments"]
+        step_config = CONFIG["step_07_search_central_ruler"]
+        input_root_dir = get_step_07_input_dir(step_config)
+        input_visual_dir = input_root_dir / step_config.get("input_overlay_subdir", "valid_lines_overlay")
         image_path = resolve_existing_image_path(
-            PROCESSED_DIR / step_config["input_visual_subdir"],
+            input_visual_dir,
             image_name
         )
 
@@ -877,8 +928,23 @@ def load_step_06_module():
 
     return module
 
+
+def get_step_06_base_config(lm=None) -> dict:
+    if lm is None:
+        lm = load_step_06_module()
+
+    step_config = (
+        CONFIG.get("step_06_fit_central_axis_from_fragments")
+        or CONFIG.get("step_06_axis_fragment_chains")
+    )
+
+    if step_config is None:
+        return copy.deepcopy(lm.DEFAULT_STEP_CONFIG)
+
+    return lm.deep_merge(lm.DEFAULT_STEP_CONFIG, step_config)
+
 def load_step_07_module():
-    module_path = PROJECT_ROOT / "pipeline" / "07_complete_line_fragments.py"
+    module_path = PROJECT_ROOT / "pipeline" / "07_search_central_ruler.py"
 
     if not module_path.exists():
         raise FileNotFoundError(f"Step 07 file not found: {module_path}")
@@ -1080,7 +1146,7 @@ def run_step_05_single_preset(
     if edge_image is None:
         raise ValueError(f"Could not read image: {image_path}")
 
-    roi_dir = PROCESSED_DIR / lm.STEP_CONFIG["roi_mask_subdir"]
+    roi_dir = get_step_05_roi_dir(lm.STEP_CONFIG)
     roi_path = resolve_existing_image_path(roi_dir, image_path.name)
     roi_mask = cv2.imread(str(roi_path), cv2.IMREAD_GRAYSCALE)
 
@@ -1139,21 +1205,14 @@ def run_step_06_single_preset(
     image_path: Path,
     preset: dict,
 ) -> tuple[str, np.ndarray]:
-    base_step_config = (
-        CONFIG.get("step_06_fit_central_axis_from_fragments")
-        or CONFIG.get("step_06_axis_fragment_chains")
-    )
-    if base_step_config is None:
-        raise KeyError(
-            "Missing Step 06 config. Expected 'step_06_fit_central_axis_from_fragments'."
-        )
+    base_step_config = get_step_06_base_config(lm)
 
     preset_name = str(preset.get("name", "unnamed variation"))
     override = copy.deepcopy(preset.get("override", {}))
 
     lm.STEP_CONFIG = lm.deep_merge(base_step_config, override)
 
-    input_json_dir = PROCESSED_DIR / lm.STEP_CONFIG["input_subdir"] / lm.STEP_CONFIG.get(
+    input_json_dir = get_step_06_input_dir(lm.STEP_CONFIG) / lm.STEP_CONFIG.get(
         "input_json_subdir",
         "valid_lines_json"
     )
@@ -1168,19 +1227,26 @@ def run_step_06_single_preset(
 
     roi_mask_path = lm.resolve_project_path(data.get("roi_mask_file"))
     roi_mask = lm.load_roi_mask(roi_mask_path)
-    prior = lm.robust_roi_axis_prior(roi_mask)
+    roi_profile = None
 
     image_height = int(data.get("height", 0)) or 4032
     filtered_lines, rejected_lines = lm.filter_fragments(lines)
-    fit_result = lm.fit_central_axis(filtered_lines, image_height, prior, roi_mask=roi_mask)
+    seed_pool, remaining_pool = lm.select_seed_pool(filtered_lines)
+    fit_result = lm.fit_central_candidates(
+        seed_lines=seed_pool,
+        support_lines=seed_pool + remaining_pool,
+        image_height=image_height,
+        roi_profile=roi_profile,
+        roi_mask=roi_mask,
+    )
     best_candidate = fit_result["best_candidate"]
+    base_image, _, base_is_overlay = lm.load_base_image(data)
 
     overlay = lm.draw_overlay(
-        lm.load_base_image(data),
+        base_image,
+        base_is_overlay,
         filtered_lines,
-        rejected_lines,
-        best_candidate,
-        prior,
+        fit_result["candidates"],
         data.get("image_name", image_path.name),
     )
 
@@ -1206,7 +1272,7 @@ def run_step_06_single_preset_worker(
 
     lm.STEP_CONFIG = lm.deep_merge(base_step_config, override)
 
-    input_json_dir = PROCESSED_DIR / lm.STEP_CONFIG["input_subdir"] / lm.STEP_CONFIG.get(
+    input_json_dir = get_step_06_input_dir(lm.STEP_CONFIG) / lm.STEP_CONFIG.get(
         "input_json_subdir",
         "valid_lines_json"
     )
@@ -1221,19 +1287,26 @@ def run_step_06_single_preset_worker(
 
     roi_mask_path = lm.resolve_project_path(data.get("roi_mask_file"))
     roi_mask = lm.load_roi_mask(roi_mask_path)
-    prior = lm.robust_roi_axis_prior(roi_mask)
+    roi_profile = None
 
     image_height = int(data.get("height", 0)) or 4032
     filtered_lines, rejected_lines = lm.filter_fragments(lines)
-    fit_result = lm.fit_central_axis(filtered_lines, image_height, prior, roi_mask=roi_mask)
+    seed_pool, remaining_pool = lm.select_seed_pool(filtered_lines)
+    fit_result = lm.fit_central_candidates(
+        seed_lines=seed_pool,
+        support_lines=seed_pool + remaining_pool,
+        image_height=image_height,
+        roi_profile=roi_profile,
+        roi_mask=roi_mask,
+    )
     best_candidate = fit_result["best_candidate"]
+    base_image, _, base_is_overlay = lm.load_base_image(data)
 
     overlay = lm.draw_overlay(
-        lm.load_base_image(data),
+        base_image,
+        base_is_overlay,
         filtered_lines,
-        rejected_lines,
-        best_candidate,
-        prior,
+        fit_result["candidates"],
         data.get("image_name", image_path.name),
     )
 
@@ -1248,14 +1321,7 @@ def run_step_06_single_preset_worker(
     return label, overlay
 
 def build_step_06_presets() -> list[dict]:
-    step_config = (
-        CONFIG.get("step_06_fit_central_axis_from_fragments")
-        or CONFIG.get("step_06_axis_fragment_chains")
-    )
-    if step_config is None:
-        raise KeyError(
-            "Missing Step 06 config. Expected 'step_06_fit_central_axis_from_fragments'."
-        )
+    step_config = get_step_06_base_config()
     explicit_presets = step_config.get("test_presets", [])
 
     if explicit_presets:
@@ -1277,14 +1343,7 @@ def run_step_06_variations(
 ) -> None:
     presets = build_step_06_presets()
     presets = select_combo_items(presets, combo)
-    base_step_config = (
-        CONFIG.get("step_06_fit_central_axis_from_fragments")
-        or CONFIG.get("step_06_axis_fragment_chains")
-    )
-    if base_step_config is None:
-        raise KeyError(
-            "Missing Step 06 config. Expected 'step_06_fit_central_axis_from_fragments'."
-        )
+    base_step_config = get_step_06_base_config()
 
     results = []
 
@@ -1336,7 +1395,7 @@ def run_step_06_variations(
     )
 
 def get_axis_fit_test_presets() -> list[str]:
-    step_config = CONFIG.get("step_06_fit_central_axis_from_fragments", {})
+    step_config = get_step_06_base_config()
     presets = step_config.get("test_presets", [])
     preset_names = [
         str(preset.get("name")).strip()
@@ -1347,15 +1406,7 @@ def get_axis_fit_test_presets() -> list[str]:
     if preset_names:
         return preset_names
 
-    return [
-        "stricter_center_fast",
-        "stricter_center",
-        "strict_center_narrow",
-        "strict_center_wider",
-        "strict_low_residual",
-        "strict_more_support",
-        "strict_prior_heavy",
-    ]
+    return ["default"]
 
 def run_axis_fit_preset(preset: str, image: str | None = None) -> None:
     step_script = PROJECT_ROOT / "pipeline" / "06_fit_central_axis_from_fragments.py"
@@ -1469,7 +1520,7 @@ def collect_step_07_test_presets(
         )
 
 def build_step_07_presets() -> list[dict]:
-    step_config = CONFIG["step_07_complete_line_fragments"]
+    step_config = CONFIG["step_07_search_central_ruler"]
     explicit_presets = step_config.get("test_presets", [])
 
     if explicit_presets:
@@ -1513,50 +1564,34 @@ def run_step_07_single_preset(
     image_path: Path,
     preset: dict,
 ) -> tuple[str, np.ndarray]:
-    base_step_config = CONFIG["step_07_complete_line_fragments"]
+    base_step_config = CONFIG["step_07_search_central_ruler"]
     preset_name = str(preset.get("name", "unnamed variation"))
     override = copy.deepcopy(preset.get("override", {}))
 
-    lm.STEP = deep_merge_dict(base_step_config, override)
+    lm.STEP_CONFIG = lm.deep_merge(lm.DEFAULT_STEP_CONFIG, deep_merge_dict(base_step_config, override))
+    input_root_dir = get_step_07_input_dir(lm.STEP_CONFIG)
+    input_json_dir = (
+        input_root_dir
+        / lm.STEP_CONFIG.get("input_json_subdir", "valid_lines_json")
+    )
+    json_path = input_json_dir / f"{image_path.stem}.json"
 
-    visual = cv2.imread(str(image_path))
+    if not json_path.exists():
+        raise FileNotFoundError(f"Step 07 input JSON not found: {json_path}")
 
-    if visual is None:
-        raise ValueError(f"Could not read image: {image_path}")
-
-    h, w = visual.shape[:2]
-    edge = lm.load_edge(image_path, visual)
-    raw_mask, _ = lm.load_roi_mask(image_path.name, (h, w))
-    outer_mask = lm.dilate_mask(raw_mask)
-    hough_mask = lm.make_inner_mask(raw_mask)
-    masked_edge = cv2.bitwise_and(edge, edge, mask=hough_mask)
-
-    raw_hough_lines = lm.detect_hough_lines(masked_edge)
-
-    all_fragments = []
-    for idx, line in enumerate(raw_hough_lines, start=1):
-        fragment = lm.make_fragment(idx, line, outer_mask)
-        if fragment is not None:
-            all_fragments.append(fragment)
-
-    mask_supported = lm.filter_mask_supported(all_fragments)
-    vertical = lm.filter_vertical(mask_supported)
-    groups = lm.merge_groups(vertical)
-    completed = [
-        lm.build_completed_line(idx, group, outer_mask, edge)
-        for idx, group in enumerate(groups, start=1)
-    ]
-    completed.sort(key=lambda item: item.support_score, reverse=True)
-
-    completed_overlay = lm.draw_completed(visual, completed, vertical)
+    analysis = lm.build_analysis(json_path)
+    best_candidate = analysis["best_candidate"]
 
     label = (
-        f"{preset_name} | "
-        f"h={len(raw_hough_lines)} f={len(all_fragments)} "
-        f"v={len(vertical)} c={len(completed)}"
+        f"{preset_name} | filt={len(analysis['filtered_lines'])} "
+        f"cand={len(analysis['fine_candidates'])} "
+        f"sel={best_candidate['selected_fragment_count'] if best_candidate else 0} "
+        f"score={best_candidate['score']:.3f}"
+        if best_candidate is not None
+        else f"{preset_name} | filt={len(analysis['filtered_lines'])} cand=0"
     )
 
-    return label, completed_overlay
+    return label, analysis["overlay"]
 
 def run_step_07_variations(image_path: Path, combo: int | None = None) -> None:
     presets = build_step_07_presets()
