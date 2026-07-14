@@ -1,6 +1,6 @@
-{
+﻿{
   "image_name": "IMG_0511.png",
-  "processing_step": "07_search_central_ruler",
+  "processing_step": "06_search_central_ruler",
   "source_step": "05_valid_hough_lines_in_roi",
   "width": 3024,
   "height": 4032,
@@ -3638,7 +3638,7 @@
     "input_json_subdir": "valid_lines_json",
     "input_visual_subdir": "05_valid_hough_lines_in_roi/valid_lines_overlay",
     "input_overlay_subdir": "valid_lines_overlay",
-    "output_subdir": "07_search_central_ruler",
+    "output_subdir": "06_search_central_ruler",
     "cleanup_output_on_start": true,
     "fragment_filter": {
       "min_length_px": 90,
@@ -3777,6 +3777,6 @@
       }
     ]
   },
-  "output_overlay_file": "data\\processed\\07_search_central_ruler\\overlay\\IMG_0511.png",
-  "output_comparison_file": "data\\processed\\07_search_central_ruler\\comparison\\IMG_0511.png"
+  "output_overlay_file": "data\\processed\\06_search_central_ruler\\overlay\\IMG_0511.png",
+  "output_comparison_file": "data\\processed\\06_search_central_ruler\\comparison\\IMG_0511.png"
 }

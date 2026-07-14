@@ -23,7 +23,7 @@ PROCESSED_DIR = PROJECT_ROOT / PATHS_CONFIG["processed_dir"]
 WORKING_PNG_DIR = PROJECT_ROOT / PATHS_CONFIG["working_png_dir"]
 STEP_05_CONFIG = CONFIG.get("step_05_valid_hough_lines_in_roi", {})
 
-STEP_CONFIG_RAW = CONFIG.get("step_07_search_central_ruler", {})
+STEP_CONFIG_RAW = CONFIG.get("step_06_search_central_ruler", {})
 
 DEFAULT_STEP_CONFIG = {
     "enabled": True,
@@ -32,7 +32,7 @@ DEFAULT_STEP_CONFIG = {
     "input_json_subdir": "valid_lines_json",
     "input_visual_subdir": "05_valid_hough_lines_in_roi/valid_lines_overlay",
     "input_overlay_subdir": "valid_lines_overlay",
-    "output_subdir": "07_search_central_ruler",
+    "output_subdir": "06_search_central_ruler",
     "cleanup_output_on_start": True,
     "fragment_filter": {
         "min_length_px": 90,
@@ -218,7 +218,7 @@ def get_step_dirs() -> dict[str, Path]:
         input_subdir = step_05_output_subdir
     else:
         input_subdir = str(STEP_CONFIG.get("input_subdir", step_05_output_subdir))
-    output_subdir = STEP_CONFIG.get("output_subdir", "07_search_central_ruler")
+    output_subdir = STEP_CONFIG.get("output_subdir", "06_search_central_ruler")
     input_dir = PROCESSED_DIR / input_subdir
     output_dir = PROCESSED_DIR / output_subdir
     return {
@@ -1834,7 +1834,7 @@ def build_analysis(json_path: Path) -> dict:
 
     metadata = {
         "image_name": image_name,
-        "processing_step": "07_search_central_ruler",
+        "processing_step": "06_search_central_ruler",
         "source_step": data.get("processing_step", "05_valid_hough_lines_in_roi"),
         "width": width,
         "height": height,
@@ -1949,7 +1949,7 @@ def show_image(path: Path) -> None:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Step 07: search a central ruler hypothesis across ROI and fit the final center axis.")
+    parser = argparse.ArgumentParser(description="Step 06: search a central ruler hypothesis across ROI and fit the final center axis.")
     parser.add_argument("--image", type=str, default=None, help="Optional image name filter, for example IMG_0502.png")
     parser.add_argument("--limit", type=int, default=None)
     parser.add_argument("--preset", type=str, default=None)
@@ -1970,8 +1970,8 @@ def main() -> None:
         print(f"Input dir: {get_step_dirs()['input_json_dir']}")
         return
 
-    print(f"Step 07 input dir: {get_step_dirs()['input_json_dir']}")
-    print(f"Step 07 output dir: {get_step_dirs()['output_dir']}")
+    print(f"Step 06 input dir: {get_step_dirs()['input_json_dir']}")
+    print(f"Step 06 output dir: {get_step_dirs()['output_dir']}")
     if args.preset:
         print(f"Preset: {args.preset}")
     print(f"Found JSON files: {len(json_files)}")
@@ -1995,7 +1995,7 @@ def main() -> None:
         except Exception as exc:
             print(f"  ERROR: {exc}")
 
-    summary_path = get_step_dirs()["output_dir"] / "step_07_summary.json"
+    summary_path = get_step_dirs()["output_dir"] / "step_06_summary.json"
     summary_path.parent.mkdir(parents=True, exist_ok=True)
     save_json(summary_path, summary)
     print(f"\nSaved summary: {summary_path}")
