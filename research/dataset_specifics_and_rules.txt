@@ -1,0 +1,91 @@
+Dataset-specific pravila i ocekivanja
+
+Svrha ovog dokumenta:
+- da eksplicitno zapise sta se ocekuje od ulaznih slika
+- da razdvoji task-specific i setup-specific pretpostavke od slucajnog overfita
+- da bude referenca za buduce promene pipeline-a
+
+Osnovni stav:
+- pipeline nije pravljen da bude potpuno genericki za bilo kakvu obucu i bilo kakvu scenu
+- pipeline jeste pravljen za standardizovan protokol snimanja ski pancerice radi merenja canting ugla
+- zato su neka "dataset-specific" pravila zapravo namerne i dozvoljene pretpostavke sistema
+
+1. Pravila snimanja
+
+- Na ekranu tokom snimanja treba da postoji mali X marker za centar kadra.
+- Od korisnika se trazi da centar cizme bude postavljen sto blize tom X markeru.
+- Cizma treba da bude snimljena u standardizovanom front/back pogledu za merenje canting-a.
+- Kadar ne sme da sece bitne delove cizme. Ako je vrh ili bitan deo cizme odsecen, slika je los ulaz.
+- Ocekivano je da se koristi isti ili veoma slican setup snimanja kroz ceo skup podataka.
+
+2. Ocekivana geometrija cizme u kadru
+
+- Glavni objekat u kadru je jedna ski cizma.
+- Cizma treba da bude centralni objekat scene.
+- Ocekivana centralna osa cizme je skoro vertikalna.
+- Ne ocekuju se veliki nagibi cele cizme u levo ili desno.
+- Cizma treba da ima dovoljno vidljive leve i desne strane da moze da se procenjuje bilateralna simetrija.
+
+3. Ocekivanja za centralnu osu
+
+- Cilj nije dokazati da je cizma idealno simetricna.
+- Cilj je pronaci onu osu koja najbolje objasnjava dostupnu levu-desnu simetriju cizme.
+- Simetrija se koristi kao signal za izbor centralne ose, ne kao tvrdnja da je objekat savrseno simetrican.
+- Mala asimetrija zbog kopci, kaisa, plocica, srafova i drugih detalja je ocekivana.
+- Uprkos lokalnim asimetrijama, mora da postoji bar dovoljna globalna simetrija da osa moze smisleno da se proceni.
+
+4. Ocekivanja za ROI i raspored scene
+
+- ROI treba da obuhvati glavni volumen cizme.
+- Pozadina i sporedni elementi ne smeju da dominiraju scenom vise od same cizme.
+- Delovi kao sto su kais, kopce, plocice i srafovi mogu praviti false-positive ivice i linije.
+- Ti elementi se tretiraju kao ocekivani sum unutar cizme, ne kao razlog da se menja osnovna definicija ose.
+
+5. Ocekivanja za referentnu liniju podloge
+
+- Referentna linija za merenje canting-a dolazi iz podloge/stola.
+- Ocekivano je da se ta linija pojavljuje u donjem delu slike, odnosno donjoj zoni u odnosu na cizmu.
+- Ocekivano je da referentna linija bude skoro horizontalna.
+- Ocekivano je da postoji podrzka te linije sa leve i desne strane cizme.
+- Ovo je trenutno najosetljiviji deo pipeline-a na promenu setup-a.
+- Ako se promeni tip podloge, visina kamere, kadar ili vizuelni raspored donje zone, Step 09 ce verovatno traziti dodatne izmene.
+
+6. Ocekivano tumacenje rezultata
+
+- Izmereni ugao treba da bude potpisan, odnosno da ima znak.
+- Na osnovu znaka i velicine ugla rezultat se interpretira kao:
+- `left`
+- `right`
+- `neutral`
+- `neutral` znaci da je ugao dovoljno blizu nuli prema definisanom pragu.
+- Oznake levo/desno nisu problem same po sebi; one su direktna interpretacija merenog ugla.
+
+7. Sta nije pozeljan dataset bias
+
+- Nije cilj da logika radi samo za jednu konkretnu sliku.
+- Nije cilj da se uvode pravila po imenu fajla, po konkretnom paru pancerica ili po pojedinacnoj anomaliji jedne slike.
+- Nije cilj da se pravila baziraju na slucajnim detaljima koji nisu deo protokola snimanja.
+
+8. Sta jeste dozvoljena i namerna privrzenost setup-u
+
+- centriranje cizme u kadru
+- skoro vertikalna centralna osa
+- upotreba bilateralne simetrije kao signala
+- prisustvo referentne skoro horizontalne linije podloge u donjoj zoni
+- prevod znaka ugla u `left/right/neutral`
+
+9. Praktican zakljucak za pipeline
+
+- Step 04 legitimno koristi centriranost cizme kao prior.
+- Step 05 legitimno favorizuje skoro vertikalne fragmente.
+- Step 06 i Step 07 legitimno koriste simetriju za izbor ose.
+- Step 09 legitimno pretpostavlja da je referentna linija dole i skoro horizontalna.
+- Od svih ovih pretpostavki, Step 09 je najvise vezan za konkretan vizuelni setup scene.
+
+10. Kada treba menjati ova pravila
+
+- kada se promeni protokol snimanja
+- kada se uvede novi kadar ili novi ugao kamere
+- kada referentna linija vise nije podloga/stol u donjoj zoni
+- kada cizma vise nije centralno postavljena
+- kada se pipeline prosiruje na znacajno drugacije tipove obuce ili scene
