@@ -424,23 +424,123 @@ def select_support_fragments(
     return selected
 
 def merge_support_intervals(selected_support: list[dict]) -> list[tuple[float, float]]:
-    intervals = sorted(
+    intervals = [
         (float(item["line"]["y_min"]), float(item["line"]["y_max"]))
         for item in selected_support
-    )
-    if not intervals:
+    ]
+    return merge_numeric_intervals(intervals)
+
+
+def merge_numeric_intervals(
+    intervals: list[tuple[float, float]],
+    clip_min: float | None = None,
+    clip_max: float | None = None,
+) -> list[tuple[float, float]]:
+    normalized: list[tuple[float, float]] = []
+    for start, end in intervals:
+        start_value = float(min(start, end))
+        end_value = float(max(start, end))
+        if clip_min is not None:
+            start_value = max(start_value, float(clip_min))
+        if clip_max is not None:
+            end_value = min(end_value, float(clip_max))
+        if end_value > start_value:
+            normalized.append((start_value, end_value))
+    normalized.sort()
+    if not normalized:
         return []
 
-    merged = []
-    current_start, current_end = intervals[0]
-    for start, end in intervals[1:]:
-        if start <= current_end:
-            current_end = max(current_end, end)
+    merged: list[list[float]] = [[normalized[0][0], normalized[0][1]]]
+    for start, end in normalized[1:]:
+        if start <= merged[-1][1]:
+            merged[-1][1] = max(merged[-1][1], end)
+        else:
+            merged.append([start, end])
+    return [(float(start), float(end)) for start, end in merged]
+
+
+def interval_union_length(intervals: list[tuple[float, float]]) -> float:
+    return float(sum(max(0.0, end - start) for start, end in merge_numeric_intervals(intervals)))
+
+
+def line_y_overlap_ratio(line_a: dict, line_b: dict) -> float:
+    overlap = max(
+        0.0,
+        min(float(line_a["y_max"]), float(line_b["y_max"]))
+        - max(float(line_a["y_min"]), float(line_b["y_min"])),
+    )
+    min_span = max(
+        1.0,
+        min(
+            float(line_a["y_max"]) - float(line_a["y_min"]),
+            float(line_b["y_max"]) - float(line_b["y_min"]),
+        ),
+    )
+    return float(overlap / min_span)
+
+
+def mean_line_distance_on_overlap(line_a: dict, line_b: dict) -> float:
+    y_start = max(float(line_a["y_min"]), float(line_b["y_min"]))
+    y_end = min(float(line_a["y_max"]), float(line_b["y_max"]))
+    if y_end <= y_start:
+        y_start = min(float(line_a["y_mid"]), float(line_b["y_mid"]))
+        y_end = max(float(line_a["y_mid"]), float(line_b["y_mid"]))
+    rows = np.linspace(y_start, y_end, 3, dtype=np.float64)
+    distances = [abs(line_x_at_y(line_a, float(y)) - line_x_at_y(line_b, float(y))) for y in rows]
+    return float(np.mean(distances))
+
+
+def suppress_redundant_fragments(lines: list[dict]) -> list[dict]:
+    """Greedy NMS for duplicate Hough segments representing the same physical edge."""
+    if not bool(cfg("fragment_nms", "enabled", default=True)) or len(lines) <= 1:
+        return list(lines)
+
+    max_angle_difference_deg = float(
+        cfg("fragment_nms", "max_angle_difference_deg", default=1.5)
+    )
+    max_mean_axis_distance_px = float(
+        cfg("fragment_nms", "max_mean_axis_distance_px", default=8.0)
+    )
+    min_y_overlap_ratio = float(
+        cfg("fragment_nms", "min_y_overlap_ratio", default=0.55)
+    )
+
+    def quality(line: dict) -> tuple[float, ...]:
+        return (
+            float(line.get("length", 0.0)),
+            float(line.get("mask_support_ratio", 0.0)),
+            float(line.get("points_inside_mask", 0.0)),
+        )
+
+    kept: list[dict] = []
+    for raw_line in sorted(lines, key=quality, reverse=True):
+        line = dict(raw_line)
+        line.setdefault("source_line_indices", [int(line["line_index"])])
+        duplicate_of: dict | None = None
+        for existing in kept:
+            if (
+                abs(float(line["signed_tilt_deg"]) - float(existing["signed_tilt_deg"]))
+                > max_angle_difference_deg
+            ):
+                continue
+            if line_y_overlap_ratio(line, existing) < min_y_overlap_ratio:
+                continue
+            if mean_line_distance_on_overlap(line, existing) > max_mean_axis_distance_px:
+                continue
+            duplicate_of = existing
+            break
+
+        if duplicate_of is None:
+            kept.append(line)
             continue
-        merged.append((current_start, current_end))
-        current_start, current_end = start, end
-    merged.append((current_start, current_end))
-    return merged
+
+        merged_sources = set(int(value) for value in duplicate_of.get("source_line_indices", []))
+        merged_sources.update(int(value) for value in line.get("source_line_indices", []))
+        duplicate_of["source_line_indices"] = sorted(merged_sources)
+        duplicate_of["nms_duplicate_count"] = max(0, len(merged_sources) - 1)
+
+    kept.sort(key=lambda line: (float(line["y_mid"]), float(line["x_mid"])))
+    return kept
 
 def is_adjusted_support_item(item: dict) -> bool:
     return bool(item.get("adjustment", {}).get("is_adjusted", False))
@@ -543,7 +643,9 @@ def compute_endpoint_metrics(
     y_min: float,
     y_max: float,
 ) -> dict[str, float]:
-    del y_min, y_max
+    roi_y_min = float(min(y_min, y_max))
+    roi_y_max = float(max(y_min, y_max))
+    roi_span_px = max(1.0, roi_y_max - roi_y_min)
 
     empty_result = {
         "support_y_min": 0.0,
@@ -569,8 +671,8 @@ def compute_endpoint_metrics(
         "top_original_endpoint_fragment_count": 0,
         "bottom_original_endpoint_fragment_count": 0,
         "endpoint_anchor_score": 0.0,
-        "top_reach_gap_px": 0.0,
-        "bottom_reach_gap_px": 0.0,
+        "top_reach_gap_px": roi_span_px,
+        "bottom_reach_gap_px": roi_span_px,
     }
 
     merged = merge_support_intervals(selected_support)
@@ -584,13 +686,13 @@ def compute_endpoint_metrics(
     band_ratio = float(cfg("endpoint_support", "band_ratio", default=0.15))
     min_band_px = float(cfg("endpoint_support", "min_band_px", default=80))
     max_band_px = float(cfg("endpoint_support", "max_band_px", default=160))
-    endpoint_band_px = float(np.clip(support_span_px * band_ratio, min_band_px, max_band_px))
-    endpoint_band_px = min(endpoint_band_px, support_span_px * 0.5)
+    endpoint_band_px = float(np.clip(roi_span_px * band_ratio, min_band_px, max_band_px))
+    endpoint_band_px = min(endpoint_band_px, roi_span_px * 0.5)
 
-    top_band_start = float(support_y_min)
-    top_band_end = float(min(support_y_max, support_y_min + endpoint_band_px))
-    bottom_band_start = float(max(support_y_min, support_y_max - endpoint_band_px))
-    bottom_band_end = float(support_y_max)
+    top_band_start = roi_y_min
+    top_band_end = min(roi_y_max, roi_y_min + endpoint_band_px)
+    bottom_band_start = max(roi_y_min, roi_y_max - endpoint_band_px)
+    bottom_band_end = roi_y_max
     top_band_size_px = max(1.0, top_band_end - top_band_start)
     bottom_band_size_px = max(1.0, bottom_band_end - bottom_band_start)
 
@@ -600,7 +702,7 @@ def compute_endpoint_metrics(
         band_size_px: float,
         original_only: bool = False,
     ) -> dict[str, float]:
-        overlap_sum_px = 0.0
+        overlaps: list[tuple[float, float]] = []
         weighted_alignment_sum = 0.0
         overlap_weight_sum = 0.0
         best_fragment_overlap_px = 0.0
@@ -611,66 +713,61 @@ def compute_endpoint_metrics(
                 continue
             line_start = float(item["line"]["y_min"])
             line_end = float(item["line"]["y_max"])
-            overlap_px = float(max(0.0, min(line_end, band_end) - max(line_start, band_start)))
+            overlap_start = max(line_start, band_start)
+            overlap_end = min(line_end, band_end)
+            overlap_px = max(0.0, overlap_end - overlap_start)
             if overlap_px <= 0.0:
                 continue
-
             overlapping_fragment_count += 1
-            overlap_sum_px += overlap_px
+            overlaps.append((overlap_start, overlap_end))
             best_fragment_overlap_px = max(best_fragment_overlap_px, overlap_px)
-
             alignment_score = 0.7 * float(item["distance_alignment"]) + 0.3 * float(item["angle_alignment"])
             weighted_alignment_sum += alignment_score * overlap_px
             overlap_weight_sum += overlap_px
 
-        band_alignment_score = 0.0
-        if overlap_weight_sum > 0.0:
-            band_alignment_score = clip01(weighted_alignment_sum / overlap_weight_sum)
-
-        coverage = clip01(overlap_sum_px / max(1.0, band_size_px))
-        best_fragment_ratio = clip01(best_fragment_overlap_px / max(1.0, band_size_px))
-        uncovered_px = max(0.0, band_size_px - overlap_sum_px)
+        unique_overlap_px = interval_union_length(overlaps)
+        alignment_score = (
+            clip01(weighted_alignment_sum / overlap_weight_sum)
+            if overlap_weight_sum > 0.0
+            else 0.0
+        )
         return {
-            "coverage": float(coverage),
-            "alignment_score": float(band_alignment_score),
+            "coverage": float(clip01(unique_overlap_px / band_size_px)),
+            "alignment_score": float(alignment_score),
             "best_fragment_overlap_px": float(best_fragment_overlap_px),
-            "best_fragment_ratio": float(best_fragment_ratio),
+            "best_fragment_ratio": float(clip01(best_fragment_overlap_px / band_size_px)),
             "overlapping_fragment_count": int(overlapping_fragment_count),
-            "uncovered_px": float(uncovered_px),
+            "unique_overlap_px": float(unique_overlap_px),
         }
 
-    top_metrics = band_metrics(top_band_start, top_band_end, top_band_size_px, original_only=False)
-    bottom_metrics = band_metrics(bottom_band_start, bottom_band_end, bottom_band_size_px, original_only=False)
+    top_metrics = band_metrics(top_band_start, top_band_end, top_band_size_px)
+    bottom_metrics = band_metrics(bottom_band_start, bottom_band_end, bottom_band_size_px)
     top_original_metrics = band_metrics(top_band_start, top_band_end, top_band_size_px, original_only=True)
     bottom_original_metrics = band_metrics(bottom_band_start, bottom_band_end, bottom_band_size_px, original_only=True)
 
-    top_endpoint_coverage = float(top_metrics["coverage"])
-    bottom_endpoint_coverage = float(bottom_metrics["coverage"])
-    top_endpoint_alignment_score = float(top_metrics["alignment_score"])
-    bottom_endpoint_alignment_score = float(bottom_metrics["alignment_score"])
-    top_reach_gap_px = float(top_metrics["uncovered_px"])
-    bottom_reach_gap_px = float(bottom_metrics["uncovered_px"])
-
+    top_reach_gap_px = max(0.0, support_y_min - roi_y_min)
+    bottom_reach_gap_px = max(0.0, roi_y_max - support_y_max)
+    paired_coverage = min(float(top_metrics["coverage"]), float(bottom_metrics["coverage"]))
+    paired_alignment = min(float(top_metrics["alignment_score"]), float(bottom_metrics["alignment_score"]))
+    paired_original_coverage = min(
+        float(top_original_metrics["coverage"]),
+        float(bottom_original_metrics["coverage"]),
+    )
     endpoint_anchor_score = clip01(
-        0.16 * top_endpoint_coverage
-        + 0.16 * bottom_endpoint_coverage
-        + 0.08 * top_endpoint_alignment_score
-        + 0.08 * bottom_endpoint_alignment_score
-        + 0.16 * float(top_metrics["best_fragment_ratio"])
-        + 0.16 * float(bottom_metrics["best_fragment_ratio"])
-        + 0.10 * float(top_original_metrics["best_fragment_ratio"])
-        + 0.10 * float(bottom_original_metrics["best_fragment_ratio"])
+        0.50 * paired_coverage
+        + 0.25 * paired_alignment
+        + 0.25 * paired_original_coverage
     )
 
     return {
-        "support_y_min": float(support_y_min),
-        "support_y_max": float(support_y_max),
-        "support_span_px": float(support_span_px),
-        "endpoint_band_px": float(endpoint_band_px),
-        "top_endpoint_coverage": float(top_endpoint_coverage),
-        "bottom_endpoint_coverage": float(bottom_endpoint_coverage),
-        "top_endpoint_alignment_score": float(top_endpoint_alignment_score),
-        "bottom_endpoint_alignment_score": float(bottom_endpoint_alignment_score),
+        "support_y_min": support_y_min,
+        "support_y_max": support_y_max,
+        "support_span_px": support_span_px,
+        "endpoint_band_px": endpoint_band_px,
+        "top_endpoint_coverage": float(top_metrics["coverage"]),
+        "bottom_endpoint_coverage": float(bottom_metrics["coverage"]),
+        "top_endpoint_alignment_score": float(top_metrics["alignment_score"]),
+        "bottom_endpoint_alignment_score": float(bottom_metrics["alignment_score"]),
         "top_endpoint_best_fragment_overlap_px": float(top_metrics["best_fragment_overlap_px"]),
         "bottom_endpoint_best_fragment_overlap_px": float(bottom_metrics["best_fragment_overlap_px"]),
         "top_endpoint_best_fragment_ratio": float(top_metrics["best_fragment_ratio"]),
@@ -783,67 +880,171 @@ def support_component_key(component: list[dict], roi_profile: dict) -> tuple[flo
     )
 
 def prune_support_to_dominant_chain(selected_support: list[dict], roi_profile: dict) -> list[dict]:
+    """Select the strongest top-to-bottom path in a directed acyclic fragment graph.
+
+    Unlike the previous connected-component implementation, a single bridge cannot
+    merge two parallel structures into one component. Each result is one coherent path.
+    """
     if not bool(cfg("support_chain", "enabled", default=True)):
-        return selected_support
+        return list(selected_support)
     if len(selected_support) <= 1:
-        return selected_support
+        return list(selected_support)
 
-    max_connection_gap_px = float(cfg("support_chain", "max_connection_gap_px", default=220.0))
-    max_connection_dx_px = float(cfg("support_chain", "max_connection_dx_px", default=28.0))
-    max_angle_difference_deg = float(cfg("support_chain", "max_angle_difference_deg", default=3.0))
+    items = sorted(
+        selected_support,
+        key=lambda item: (
+            float(item.get("effective_line", item["line"])["y_mid"]),
+            float(item.get("effective_line", item["line"])["x_mid"]),
+        ),
+    )
+    roi_span = max(
+        1.0,
+        float(roi_profile["trimmed_y_max"]) - float(roi_profile["trimmed_y_min"]),
+    )
+    max_gap_px = min(
+        float(cfg("support_chain", "max_connection_gap_px", default=220.0)),
+        roi_span * float(cfg("support_chain", "max_gap_ratio", default=0.10)),
+    )
+    base_max_dx_px = float(cfg("support_chain", "base_max_dx_px", default=10.0))
+    dx_per_gap_ratio = float(cfg("support_chain", "dx_per_gap_ratio", default=0.03))
+    absolute_max_dx_px = float(cfg("support_chain", "max_connection_dx_px", default=34.0))
+    max_angle_difference_deg = float(
+        cfg("support_chain", "max_angle_difference_deg", default=2.0)
+    )
+    min_vertical_advance_px = float(
+        cfg("support_chain", "min_vertical_advance_px", default=8.0)
+    )
+    max_path_fit_rmse_px = float(
+        cfg("support_chain", "max_path_fit_rmse_px", default=12.0)
+    )
+    beam_width = max(1, int(cfg("support_chain", "beam_width", default=6)))
+    top_path_count = max(1, int(cfg("support_chain", "top_path_count", default=40)))
 
-    indexed_items = list(enumerate(selected_support))
-    adjacency: dict[int, set[int]] = {index: set() for index, _ in indexed_items}
+    def edge_metrics(upper: dict, lower: dict) -> tuple[bool, float]:
+        upper_line = upper.get("effective_line", upper["line"])
+        lower_line = lower.get("effective_line", lower["line"])
+        vertical_advance = float(lower_line["y_max"]) - float(upper_line["y_max"])
+        if vertical_advance < min_vertical_advance_px:
+            return False, 0.0
+        gap, dx, angle_delta = compute_support_connection(upper, lower)
+        if gap > max_gap_px:
+            return False, 0.0
+        adaptive_max_dx = min(absolute_max_dx_px, base_max_dx_px + dx_per_gap_ratio * gap)
+        if dx > adaptive_max_dx or angle_delta > max_angle_difference_deg:
+            return False, 0.0
+        edge_quality = (
+            1.0
+            - 0.45 * (dx / max(1e-6, adaptive_max_dx)) ** 2
+            - 0.35 * (gap / max(1e-6, max_gap_px)) ** 2
+            - 0.20 * (angle_delta / max(1e-6, max_angle_difference_deg)) ** 2
+        )
+        return True, float(max(0.0, edge_quality))
 
-    for left_index, left_item in indexed_items:
-        for right_index, right_item in indexed_items:
-            if right_index <= left_index:
+    def fast_path_score(path_indices: tuple[int, ...], edge_quality_sum: float) -> float:
+        support = [items[index] for index in path_indices]
+        merged = merge_support_intervals(support)
+        unique_length = interval_union_length(merged)
+        span = max(1.0, merged[-1][1] - merged[0][0]) if merged else 1.0
+        continuity = unique_length / span
+        alignment_weights = [max(1.0, float(item["line"]["length"])) for item in support]
+        alignment_values = [
+            0.7 * float(item["distance_alignment"]) + 0.3 * float(item["angle_alignment"])
+            for item in support
+        ]
+        alignment = float(np.average(alignment_values, weights=alignment_weights))
+        edge_mean = edge_quality_sum / max(1, len(path_indices) - 1)
+        return float(
+            0.50 * clip01(unique_length / roi_span)
+            + 0.20 * clip01(continuity)
+            + 0.15 * clip01(alignment)
+            + 0.15 * clip01(edge_mean if len(path_indices) > 1 else alignment)
+        )
+
+    # Each state is (fast_score, path_indices, cumulative_edge_quality).
+    states_by_end: list[list[tuple[float, tuple[int, ...], float]]] = []
+    all_states: list[tuple[float, tuple[int, ...], float]] = []
+    for lower_index, lower_item in enumerate(items):
+        states: list[tuple[float, tuple[int, ...], float]] = [
+            (fast_path_score((lower_index,), 0.0), (lower_index,), 0.0)
+        ]
+        for upper_index in range(lower_index):
+            compatible, edge_quality = edge_metrics(items[upper_index], lower_item)
+            if not compatible:
                 continue
+            for _, path_indices, edge_quality_sum in states_by_end[upper_index]:
+                extended = (*path_indices, lower_index)
+                new_edge_quality_sum = edge_quality_sum + edge_quality
+                states.append(
+                    (
+                        fast_path_score(extended, new_edge_quality_sum),
+                        extended,
+                        new_edge_quality_sum,
+                    )
+                )
+        states.sort(key=lambda state: state[0], reverse=True)
+        # Deduplicate identical paths and keep a small beam for this endpoint.
+        unique_states: list[tuple[float, tuple[int, ...], float]] = []
+        seen_paths: set[tuple[int, ...]] = set()
+        for state in states:
+            if state[1] in seen_paths:
+                continue
+            seen_paths.add(state[1])
+            unique_states.append(state)
+            if len(unique_states) >= beam_width:
+                break
+        states_by_end.append(unique_states)
+        all_states.extend(unique_states)
 
-            upper_item = left_item
-            lower_item = right_item
-            if float(left_item["line"]["y_mid"]) > float(right_item["line"]["y_mid"]):
-                upper_item = right_item
-                lower_item = left_item
+    all_states.sort(key=lambda state: state[0], reverse=True)
+    best_support: list[dict] | None = None
+    best_key: tuple[float, ...] | None = None
+    for fast_score, path_indices, _ in all_states[:top_path_count]:
+        support = [items[index] for index in path_indices]
+        chain_metrics = compute_chain_metrics(support)
+        merged = merge_support_intervals(support)
+        unique_length = float(chain_metrics["total_merged_length_px"])
+        chain_span = max(1.0, merged[-1][1] - merged[0][0]) if merged else 1.0
 
-            vertical_gap_px, connection_dx_px, angle_difference_deg = compute_support_connection(
-                upper_item,
-                lower_item,
+        y_values: list[float] = []
+        x_values: list[float] = []
+        weights: list[float] = []
+        for item in support:
+            line = item.get("effective_line", item["line"])
+            for y_value in (float(line["y_min"]), float(line["y_mid"]), float(line["y_max"])):
+                y_values.append(y_value)
+                x_values.append(float(line_x_at_y(line, y_value)))
+                weights.append(max(1.0, float(line["length"])) / 3.0)
+        fit = safe_linear_polyfit(y_values, x_values, weights)
+        if fit is None:
+            fit_rmse = float("inf")
+        else:
+            residuals = np.asarray(x_values) - (
+                float(fit[0]) * np.asarray(y_values) + float(fit[1])
             )
-            if vertical_gap_px > max_connection_gap_px:
-                continue
-            if connection_dx_px > max_connection_dx_px:
-                continue
-            if angle_difference_deg > max_angle_difference_deg:
-                continue
+            fit_rmse = float(np.sqrt(np.average(residuals**2, weights=np.asarray(weights))))
+        fit_score = math.exp(-fit_rmse / max(1.0, max_path_fit_rmse_px)) if math.isfinite(fit_rmse) else 0.0
+        quality = (
+            0.38 * clip01(unique_length / roi_span)
+            + 0.24 * clip01(unique_length / chain_span)
+            + 0.18 * clip01(fast_score)
+            + 0.20 * clip01(fit_score)
+        )
+        if fit_rmse > max_path_fit_rmse_px * 1.8:
+            quality -= 0.25
+        key = (
+            float(quality),
+            float(unique_length / roi_span),
+            float(chain_metrics["chain_continuity_ratio"]),
+            -float(fit_rmse),
+            -float(chain_metrics["chain_total_gap_px"]),
+        )
+        if best_key is None or key > best_key:
+            best_key = key
+            best_support = support
 
-            adjacency[left_index].add(right_index)
-            adjacency[right_index].add(left_index)
-
-    components: list[list[dict]] = []
-    visited: set[int] = set()
-    for start_index, _ in indexed_items:
-        if start_index in visited:
-            continue
-        stack = [start_index]
-        component_indices: list[int] = []
-        while stack:
-            current_index = stack.pop()
-            if current_index in visited:
-                continue
-            visited.add(current_index)
-            component_indices.append(current_index)
-            stack.extend(index for index in adjacency[current_index] if index not in visited)
-
-        component = [selected_support[index] for index in component_indices]
-        component.sort(key=lambda item: (item["support_strength"], item["line"]["length"]), reverse=True)
-        components.append(component)
-
-    if not components:
-        return selected_support
-
-    best_component = max(components, key=lambda component: support_component_key(component, roi_profile))
-    return best_component
+    if not best_support:
+        return [max(items, key=lambda item: float(item.get("support_strength", 0.0)))]
+    return sorted(best_support, key=lambda item: float(item["line"]["y_mid"]))
 
 def merge_support_items(primary_support: list[dict], secondary_support: list[dict]) -> list[dict]:
     merged_by_line_index: dict[int, dict] = {}
@@ -1147,36 +1348,40 @@ def make_support_signature(selected_support: list[dict]) -> tuple[tuple[float | 
     return tuple(signature_items)
 
 def build_point_cloud(selected_support: list[dict]) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Sample fragments without giving long fragments a quadratic influence."""
     step_px = float(cfg("final_fit", "sample_step_px", default=22))
-    endpoint_sample_weight_boost = float(cfg("final_fit", "endpoint_sample_weight_boost", default=1.7))
-    original_endpoint_sample_weight_boost = float(
-        cfg("final_fit", "original_endpoint_sample_weight_boost", default=2.2)
+    enable_endpoint_boost = bool(
+        cfg("final_fit", "enable_endpoint_weight_boost", default=False)
     )
-    y_values = []
-    x_values = []
-    weights = []
+    endpoint_sample_weight_boost = float(
+        cfg("final_fit", "endpoint_sample_weight_boost", default=1.0)
+    )
+    original_endpoint_sample_weight_boost = float(
+        cfg("final_fit", "original_endpoint_sample_weight_boost", default=1.0)
+    )
+
+    y_values: list[float] = []
+    x_values: list[float] = []
+    weights: list[float] = []
     merged = merge_support_intervals(selected_support)
-    support_y_min = 0.0
-    support_y_max = 0.0
-    top_band_start = 0.0
-    top_band_end = 0.0
-    bottom_band_start = 0.0
-    bottom_band_end = 0.0
-    top_band_size_px = 1.0
-    bottom_band_size_px = 1.0
-    if merged:
+    top_band_start = top_band_end = bottom_band_start = bottom_band_end = 0.0
+    top_band_size_px = bottom_band_size_px = 1.0
+    if enable_endpoint_boost and merged:
         support_y_min = float(merged[0][0])
         support_y_max = float(merged[-1][1])
         support_span_px = max(1.0, support_y_max - support_y_min)
-        band_ratio = float(cfg("endpoint_support", "band_ratio", default=0.15))
-        min_band_px = float(cfg("endpoint_support", "min_band_px", default=80))
-        max_band_px = float(cfg("endpoint_support", "max_band_px", default=160))
-        endpoint_band_px = float(np.clip(support_span_px * band_ratio, min_band_px, max_band_px))
+        endpoint_band_px = float(
+            np.clip(
+                support_span_px * float(cfg("endpoint_support", "band_ratio", default=0.15)),
+                float(cfg("endpoint_support", "min_band_px", default=80)),
+                float(cfg("endpoint_support", "max_band_px", default=160)),
+            )
+        )
         endpoint_band_px = min(endpoint_band_px, support_span_px * 0.5)
-        top_band_start = float(support_y_min)
-        top_band_end = float(min(support_y_max, support_y_min + endpoint_band_px))
-        bottom_band_start = float(max(support_y_min, support_y_max - endpoint_band_px))
-        bottom_band_end = float(support_y_max)
+        top_band_start = support_y_min
+        top_band_end = min(support_y_max, support_y_min + endpoint_band_px)
+        bottom_band_start = max(support_y_min, support_y_max - endpoint_band_px)
+        bottom_band_end = support_y_max
         top_band_size_px = max(1.0, top_band_end - top_band_start)
         bottom_band_size_px = max(1.0, bottom_band_end - bottom_band_start)
 
@@ -1184,16 +1389,22 @@ def build_point_cloud(selected_support: list[dict]) -> tuple[np.ndarray, np.ndar
         line = item.get("effective_line", item["line"])
         length = max(1.0, float(line["length"]))
         sample_count = max(2, int(math.ceil(length / max(1.0, step_px))) + 1)
+        alignment_quality = clip01(
+            0.7 * float(item.get("distance_alignment", 0.0))
+            + 0.3 * float(item.get("angle_alignment", 0.0))
+        )
+        # Linear total influence: length * quality, divided over all samples.
+        fragment_total_weight = max(1.0, length * (0.35 + 0.65 * alignment_quality))
         item_weight_scale = 1.0
-        if merged:
+        if enable_endpoint_boost and merged:
             line_y_min = float(line["y_min"])
             line_y_max = float(line["y_max"])
             top_overlap_px = max(0.0, min(line_y_max, top_band_end) - max(line_y_min, top_band_start))
             bottom_overlap_px = max(0.0, min(line_y_max, bottom_band_end) - max(line_y_min, bottom_band_start))
             endpoint_overlap_ratio = clip01(
                 max(
-                    top_overlap_px / max(1.0, top_band_size_px),
-                    bottom_overlap_px / max(1.0, bottom_band_size_px),
+                    top_overlap_px / top_band_size_px,
+                    bottom_overlap_px / bottom_band_size_px,
                 )
             )
             if endpoint_overlap_ratio > 0.0:
@@ -1203,20 +1414,43 @@ def build_point_cloud(selected_support: list[dict]) -> tuple[np.ndarray, np.ndar
                     else original_endpoint_sample_weight_boost
                 )
                 item_weight_scale = 1.0 + (target_boost - 1.0) * endpoint_overlap_ratio
-        item_weight = max(1.0, float(item["support_strength"])) * item_weight_scale
-        ts = np.linspace(0.0, 1.0, sample_count)
-        for t_value in ts:
+        sample_weight = fragment_total_weight * item_weight_scale / sample_count
+        for t_value in np.linspace(0.0, 1.0, sample_count):
             y_coord = float(line["y1"] + t_value * (line["y2"] - line["y1"]))
             x_coord = float(line["x1"] + t_value * (line["x2"] - line["x1"]))
             y_values.append(y_coord)
             x_values.append(x_coord)
-            weights.append(item_weight)
+            weights.append(sample_weight)
 
     return (
         np.asarray(y_values, dtype=np.float64),
         np.asarray(x_values, dtype=np.float64),
         np.asarray(weights, dtype=np.float64),
     )
+
+
+def compute_axis_fit_metrics(axis: dict[str, float], selected_support: list[dict]) -> dict[str, float]:
+    if not selected_support:
+        return {
+            "fit_rmse_px": float("inf"),
+            "fit_median_abs_residual_px": float("inf"),
+            "fit_p90_abs_residual_px": float("inf"),
+        }
+    y_values, x_values, weights = build_point_cloud(selected_support)
+    if y_values.size == 0:
+        return {
+            "fit_rmse_px": float("inf"),
+            "fit_median_abs_residual_px": float("inf"),
+            "fit_p90_abs_residual_px": float("inf"),
+        }
+    residuals = np.abs(x_values - (float(axis["a"]) * y_values + float(axis["b"])))
+    normalized_weights = weights / max(1e-9, float(np.sum(weights)))
+    rmse = float(np.sqrt(np.sum(normalized_weights * residuals**2)))
+    return {
+        "fit_rmse_px": rmse,
+        "fit_median_abs_residual_px": float(np.median(residuals)),
+        "fit_p90_abs_residual_px": float(np.quantile(residuals, 0.90)),
+    }
 
 def fit_axis_from_support(
     selected_support: list[dict],
@@ -1247,17 +1481,21 @@ def fit_axis_from_support(
     a_value, b_value = fit
     huber_delta_px = float(cfg("final_fit", "huber_delta_px", default=10.0))
     huber_iterations = int(cfg("final_fit", "huber_iterations", default=4))
-
-    current_weights = base_weights.copy()
     for _ in range(max(0, huber_iterations)):
         residuals = np.abs(x_values - (a_value * y_values + b_value))
         huber_weights = np.ones_like(residuals)
         large_residual_mask = residuals > huber_delta_px
-        huber_weights[large_residual_mask] = huber_delta_px / np.maximum(residuals[large_residual_mask], 1e-6)
-        fit = safe_linear_polyfit(y_values, x_values, current_weights * huber_weights)
-        if fit is None:
+        huber_weights[large_residual_mask] = huber_delta_px / np.maximum(
+            residuals[large_residual_mask], 1e-6
+        )
+        updated_fit = safe_linear_polyfit(y_values, x_values, base_weights * huber_weights)
+        if updated_fit is None:
             break
-        a_value, b_value = fit
+        new_a, new_b = updated_fit
+        if abs(new_a - a_value) < 1e-8 and abs(new_b - b_value) < 1e-4:
+            a_value, b_value = new_a, new_b
+            break
+        a_value, b_value = new_a, new_b
 
     tilt_deg = float(math.degrees(math.atan(float(a_value))))
     max_fit_tilt_deg = float(cfg("final_fit", "max_fit_tilt_deg", default=12.0))
@@ -1266,12 +1504,17 @@ def fit_axis_from_support(
             fit_cache[cache_key] = False
         return None
 
+    residuals = np.abs(x_values - (a_value * y_values + b_value))
+    normalized_weights = base_weights / max(1e-9, float(np.sum(base_weights)))
     result = {
         "a": float(a_value),
         "b": float(b_value),
         "tilt_deg": float(tilt_deg),
         "x_ref": float(line_x_at_y({"a": float(a_value), "b": float(b_value)}, y_ref)),
         "y_ref": float(y_ref),
+        "fit_rmse_px": float(np.sqrt(np.sum(normalized_weights * residuals**2))),
+        "fit_median_abs_residual_px": float(np.median(residuals)),
+        "fit_p90_abs_residual_px": float(np.quantile(residuals, 0.90)),
     }
     if fit_cache is not None and cache_key is not None:
         fit_cache[cache_key] = dict(result)

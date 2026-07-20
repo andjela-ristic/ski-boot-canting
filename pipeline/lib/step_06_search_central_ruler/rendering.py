@@ -114,8 +114,8 @@ def draw_overlay(
             overlay,
             (
                 f"tilt={best_candidate['tilt_deg']:.2f}deg "
-                f"sym={best_candidate['symmetry_score']:.3f} "
-                f"end={best_candidate['endpoint_anchor_score']:.3f}"
+                f"geom={best_candidate.get('geometry_score', 0.0):.3f} "
+                f"mirror={best_candidate.get('mirror_symmetry_score', 0.5):.3f}"
             ),
             26,
             118,
@@ -123,9 +123,9 @@ def draw_overlay(
         put_text(
             overlay,
             (
-                f"gap={best_candidate['gap_penalty']:.3f} "
-                f"ealign={best_candidate['top_endpoint_alignment_score']:.3f}/{best_candidate['bottom_endpoint_alignment_score']:.3f} "
-                f"cov={best_candidate['top_endpoint_coverage']:.2f}/{best_candidate['bottom_endpoint_coverage']:.2f}"
+                f"coverage={best_candidate.get('unique_vertical_coverage', 0.0):.3f} "
+                f"span={best_candidate.get('chain_span_ratio', 0.0):.3f} "
+                f"rmse={best_candidate.get('fit_rmse_px', 0.0):.1f}px"
             ),
             26,
             146,
@@ -133,9 +133,9 @@ def draw_overlay(
         put_text(
             overlay,
             (
-                f"adj={best_candidate['adjusted_fragment_count']} "
-                f"shift={best_candidate['length_weighted_mean_abs_support_shift_px']:.1f}px "
-                f"dtilt={best_candidate['mean_abs_support_tilt_delta_deg']:.2f}deg"
+                f"balance={best_candidate.get('above_below_balance_score', 0.0):.3f} "
+                f"continuity={best_candidate.get('chain_continuity_ratio', 0.0):.3f} "
+                f"valid={'yes' if best_candidate.get('validation_passed', False) else 'no'}"
             ),
             26,
             174,
@@ -188,9 +188,9 @@ def draw_candidate_snapshot(
     put_text(
         overlay,
         (
-            f"bins={candidate['supported_bin_count']}/{candidate['bin_count']} "
-            f"gap={candidate['gap_penalty']:.3f} "
-            f"end={candidate['endpoint_anchor_score']:.3f}"
+            f"geom={candidate.get('geometry_score', 0.0):.3f} "
+            f"mirror={candidate.get('mirror_symmetry_score', 0.5):.3f} "
+            f"rmse={candidate.get('fit_rmse_px', 0.0):.1f}px"
         ),
         26,
         90,
@@ -199,7 +199,8 @@ def draw_candidate_snapshot(
         overlay,
         (
             f"src={candidate.get('source_hypothesis_label', '?')} "
-            f"stage={candidate.get('search_stage', '?')} "
+            f"cov={candidate.get('unique_vertical_coverage', 0.0):.2f} "
+            f"span={candidate.get('chain_span_ratio', 0.0):.2f} "
             f"cont={candidate.get('chain_continuity_ratio', 0.0):.2f}"
         ),
         26,
@@ -235,6 +236,28 @@ def sanitize_candidate(candidate: dict | None) -> dict | None:
         "b": float(candidate["b"]),
         "tilt_deg": float(candidate["tilt_deg"]),
         "score": float(candidate["score"]),
+        "final_score": float(candidate.get("final_score", candidate["score"])),
+        "geometry_score": float(candidate.get("geometry_score", 0.0)),
+        "mirror_symmetry_score": float(candidate.get("mirror_symmetry_score", 0.5)),
+        "mirror_left_to_right_score": float(candidate.get("mirror_left_to_right_score", 0.5)),
+        "mirror_right_to_left_score": float(candidate.get("mirror_right_to_left_score", 0.5)),
+        "mirror_valid_row_ratio": float(candidate.get("mirror_valid_row_ratio", 0.0)),
+        "mirror_median_distance_px": float(candidate.get("mirror_median_distance_px", 0.0)),
+        "mirror_is_reliable": bool(candidate.get("mirror_is_reliable", False)),
+        "validation_passed": bool(candidate.get("validation_passed", True)),
+        "rejection_reasons": list(candidate.get("rejection_reasons", [])),
+        "chain_span_ratio": float(candidate.get("chain_span_ratio", 0.0)),
+        "unique_vertical_coverage": float(candidate.get("unique_vertical_coverage", 0.0)),
+        "fit_rmse_px": float(candidate.get("fit_rmse_px", 0.0)),
+        "fit_median_abs_residual_px": float(candidate.get("fit_median_abs_residual_px", 0.0)),
+        "fit_p90_abs_residual_px": float(candidate.get("fit_p90_abs_residual_px", 0.0)),
+        "fit_consistency_score": float(candidate.get("fit_consistency_score", 0.0)),
+        "fragment_alignment_score": float(candidate.get("fragment_alignment_score", 0.0)),
+        "support_above_y_ref_ratio": float(candidate.get("support_above_y_ref_ratio", 0.0)),
+        "support_below_y_ref_ratio": float(candidate.get("support_below_y_ref_ratio", 0.0)),
+        "above_below_balance_score": float(candidate.get("above_below_balance_score", 0.0)),
+        "roi_balance_score": float(candidate.get("roi_balance_score", candidate.get("symmetry_score", 0.0))),
+        "gap_outlier_penalty": float(candidate.get("gap_outlier_penalty", 0.0)),
         "selected_fragment_count": int(candidate["selected_fragment_count"]),
         "selected_fragment_line_indices": [int(value) for value in candidate["selected_fragment_line_indices"]],
         "selected_total_length_px": float(candidate["selected_total_length_px"]),
@@ -314,6 +337,10 @@ def sanitize_candidate(candidate: dict | None) -> dict | None:
         "selected_support": [
             {
                 "line_index": int(item["line"]["line_index"]),
+                "source_line_indices": [
+                    int(value) for value in item["line"].get("source_line_indices", [item["line"]["line_index"]])
+                ],
+                "nms_duplicate_count": int(item["line"].get("nms_duplicate_count", 0)),
                 "length": float(item["line"]["length"]),
                 "axis_distance_px": float(item["axis_distance_px"]),
                 "angle_error_deg": float(item["angle_error_deg"]),

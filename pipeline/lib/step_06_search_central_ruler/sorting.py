@@ -206,70 +206,8 @@ def select_diverse_candidates(
     return selected
 
 def compute_best_fit_selection_score(candidate: dict) -> float:
-    def formula_weight(key: str, default: float) -> float:
-        return float(cfg("best_fit_selection", "formula_weights", key, default=default))
-
-    def formula_bucket(key: str, default: float) -> float:
-        return float(cfg("best_fit_selection", "formula_buckets", key, default=default))
-
-    longest_interval_px = float(candidate.get("longest_merged_interval_px", 0.0))
-    chain_continuity_ratio = float(candidate.get("chain_continuity_ratio", 0.0))
-    longest_interval_bucket_px = max(1e-6, formula_bucket("longest_interval_px", 20.0))
-    continuity_ratio_scale = max(1e-6, formula_bucket("continuity_ratio_scale", 20.0))
-    longest_interval_bucket = float(int(longest_interval_px / longest_interval_bucket_px))
-    continuity_bucket = float(int(chain_continuity_ratio * continuity_ratio_scale))
-    endpoint_strengths = candidate_endpoint_strengths(candidate)
-    paired_anchor_strength = float(endpoint_strengths["paired_anchor_strength"])
-    paired_original_anchor_strength = float(endpoint_strengths["paired_original_anchor_strength"])
-    paired_endpoint_coverage = float(endpoint_strengths["paired_endpoint_coverage"])
-    paired_original_endpoint_coverage = float(endpoint_strengths["paired_original_endpoint_coverage"])
-    total_reach_gap_px = float(candidate.get("top_reach_gap_px", 0.0)) + float(candidate.get("bottom_reach_gap_px", 0.0))
-    hypothesis_x_ref_delta_px = float(candidate.get("hypothesis_x_ref_delta_px", 0.0))
-    hypothesis_tilt_delta_deg = float(candidate.get("hypothesis_tilt_delta_deg", 0.0))
-    side_clearance_row_ratio = float(candidate.get("side_clearance_row_ratio", 0.0))
-    side_clearance_score = float(candidate.get("side_clearance_score", 0.0))
-    return (
-        formula_weight("has_top_bottom_anchor", 1000.0) * float(bool(candidate.get("has_top_bottom_anchor", False)))
-        + formula_weight("has_top_anchor", 160.0) * float(bool(candidate.get("has_top_anchor", False)))
-        + formula_weight("has_bottom_anchor", 160.0) * float(bool(candidate.get("has_bottom_anchor", False)))
-        + formula_weight("paired_anchor_strength", 340.0) * paired_anchor_strength
-        + formula_weight("paired_endpoint_coverage", 220.0) * paired_endpoint_coverage
-        + formula_weight("longest_interval_bucket", 22.0) * longest_interval_bucket
-        + formula_weight("continuity_bucket", 14.0) * continuity_bucket
-        + formula_weight("longest_interval_px", 0.08) * longest_interval_px
-        + formula_weight("chain_continuity_ratio", 14.0) * chain_continuity_ratio
-        + formula_weight("has_top_bottom_original_anchor", 520.0)
-        * float(bool(candidate.get("has_top_bottom_original_anchor", False)))
-        + formula_weight("has_top_original_anchor", 110.0)
-        * float(bool(candidate.get("has_top_original_anchor", False)))
-        + formula_weight("has_bottom_original_anchor", 110.0)
-        * float(bool(candidate.get("has_bottom_original_anchor", False)))
-        + formula_weight("paired_original_anchor_strength", 260.0) * paired_original_anchor_strength
-        + formula_weight("paired_original_endpoint_coverage", 180.0) * paired_original_endpoint_coverage
-        + formula_weight("endpoint_anchor_score", 0.10) * float(candidate["endpoint_anchor_score"])
-        + formula_weight("has_min_side_clearance", 180.0)
-        * float(bool(candidate.get("has_min_side_clearance", False)))
-        + formula_weight("side_clearance_row_ratio", 120.0) * side_clearance_row_ratio
-        + formula_weight("side_clearance_score", 90.0) * side_clearance_score
-        - formula_weight("outside_chain_length_ratio", 140.0)
-        * float(candidate.get("outside_chain_length_ratio", 0.0))
-        - formula_weight("outside_chain_fragment_ratio", 80.0)
-        * float(candidate.get("outside_chain_fragment_ratio", 0.0))
-        - formula_weight("total_reach_gap_px", 0.10) * total_reach_gap_px
-        - formula_weight("chain_total_gap_px", 0.03) * float(candidate.get("chain_total_gap_px", 0.0))
-        - formula_weight("gap_penalty", 0.12) * float(candidate["gap_penalty"])
-        - formula_weight("merged_interval_count", 4.0) * float(candidate.get("merged_interval_count", 0))
-        - formula_weight("adjusted_fragment_ratio", 80.0)
-        * float(candidate.get("adjusted_fragment_ratio", 0.0))
-        - formula_weight("support_adjustment_penalty", 0.18) * float(candidate["support_adjustment_penalty"])
-        - formula_weight("length_weighted_mean_abs_support_shift_px", 0.08)
-        * float(candidate.get("length_weighted_mean_abs_support_shift_px", 0.0))
-        - formula_weight("max_abs_support_shift_px", 0.12) * float(candidate.get("max_abs_support_shift_px", 0.0))
-        - formula_weight("outside_mask_penalty", 0.08) * float(candidate["outside_mask_penalty"])
-        - formula_weight("hypothesis_x_ref_delta_px", 8.0) * hypothesis_x_ref_delta_px
-        - formula_weight("hypothesis_tilt_delta_deg", 24.0) * hypothesis_tilt_delta_deg
-        + formula_weight("score", 60.0) * float(candidate["score"])
-    )
+    """Return the single normalized score used for final ranking."""
+    return float(candidate.get("final_score", candidate.get("score", 0.0)))
 
 def annotate_candidate_selection(
     candidate: dict,
@@ -281,7 +219,7 @@ def annotate_candidate_selection(
     result["search_stage"] = stage_name
     result["hypothesis_x_ref"] = float(hypothesis["x_ref"])
     result["hypothesis_tilt_deg"] = float(hypothesis["tilt_deg"])
-    result["hypothesis_score"] = float(hypothesis["score"])
+    result["hypothesis_score"] = float(hypothesis.get("final_score", hypothesis.get("score", 0.0)))
     result["hypothesis_x_ref_delta_px"] = abs(float(result["x_ref"]) - float(hypothesis["x_ref"]))
     result["hypothesis_tilt_delta_deg"] = abs(float(result["tilt_deg"]) - float(hypothesis["tilt_deg"]))
     result["source_hypothesis_rank"] = int(hypothesis_rank)
@@ -290,45 +228,19 @@ def annotate_candidate_selection(
     return result
 
 def candidate_selection_key(candidate: dict) -> tuple[float, ...]:
-    longest_interval_px = float(candidate.get("longest_merged_interval_px", 0.0))
-    chain_continuity_ratio = float(candidate.get("chain_continuity_ratio", 0.0))
-    endpoint_strengths = candidate_endpoint_strengths(candidate)
-    return (
-        1 if bool(candidate.get("has_top_bottom_anchor", False)) else 0,
-        1 if bool(candidate.get("has_top_bottom_original_anchor", False)) else 0,
-        1 if bool(candidate.get("has_min_side_clearance", False)) else 0,
-        int(endpoint_strengths["paired_anchor_strength"] * 100.0),
-        int(endpoint_strengths["paired_endpoint_coverage"] * 100.0),
-        int(endpoint_strengths["paired_original_anchor_strength"] * 100.0),
-        int(endpoint_strengths["paired_original_endpoint_coverage"] * 100.0),
-        float(candidate.get("side_clearance_row_ratio", 0.0)),
-        float(candidate.get("side_clearance_score", 0.0)),
-        int(longest_interval_px / 20.0),
-        int(chain_continuity_ratio * 20.0),
-        float(candidate["score"]),
-        float(candidate["symmetry_score"]),
-        float(candidate["roi_center_score"]),
-        -float(candidate.get("hypothesis_x_ref_delta_px", 0.0)),
-        -float(candidate.get("hypothesis_tilt_delta_deg", 0.0)),
-        longest_interval_px,
-        chain_continuity_ratio,
-        -float(candidate.get("outside_chain_length_ratio", 0.0)),
-        -float(candidate.get("outside_chain_fragment_ratio", 0.0)),
-        -float(candidate.get("top_reach_gap_px", 0.0)),
-        -float(candidate.get("bottom_reach_gap_px", 0.0)),
-        -float(candidate.get("largest_gap_px", 0.0)),
-        -float(candidate.get("chain_total_gap_px", 0.0)),
-        float(candidate.get("total_merged_length_px", 0.0)),
-        -float(candidate.get("merged_interval_count", 0)),
-        -float(candidate.get("adjusted_fragment_ratio", 0.0)),
-        -float(candidate.get("support_adjustment_penalty", 0.0)),
-        -float(candidate.get("length_weighted_mean_abs_support_shift_px", 0.0)),
-        -float(candidate.get("max_abs_support_shift_px", 0.0)),
-        float(candidate["endpoint_anchor_score"]),
-    )
+    return candidate_ranking_key(candidate)
 
 def candidate_ranking_key(candidate: dict) -> tuple[float, ...]:
+    """Final score is authoritative; remaining fields are deterministic tie-breakers."""
     return (
-        *candidate_selection_key(candidate),
-        float(candidate.get("selection_score", candidate.get("score", 0.0))),
+        float(candidate.get("final_score", candidate.get("selection_score", candidate.get("score", 0.0)))),
+        1.0 if bool(candidate.get("validation_passed", True)) else 0.0,
+        float(candidate.get("geometry_score", 0.0)),
+        float(candidate.get("mirror_symmetry_score", 0.5)),
+        float(candidate.get("unique_vertical_coverage", candidate.get("vertical_coverage_score", 0.0))),
+        float(candidate.get("chain_span_ratio", 0.0)),
+        float(candidate.get("chain_continuity_ratio", 0.0)),
+        -float(candidate.get("fit_rmse_px", 1e9)),
+        -float(candidate.get("largest_gap_px", 1e9)),
     )
+

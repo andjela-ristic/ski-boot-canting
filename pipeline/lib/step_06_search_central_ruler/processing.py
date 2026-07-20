@@ -34,8 +34,11 @@ def build_analysis(json_path: Path) -> dict:
     if roi_profile is None:
         raise RuntimeError(f"Could not build ROI profile for {image_name}")
 
+    # Mirror symmetry is part of final candidate ranking, so load the edge image
+    # before the search rather than only during rendering.
+    base_edge_image, base_edge_path = load_base_edge_image(data)
     search_started_at = time.perf_counter()
-    search_result = search_best_candidate(filtered_lines, roi_profile)
+    search_result = search_best_candidate(filtered_lines, roi_profile, edge_image=base_edge_image)
     search_duration_sec = time.perf_counter() - search_started_at
     best_candidate = search_result["best_candidate"]
     fine_candidates = search_result["fine_candidates"]
@@ -43,7 +46,6 @@ def build_analysis(json_path: Path) -> dict:
     ranked_candidate_total_count = int(search_result.get("ranked_candidate_total_count", len(ranked_candidates)))
 
     rendering_started_at = time.perf_counter()
-    base_edge_image, base_edge_path = load_base_edge_image(data)
     step05_overlay = load_step05_overlay(image_name)
     fragment_background = build_fragment_background(base_edge_image, filtered_lines)
     overlay = draw_overlay(
@@ -91,6 +93,8 @@ def build_analysis(json_path: Path) -> dict:
         "resolved_input_dir": str(get_step_dirs()["input_dir"].relative_to(PROJECT_ROOT)),
         "input_line_count": len(lines),
         "filtered_line_count": len(filtered_lines),
+        "nms_line_count": int(search_result.get("nms_line_count", len(filtered_lines))),
+        "nms_removed_line_count": int(search_result.get("nms_removed_line_count", 0)),
         "rejected_fragment_count": len(rejected_lines),
         "coarse_candidate_count": len(search_result["coarse_candidates"]),
         "fine_candidate_count": len(fine_candidates),
