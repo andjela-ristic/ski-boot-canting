@@ -1,0 +1,338 @@
+# Istrazivanje centralnog lenjira za korak 06
+
+## 2026-07-15
+
+### Opsti pristup
+
+Trenutni smer je da se detekcija centralnog lenjira u `Step 06` resi povecanjem odziva kandidata i njihove raznovrsnosti, a ne doterivanjem za jednu konkretnu sliku. Praktican tok rada je sledeci:
+
+1. `Step 05` pravi validne skoro vertikalne fragmente linija unutar ROI oblasti pancerice.
+2. `Step 06` gradi grube hipoteze centralne ose, lokalno ih doradjuje i cuva snimke za svakog kandidata.
+3. Snimci kandidata se rucno pregledaju kako bi se zadrzali samo stvarno validni kandidati za centralni lenjir.
+4. Promene parametara se prihvataju samo ako povecavaju sansu da se pojavi savrsen kandidat kroz ceo skup podataka, bez oslanjanja na logiku vezanu za pojedinacnu sliku.
+
+### Ranije stanje
+
+Kod ranijeg, uzeg pretrazivanja u `Step 06`, posle rucnog ciscenja snimaka nije ostao nijedan validan kandidat za:
+
+- `IMG_0502`
+- `IMG_0505`
+- `IMG_0508`
+- `IMG_0510`
+
+Tumacenje: glavni problem nije bio kvalitet konacnog rangiranja, vec nedovoljan odziv kandidata i nedovoljna raznovrsnost.
+
+### Trenutno `stable_slope` stanje
+
+Sa trenutnom konfiguracijom zasnovanom na `stable_slope`, generisanje kandidata je znacajno poboljsano. Posle rucnog ciscenja snimaka, svaka slika osim `IMG_0510` ima savrsenog kandidata.
+
+Trenutni zakljucak:
+
+- bodovanje je vec dovoljno dobro kada pravi kandidat postoji
+- preostalo usko grlo je i dalje pokrivenost pretrage u `Step 06`
+- sledece izmene treba da prosire pretragu oko verovatnih grubih hipoteza i da sacuvaju vise skoro savrsenih varijanti kao odvojene kandidate
+
+### Trenutno problematcna slika
+
+Preostala slika bez savrsenog kandidata:
+
+- `IMG_0510`
+
+Uoceno ponasanje:
+
+- `Step 06` vec generise vise jakih kandidata za `IMG_0510`
+- nijedan od njih nije dovoljno dobar da bude prihvacen
+- to sugerise da je tacno resenje blizu vec istrazenog prostora, ali nije obuhvaceno ili nije dovoljno jasno sacuvano kao poseban kandidat
+
+### Sledeca promena parametara za testiranje
+
+Sledeca promena je opste prosirenje odziva i raznovrsnosti u `Step 06`:
+
+- povecati skup grubih kandidata
+- dozvoliti vise grubih kandidata po ugaonom i `x` segmentu
+- prosiriti fini prozor pretrage u `x` i `tilt`
+- povecati skup finih kandidata
+- smanjiti agresivnost deduplikacije tako sto kandidati moraju biti slicniji pre nego sto se spoje
+- cuvati vise zavrsnih snimaka kandidata
+
+Obrazlozenje:
+
+- ako skoro tacne hipoteze vec postoje, sire lokalno usavrsavanje treba da otkrije nedostajucu savrsenu varijantu
+- ako se vise odlicnih kandidata razlikuje samo za nekoliko piksela ili stepeni, stroza detekcija duplikata moze sakriti onaj koji je zapravo savrsen
+- ovo je i dalje podesavanje na nivou celog skupa podataka, jer menja sirinu pretrage, a ne uvodi pravila za pojedinacne slike
+
+### Napomena za log
+
+Ovaj fajl treba dopunjavati posle svakog pokretanja `Step 06` sa:
+
+- tacnim skupom parametara
+- informacijom koje slike i dalje nemaju savrsenog kandidata posle rucnog ciscenja
+- procenom da li problem deluje kao manjak odziva, pogresno rangiranje ili gubitak fragmenata u ranijoj fazi
+
+### Rezultat pokretanja posle prosirenja odziva i raznovrsnosti
+
+Primenjeno prosirenje parametara:
+
+- `search.coarse_candidate_pool_limit`: `80 -> 120`
+- `search.fine_candidate_pool_limit`: `96 -> 144`
+- `search.max_coarse_candidates_per_angle_bucket`: `2 -> 3`
+- `search.max_coarse_candidates_per_x_bucket`: `2 -> 3`
+- `search.top_coarse_candidates`: `16 -> 24`
+- `search.fine_window_x_px`: `28 -> 40`
+- `search.fine_window_angle_deg`: `1.6 -> 2.2`
+- `candidate_deduplication.max_mean_axis_distance_px`: `8 -> 5`
+- `candidate_deduplication.max_angle_difference_deg`: `0.45 -> 0.25`
+- `candidate_deduplication.max_saved_candidates`: `16 -> 24`
+
+Kratak pregled neposrednog izlaza:
+
+- sve slike sada cuvaju `24` snimka kandidata
+- sve slike se sada izvrsavaju sa `144` finih kandidata
+- `IMG_0510` sada takodje ima `24` sacuvana snimka kandidata za rucni pregled
+- najbolji prijavljeni skor za `IMG_0510` ostaje priblizno `0.426`, tako da sira pretraga nije automatski poboljsala najbolje rangirano resenje
+
+Tumacenje:
+
+- sira pretraga je uspesno povecala povrsinu odziva i sacuvala vise varijanti
+- ako `IMG_0510` i dalje nema savrsenog kandidata posle rucnog pregleda, sledece usko grlo verovatno nije samo sirina pretrage
+- sledeca analiza treba da razdvoji ove mogucnosti:
+- `Step 05` i dalje propusta presudnu familiju fragmenata
+- bodovanje u `Step 06` favorizuje pogresnu familiju fragmenata
+- prosirenje ili korekcija potpore se zakljuca na blisku, ali pogresnu osu kada pretraga pocne
+
+### Rezultat pokretanja posle bodovanja srednje zone
+
+Primenjena promena u bodovanju:
+
+- dodat je poseban srednji pojas potpore oko `y_ref`
+- dodat je `mid_anchor_score`
+- dodat je `mid_gap_penalty`
+- broj izlaznih snimaka smanjen je sa `24` na `12`
+- opsta pristrasnost prema potpori je blago smanjena:
+- `fragment_support_weight`: `0.34 -> 0.28`
+- `symmetry_weight`: `0.24 -> 0.20`
+
+Novi clanovi bodovanja:
+
+- pozitivno: `mid_anchor_weight = 0.18`
+- negativno: `mid_gap_penalty_weight = 0.10`
+
+Uocen rezultat:
+
+- najbolji skor za `IMG_0510` poboljsan je sa priblizno `0.426` na priblizno `0.478`
+- srednje metrike za `IMG_0510` posle ponovnog pokretanja:
+- `mid_band_coverage ~= 0.914`
+- `mid_band_alignment_score ~= 0.335`
+- `mid_anchor_score ~= 0.625`
+- `mid_gap_penalty ~= 0.086`
+
+Tumacenje:
+
+- srednji pojas je sada aktivan i merljiv
+- za `IMG_0510`, centralna vertikalna zona nije prazna; problem je verovatnije nesavrsen kvalitet poravnanja nego potpuno odsustvo srednje potpore
+- ovo vise ukazuje na kvalitet rangiranja i izbora potpore nego na samu sirinu pretrage
+
+### Vracanje na prethodno `stable_slope` stanje
+
+Bodovanje srednje zone je vraceno na staro. Standardni `Step 06` se vratio na ranije stanje u kom:
+
+- sve slike osim `IMG_0510` ponovo imaju prethodno prihvatljiv skup kandidata
+- `IMG_0510` ostaje jedina problematicna slika
+- najbolji skor za `IMG_0510` vracen je na priblizno `0.426`
+
+### Posebno pokretanje sa svim kandidatima za `IMG_0510`
+
+Napravljen je poseban dijagnosticki prolaz za `IMG_0510` u:
+
+- `data/processed/06_search_central_ruler_all_candidates_0510`
+
+Postavka dijagnostike:
+
+- isto vraceno `stable_slope` bodovanje kao u standardnom pokretanju
+- bez clanova za srednji pojas
+- sacuvani su svi zavrsni fini kandidati, a ne samo gornji podskup snimaka
+
+Uocen rezultat:
+
+- `fine_candidate_count = 144`
+- `candidate_snapshot_files = 144`
+- `top_candidates = 144`
+- najbolji skor je ostao priblizno `0.426`
+
+Cilj tumacenja:
+
+- ako vizuelno savrsen kandidat postoji medju tih `144` snimaka, ali nije rangiran prvi, problem je u formuli za bodovanje i rangiranje
+- ako vizuelno savrsen kandidat ne postoji ni medju tih `144` zavrsnih kandidata, problem je uzvodno: u generisanju kandidata, izboru potpore ili ranijem filtriranju
+
+### Standardni izlaz za `Step 06` je azuriran
+
+Dijagnosticki izlaz je zatim vracen u standardni folder za `Step 06`:
+
+- `data/processed/06_search_central_ruler`
+
+Trenutno stanje standardnog izlaza za `Step 06`:
+
+- sve slike osim `IMG_0510` zadrzavaju regularni gornji podskup snimaka (`24`)
+- `IMG_0510` sada cuva sve zavrsne kandidate direktno u standardnom izlazu
+- za `IMG_0510`:
+- `fine_candidate_count = 144`
+- `candidate_snapshot_files = 144`
+- `top_candidates = 144`
+
+Prakticna posledica:
+
+- pregled sada moze da se radi na jednom mestu, bez posebnog dijagnostickog izlaznog foldera
+
+### Trenutno ogranicenje izlaza
+
+Standardni izlaz za `Step 06` je zatim smanjen na najboljih `10` sacuvanih kandidata po slici.
+
+Trenutno stanje standardnog izlaza:
+
+- `candidate_deduplication.max_saved_candidates = 10`
+- svaka slika u `data/processed/06_search_central_ruler` sada ima:
+- `candidate_snapshot_files = 10`
+- `top_candidates = 10`
+
+### Kontinuitetno biranje zavrsnih kandidata
+
+`Step 06` je zatim promenjen tako da prikaz i izbor kandidata vise ne zavise direktno od sirovih finih hipoteza.
+
+Novo ponasanje:
+
+- sirove fine hipoteze se i dalje generisu kao i ranije
+- algoritam evaluira samo smanjeni skup najboljih hipoteza (`best_fit_selection.top_hypothesis_count = 12`)
+- za svaku hipotezu se evaluiraju zavrsne varijante zasnovane na potpori:
+- `hypothesis_final_band`
+- `hypothesis_final_band_adjusted`
+- `final_fit_support`
+- `final_fit_extended_support`
+- `final_fit_extended_refit`
+- zadrzava se samo najbolja zavrsna varijanta po hipotezi
+- prikazani i sacuvani `top_candidates` sada su te zavrsne varijante, a ne sirove fine hipoteze
+
+Nova primarna logika izbora:
+
+1. kandidat treba po mogucnosti da ima i gornje i donje sidro
+2. prednost imaju duzi povezani lanci fragmenata
+3. prednost imaju manji razmaci i bolji kontinuitet
+4. prednost imaju manja pomeranja originalnih fragmenata
+5. kvalitet krajeva, simetrija i centar ROI-ja su sada tie-break signali
+
+Dodate metrike zavrsnih kandidata:
+
+- `has_top_anchor`
+- `has_bottom_anchor`
+- `has_top_bottom_anchor`
+- `merged_interval_count`
+- `total_merged_length_px`
+- `longest_merged_interval_px`
+- `chain_total_gap_px`
+- `chain_continuity_ratio`
+- `source_hypothesis_label`
+- `search_stage`
+
+Praktican efekat:
+
+- snapshotovi kandidata sada vizuelizuju i izabrane fragmente potpore, ne samo osu kandidata
+- snapshotovi takodje prikazuju oznaku izvorne sirove hipoteze i fazu koja je proizvela zavrsnog kandidata
+- broj sacuvanih kandidata moze da bude i manji od `10` kada se zavrsni kandidati jako deduplikuju
+
+### Korekcija znacenja "krajeva ose"
+
+Pokazalo se da prethodna interpretacija "sidra na vrhu i dnu" nije bila dobra ako se vezuje za granice ROI-ja.
+
+Trazeni signal za `Step 06` nije:
+
+- fragment blizu vrha i dna ROI-ja
+
+nego:
+
+- fragment blizu oba kraja same kandidatske ose, odnosno glavnog povezanog lanca koji tu osu nosi
+
+Zbog toga je logika promenjena ovako:
+
+- endpoint pojasevi se sada mere na rasponu potpore kandidata, ne na rasponu ROI-ja
+- uvodi se dominantni povezani lanac potpore i njegove metrike postaju primarni signal za izbor
+- beleze se odvojeno:
+- krajnji fragmenti bilo koje potpore
+- krajnji fragmenti koji dolaze iz originalnih, ne-prilagodjenih fragmenata
+
+Nove metrike:
+
+- `top_endpoint_best_fragment_overlap_px`
+- `bottom_endpoint_best_fragment_overlap_px`
+- `top_original_endpoint_best_fragment_overlap_px`
+- `bottom_original_endpoint_best_fragment_overlap_px`
+- `has_top_original_anchor`
+- `has_bottom_original_anchor`
+- `has_top_bottom_original_anchor`
+- `chain_fragment_count`
+- `chain_total_length_px`
+- `outside_chain_length_ratio`
+- `outside_chain_fragment_ratio`
+
+### Korekcija rangiranja skoro-jednakih kandidata
+
+Na `IMG_0510` se pokazalo da cisti leksikografski prioritet duzine moze da bude previse grub.
+
+Primer:
+
+- kandidat sa `longest_merged_interval_px = 575` i bez originalnog gornjeg sidra
+- kandidat sa `longest_merged_interval_px = 572` i sa originalnim sidrima na oba kraja
+
+Razlika od `3 px` ne treba da pregazi jaci signal da kandidat zaista ima originalne krajeve ose.
+
+Zbog toga je rangiranje dopunjeno ovako:
+
+- duzina i kontinuitet se prvo gledaju kroz grublje bucket-e
+- tek kada su kandidati i dalje izjednaceni, ulazi tacna duzina
+- originalna sidra na krajevima sada mogu da prelome izmedju skoro-jednakih kandidata
+
+### Rezultat na `IMG_0510`
+
+Posle ove izmene i ciscenja paralelnih starih `python` procesa:
+
+- najbolji kandidat za `IMG_0510` postao je `final_fit_extended_refit`
+- `source_hypothesis_label = C12`
+- `score = 0.5188`
+- `selection_score = 2279.51`
+- `has_top_bottom_anchor = True`
+- `has_top_bottom_original_anchor = True`
+- `longest_merged_interval_px = 574`
+- `chain_continuity_ratio = 0.779`
+
+Napomena:
+
+- ovaj korak je sada racunski skuplji jer za svaki zavrsni kandidat dodatno procenjuje dominantni lanac i krajeve tog lanca
+- pre punog novog rerun-a celog skupa treba proveriti da li je potrebno jos malo optimizovati runtime
+
+### Optimizacija performansi
+
+`Step 06` je zatim optimizovan tako da vise ne radi punu, skupu evaluaciju za svaku osu iz coarse i fine grida.
+
+Nova podela rada:
+
+- coarse i fine grid sada prvo prolaze kroz brzi hipotezni screen
+- taj brzi screen koristi vektorizovane `numpy` proracune po svim fragmentima za dati ugao i skup `x` pozicija
+- tek mali broj najbolje rangiranih brzih hipoteza prolazi kroz punu evaluaciju potpore
+- finalni kandidati se zatim i dalje evaluiraju istom detaljnom logikom kao ranije
+
+Dodatne optimizacije:
+
+- analiza potpore i dominantnog lanca se kesira po potpori
+- fit ose iz potpore se kesira po potpori
+- kandidat snapshotovi vise ne crtaju sve fragmente od nule za svaku sliku, vec kopiraju jednom nacrtanu pozadinu
+- finalni ranking sada koristi `selection_score` kao glavni signal, a stari leksikografski kljuc samo kao tie-break
+
+Praktican efekat na trenutnom skupu:
+
+- pun run za svih `11` slika: oko `111.7 s`
+- prosecno po slici: oko `10.09 s`
+- prosecan `search`: oko `8.9 s`
+- prosecan `rendering`: oko `0.23 s`
+
+Bitno:
+
+- problem na `IMG_0510` nije bio samo u brzom screen-u, nego i u tome sto je zavrsni ranking birao kandidata koji nije imao najveci `selection_score`
+- posle korekcije rankinga i hibridnog screen-a, `IMG_0510` ponovo vraca kandidat sa `has_top_bottom_original_anchor = True`

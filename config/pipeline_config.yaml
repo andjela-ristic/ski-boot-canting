@@ -176,7 +176,7 @@ step_05_valid_hough_lines_in_roi:
     - 35
     - 45
     - 55
-    min_line_length: 70
+    min_line_length: 75
     min_line_length_test_values:
     - 60
     - 80
@@ -262,7 +262,6 @@ step_06_search_central_ruler:
   output_subdir: 06_search_central_ruler
   cleanup_output_on_start: true
   fragment_filter:
-    min_length_px: 90
     max_vertical_deviation_deg: 18
     min_mask_support_ratio: 0.94
     min_points_inside_mask: 60
@@ -282,9 +281,15 @@ step_06_search_central_ruler:
     final_band_half_width_px: 9
     coarse_max_angle_error_deg: 6
     final_max_angle_error_deg: 4
-    top_coarse_candidates: 10
-    fine_window_x_px: 28
-    fine_window_angle_deg: 1.6
+    coarse_candidate_pool_limit: 120
+    fine_candidate_pool_limit: 144
+    coarse_angle_bucket_deg: 1.0
+    max_coarse_candidates_per_angle_bucket: 3
+    coarse_x_bucket_px: 18
+    max_coarse_candidates_per_x_bucket: 3
+    top_coarse_candidates: 24
+    fine_window_x_px: 40
+    fine_window_angle_deg: 2.2
     min_support_fragments: 2
   coverage:
     bin_count: 12
@@ -301,14 +306,31 @@ step_06_search_central_ruler:
     huber_delta_px: 10
     huber_iterations: 4
     max_fit_tilt_deg: 12
+  best_fit_selection:
+    top_hypothesis_count: 24
+    min_anchor_band_coverage: 0.05
+    min_anchor_overlap_px: 24
+    min_anchor_fragment_ratio: 0.78
+    endpoint_anchor_bonus_weight: 0.10
+    gap_penalty_weight: 0.12
+    support_adjustment_penalty_weight: 0.18
+    outside_mask_penalty_weight: 0.08
+  support_chain:
+    enabled: true
+    max_connection_gap_px: 220
+    max_connection_dx_px: 28
+    max_angle_difference_deg: 3
   support_adjustment:
     enabled: true
     max_midpoint_shift_px: 6
-    max_tilt_delta_deg: 2
+    max_tilt_delta_deg: 1.5
     max_mean_shift_px: 6
     max_endpoint_shift_px: 9
+    allow_tilt_without_intersection_axis_distance_px: 6
     require_axis_intersection_for_tilt_adjustment: true
     min_support_strength_scale: 0.62
+    joint_adjustment_top_hypotheses: 8
+    joint_adjustment_min_original_endpoint_ratio: 0.90
   support_extension:
     enabled: true
     trigger_gap_px: 180
@@ -320,18 +342,18 @@ step_06_search_central_ruler:
     max_center_distance_px: 70
     max_vertical_deviation_deg: 10
   candidate_deduplication:
-    max_mean_axis_distance_px: 8
-    max_angle_difference_deg: 0.45
-    max_saved_candidates: 8
+    max_mean_axis_distance_px: 5
+    max_angle_difference_deg: 0.25
+    max_saved_candidates: 10
   scoring:
     fragment_support_weight: 0.34
     vertical_coverage_weight: 0.22
     symmetry_weight: 0.24
     roi_center_weight: 0.08
-    gap_penalty_weight: 0.14
-    endpoint_anchor_weight: 0.10
+    gap_penalty_weight: 0.16
+    endpoint_anchor_weight: 0.12
     outside_mask_penalty_weight: 0.16
-    support_adjustment_penalty_weight: 0.08
+    support_adjustment_penalty_weight: 0.16
     low_support_penalty: 0.20
     low_coverage_penalty: 0.20
   drawing:
@@ -345,24 +367,74 @@ step_06_search_central_ruler:
     label_candidates: true
     font_scale: 0.64
   test_presets:
-  - name: default
-    override: {}
-  - name: wider_band
+#  - name: default
+#    override: {}
+#  - name: wider_band
+#    override:
+#      search:
+#        coarse_band_half_width_px: 20
+#        final_band_half_width_px: 11
+#        coarse_max_angle_error_deg: 7
+#        final_max_angle_error_deg: 5
+#  - name: stricter_symmetry
+#    override:
+#      scoring:
+#        symmetry_weight: 0.30
+#        gap_penalty_weight: 0.16
+#        outside_mask_penalty_weight: 0.18
+#  - name: wider_search
+#    override:
+#      search:
+#        max_candidate_tilt_deg: 15
+#        coarse_x_step_px: 12
+#        fine_window_x_px: 34
+  - name: debug_no_adjustment
     override:
-      search:
-        coarse_band_half_width_px: 20
-        final_band_half_width_px: 11
-        coarse_max_angle_error_deg: 7
-        final_max_angle_error_deg: 5
-  - name: stricter_symmetry
+      support_adjustment:
+        enabled: false
+  - name: tighter_adjustment
     override:
+      support_adjustment:
+        max_midpoint_shift_px: 4
+        max_mean_shift_px: 4
+        max_endpoint_shift_px: 6
+        min_support_strength_scale: 0.45
       scoring:
-        symmetry_weight: 0.30
-        gap_penalty_weight: 0.16
-        outside_mask_penalty_weight: 0.18
-  - name: wider_search
+        support_adjustment_penalty_weight: 0.14
+  - name: tighter_adjustment_no_extension
     override:
-      search:
-        max_candidate_tilt_deg: 15
-        coarse_x_step_px: 12
-        fine_window_x_px: 34
+      support_adjustment:
+        max_midpoint_shift_px: 4
+        max_mean_shift_px: 4
+        max_endpoint_shift_px: 6
+        min_support_strength_scale: 0.40
+      support_extension:
+        enabled: false
+      scoring:
+        support_adjustment_penalty_weight: 0.16
+  - name: stable_slope_adjustment
+    override:
+      support_adjustment:
+        max_midpoint_shift_px: 4
+        max_tilt_delta_deg: 0.6
+        max_mean_shift_px: 4
+        max_endpoint_shift_px: 6
+        min_support_strength_scale: 0.42
+      scoring:
+        support_adjustment_penalty_weight: 0.16
+        endpoint_anchor_weight: 0.12
+        gap_penalty_weight: 0.16
+#  - name: strict_band_tight_adjustment
+#    override:
+#      search:
+#        coarse_band_half_width_px: 14
+#        final_band_half_width_px: 7
+#        coarse_max_angle_error_deg: 5
+#        final_max_angle_error_deg: 3.2
+#      support_adjustment:
+#        max_midpoint_shift_px: 4
+#        max_mean_shift_px: 4
+#        max_endpoint_shift_px: 5
+#        min_support_strength_scale: 0.40
+#      scoring:
+#        support_adjustment_penalty_weight: 0.18

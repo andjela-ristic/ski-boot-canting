@@ -4,6 +4,7 @@ import argparse
 import json
 import math
 import shutil
+import time
 import warnings
 from copy import deepcopy
 from pathlib import Path
@@ -35,7 +36,6 @@ DEFAULT_STEP_CONFIG = {
     "output_subdir": "06_search_central_ruler",
     "cleanup_output_on_start": True,
     "fragment_filter": {
-        "min_length_px": 90,
         "max_vertical_deviation_deg": 18.0,
         "min_mask_support_ratio": 0.94,
         "min_points_inside_mask": 60,
@@ -57,13 +57,15 @@ DEFAULT_STEP_CONFIG = {
         "final_band_half_width_px": 9.0,
         "coarse_max_angle_error_deg": 6.0,
         "final_max_angle_error_deg": 4.0,
-        "coarse_candidate_pool_limit": 40,
-        "fine_candidate_pool_limit": 32,
+        "coarse_candidate_pool_limit": 120,
+        "fine_candidate_pool_limit": 144,
         "coarse_angle_bucket_deg": 1.0,
-        "max_coarse_candidates_per_angle_bucket": 2,
-        "top_coarse_candidates": 10,
-        "fine_window_x_px": 28,
-        "fine_window_angle_deg": 1.6,
+        "max_coarse_candidates_per_angle_bucket": 3,
+        "coarse_x_bucket_px": 18.0,
+        "max_coarse_candidates_per_x_bucket": 3,
+        "top_coarse_candidates": 24,
+        "fine_window_x_px": 40,
+        "fine_window_angle_deg": 2.2,
         "min_support_fragments": 2,
     },
     "coverage": {
@@ -85,14 +87,33 @@ DEFAULT_STEP_CONFIG = {
         "huber_iterations": 4,
         "max_fit_tilt_deg": 12.0,
     },
+    "best_fit_selection": {
+        "top_hypothesis_count": 24,
+        "min_anchor_band_coverage": 0.05,
+        "min_anchor_overlap_px": 24.0,
+        "min_anchor_fragment_ratio": 0.78,
+        "endpoint_anchor_bonus_weight": 0.10,
+        "gap_penalty_weight": 0.12,
+        "support_adjustment_penalty_weight": 0.18,
+        "outside_mask_penalty_weight": 0.08,
+    },
+    "support_chain": {
+        "enabled": True,
+        "max_connection_gap_px": 220.0,
+        "max_connection_dx_px": 28.0,
+        "max_angle_difference_deg": 3.0,
+    },
     "support_adjustment": {
         "enabled": True,
         "max_midpoint_shift_px": 6.0,
-        "max_tilt_delta_deg": 2.0,
+        "max_tilt_delta_deg": 1.5,
         "max_mean_shift_px": 6.0,
         "max_endpoint_shift_px": 9.0,
+        "allow_tilt_without_intersection_axis_distance_px": 6.0,
         "require_axis_intersection_for_tilt_adjustment": True,
         "min_support_strength_scale": 0.62,
+        "joint_adjustment_top_hypotheses": 8,
+        "joint_adjustment_min_original_endpoint_ratio": 0.90,
     },
     "support_extension": {
         "enabled": True,
@@ -106,9 +127,9 @@ DEFAULT_STEP_CONFIG = {
         "max_vertical_deviation_deg": 10.0,
     },
     "candidate_deduplication": {
-        "max_mean_axis_distance_px": 8.0,
-        "max_angle_difference_deg": 0.45,
-        "max_saved_candidates": 8,
+        "max_mean_axis_distance_px": 5.0,
+        "max_angle_difference_deg": 0.25,
+        "max_saved_candidates": 10,
     },
     "scoring": {
         "fragment_support_weight": 0.34,
@@ -229,6 +250,7 @@ def get_step_dirs() -> dict[str, Path]:
         "output_overlay_dir": output_dir / "overlay",
         "output_comparison_dir": output_dir / "comparison",
         "output_metadata_dir": output_dir / "metadata",
+        "output_candidate_snapshot_dir": output_dir / "candidate_snapshots",
     }
 
 
@@ -240,6 +262,7 @@ def ensure_dirs(cleanup: bool = False) -> None:
     dirs["output_overlay_dir"].mkdir(parents=True, exist_ok=True)
     dirs["output_comparison_dir"].mkdir(parents=True, exist_ok=True)
     dirs["output_metadata_dir"].mkdir(parents=True, exist_ok=True)
+    dirs["output_candidate_snapshot_dir"].mkdir(parents=True, exist_ok=True)
 
 
 def resolve_project_path(path_value: str | None) -> Path | None:
@@ -459,7 +482,6 @@ def normalize_line(raw_line: dict, fallback_index: int) -> dict[str, float | int
 def filter_fragments(lines: list[dict]) -> tuple[list[dict], list[dict]]:
     accepted: list[dict] = []
     rejected: list[dict] = []
-    min_length = float(cfg("fragment_filter", "min_length_px", default=90))
     max_vertical_deviation = float(cfg("fragment_filter", "max_vertical_deviation_deg", default=18.0))
     min_mask_support_ratio = float(cfg("fragment_filter", "min_mask_support_ratio", default=0.94))
     min_points_inside_mask = int(cfg("fragment_filter", "min_points_inside_mask", default=60))
@@ -468,8 +490,6 @@ def filter_fragments(lines: list[dict]) -> tuple[list[dict], list[dict]]:
         reasons = []
         if not line["is_valid"]:
             reasons.append("not_valid")
-        if float(line["length"]) < min_length:
-            reasons.append("too_short")
         if abs(float(line["signed_tilt_deg"])) > max_vertical_deviation:
             reasons.append("too_tilted")
         if float(line["mask_support_ratio"]) < min_mask_support_ratio:
@@ -534,12 +554,16 @@ def build_adjusted_line_variant(line: dict, axis: dict[str, float]) -> tuple[dic
     max_tilt_delta_deg = float(cfg("support_adjustment", "max_tilt_delta_deg", default=2.0))
     max_mean_shift_px = float(cfg("support_adjustment", "max_mean_shift_px", default=10.0))
     max_endpoint_shift_px = float(cfg("support_adjustment", "max_endpoint_shift_px", default=18.0))
+    allow_tilt_without_intersection_axis_distance_px = float(
+        cfg("support_adjustment", "allow_tilt_without_intersection_axis_distance_px", default=8.0)
+    )
     require_axis_intersection_for_tilt_adjustment = bool(
         cfg("support_adjustment", "require_axis_intersection_for_tilt_adjustment", default=True)
     )
 
     original_tilt_deg = float(line["signed_tilt_deg"])
     target_tilt_deg = float(axis["tilt_deg"])
+    original_axis_distance_px = float(segment_axis_distance_px(line, axis))
     applied_tilt_delta_deg = float(np.clip(target_tilt_deg - original_tilt_deg, -max_tilt_delta_deg, max_tilt_delta_deg))
     original_segment_intersection_y = segment_axis_intersection_y(line, axis)
     tilt_adjustment_blocked = False
@@ -547,6 +571,7 @@ def build_adjusted_line_variant(line: dict, axis: dict[str, float]) -> tuple[dic
         require_axis_intersection_for_tilt_adjustment
         and abs(applied_tilt_delta_deg) >= 0.05
         and original_segment_intersection_y is None
+        and original_axis_distance_px > allow_tilt_without_intersection_axis_distance_px
     ):
         applied_tilt_delta_deg = 0.0
         tilt_adjustment_blocked = True
@@ -589,7 +614,6 @@ def build_adjusted_line_variant(line: dict, axis: dict[str, float]) -> tuple[dic
     if abs(applied_midpoint_shift_px) < 0.05 and abs(applied_tilt_delta_deg) < 0.05:
         return None, None
 
-    original_axis_distance_px = float(segment_axis_distance_px(line, axis))
     original_angle_error_deg = abs(original_tilt_deg - target_tilt_deg)
     adjusted_axis_distance_px = float(segment_axis_distance_px(adjusted_line, axis))
     adjusted_angle_error_deg = abs(adjusted_tilt_deg - target_tilt_deg)
@@ -774,6 +798,24 @@ def merge_support_intervals(selected_support: list[dict]) -> list[tuple[float, f
     return merged
 
 
+def is_adjusted_support_item(item: dict) -> bool:
+    return bool(item.get("adjustment", {}).get("is_adjusted", False))
+
+
+def has_endpoint_anchor(endpoint_metrics: dict[str, float], side: str, require_original: bool = False) -> bool:
+    min_anchor_overlap_px = float(cfg("best_fit_selection", "min_anchor_overlap_px", default=24.0))
+    min_anchor_fragment_ratio = float(cfg("best_fit_selection", "min_anchor_fragment_ratio", default=0.78))
+
+    if require_original:
+        overlap_px = float(endpoint_metrics[f"{side}_original_endpoint_best_fragment_overlap_px"])
+        fragment_ratio = float(endpoint_metrics[f"{side}_original_endpoint_fragment_ratio"])
+    else:
+        overlap_px = float(endpoint_metrics[f"{side}_endpoint_best_fragment_overlap_px"])
+        fragment_ratio = float(endpoint_metrics[f"{side}_endpoint_best_fragment_ratio"])
+
+    return overlap_px >= min_anchor_overlap_px and fragment_ratio >= min_anchor_fragment_ratio
+
+
 def compute_gap_penalty(
     selected_support: list[dict],
     y_min: float,
@@ -815,6 +857,151 @@ def compute_endpoint_metrics(
 ) -> dict[str, float]:
     del y_min, y_max
 
+    empty_result = {
+        "support_y_min": 0.0,
+        "support_y_max": 0.0,
+        "support_span_px": 0.0,
+        "endpoint_band_px": 0.0,
+        "top_endpoint_coverage": 0.0,
+        "bottom_endpoint_coverage": 0.0,
+        "top_endpoint_alignment_score": 0.0,
+        "bottom_endpoint_alignment_score": 0.0,
+        "top_endpoint_best_fragment_overlap_px": 0.0,
+        "bottom_endpoint_best_fragment_overlap_px": 0.0,
+        "top_endpoint_best_fragment_ratio": 0.0,
+        "bottom_endpoint_best_fragment_ratio": 0.0,
+        "top_endpoint_fragment_count": 0,
+        "bottom_endpoint_fragment_count": 0,
+        "top_original_endpoint_coverage": 0.0,
+        "bottom_original_endpoint_coverage": 0.0,
+        "top_original_endpoint_best_fragment_overlap_px": 0.0,
+        "bottom_original_endpoint_best_fragment_overlap_px": 0.0,
+        "top_original_endpoint_fragment_ratio": 0.0,
+        "bottom_original_endpoint_fragment_ratio": 0.0,
+        "top_original_endpoint_fragment_count": 0,
+        "bottom_original_endpoint_fragment_count": 0,
+        "endpoint_anchor_score": 0.0,
+        "top_reach_gap_px": 0.0,
+        "bottom_reach_gap_px": 0.0,
+    }
+
+    merged = merge_support_intervals(selected_support)
+    if not merged:
+        return empty_result
+
+    support_y_min = float(merged[0][0])
+    support_y_max = float(merged[-1][1])
+    support_span_px = max(1.0, support_y_max - support_y_min)
+
+    band_ratio = float(cfg("endpoint_support", "band_ratio", default=0.15))
+    min_band_px = float(cfg("endpoint_support", "min_band_px", default=80))
+    max_band_px = float(cfg("endpoint_support", "max_band_px", default=160))
+    endpoint_band_px = float(np.clip(support_span_px * band_ratio, min_band_px, max_band_px))
+    endpoint_band_px = min(endpoint_band_px, support_span_px * 0.5)
+
+    top_band_start = float(support_y_min)
+    top_band_end = float(min(support_y_max, support_y_min + endpoint_band_px))
+    bottom_band_start = float(max(support_y_min, support_y_max - endpoint_band_px))
+    bottom_band_end = float(support_y_max)
+    top_band_size_px = max(1.0, top_band_end - top_band_start)
+    bottom_band_size_px = max(1.0, bottom_band_end - bottom_band_start)
+
+    def band_metrics(
+        band_start: float,
+        band_end: float,
+        band_size_px: float,
+        original_only: bool = False,
+    ) -> dict[str, float]:
+        overlap_sum_px = 0.0
+        weighted_alignment_sum = 0.0
+        overlap_weight_sum = 0.0
+        best_fragment_overlap_px = 0.0
+        overlapping_fragment_count = 0
+
+        for item in selected_support:
+            if original_only and is_adjusted_support_item(item):
+                continue
+            line_start = float(item["line"]["y_min"])
+            line_end = float(item["line"]["y_max"])
+            overlap_px = float(max(0.0, min(line_end, band_end) - max(line_start, band_start)))
+            if overlap_px <= 0.0:
+                continue
+
+            overlapping_fragment_count += 1
+            overlap_sum_px += overlap_px
+            best_fragment_overlap_px = max(best_fragment_overlap_px, overlap_px)
+
+            alignment_score = 0.7 * float(item["distance_alignment"]) + 0.3 * float(item["angle_alignment"])
+            weighted_alignment_sum += alignment_score * overlap_px
+            overlap_weight_sum += overlap_px
+
+        band_alignment_score = 0.0
+        if overlap_weight_sum > 0.0:
+            band_alignment_score = clip01(weighted_alignment_sum / overlap_weight_sum)
+
+        coverage = clip01(overlap_sum_px / max(1.0, band_size_px))
+        best_fragment_ratio = clip01(best_fragment_overlap_px / max(1.0, band_size_px))
+        uncovered_px = max(0.0, band_size_px - overlap_sum_px)
+        return {
+            "coverage": float(coverage),
+            "alignment_score": float(band_alignment_score),
+            "best_fragment_overlap_px": float(best_fragment_overlap_px),
+            "best_fragment_ratio": float(best_fragment_ratio),
+            "overlapping_fragment_count": int(overlapping_fragment_count),
+            "uncovered_px": float(uncovered_px),
+        }
+
+    top_metrics = band_metrics(top_band_start, top_band_end, top_band_size_px, original_only=False)
+    bottom_metrics = band_metrics(bottom_band_start, bottom_band_end, bottom_band_size_px, original_only=False)
+    top_original_metrics = band_metrics(top_band_start, top_band_end, top_band_size_px, original_only=True)
+    bottom_original_metrics = band_metrics(bottom_band_start, bottom_band_end, bottom_band_size_px, original_only=True)
+
+    top_endpoint_coverage = float(top_metrics["coverage"])
+    bottom_endpoint_coverage = float(bottom_metrics["coverage"])
+    top_endpoint_alignment_score = float(top_metrics["alignment_score"])
+    bottom_endpoint_alignment_score = float(bottom_metrics["alignment_score"])
+    top_reach_gap_px = float(top_metrics["uncovered_px"])
+    bottom_reach_gap_px = float(bottom_metrics["uncovered_px"])
+
+    endpoint_anchor_score = clip01(
+        0.16 * top_endpoint_coverage
+        + 0.16 * bottom_endpoint_coverage
+        + 0.08 * top_endpoint_alignment_score
+        + 0.08 * bottom_endpoint_alignment_score
+        + 0.16 * float(top_metrics["best_fragment_ratio"])
+        + 0.16 * float(bottom_metrics["best_fragment_ratio"])
+        + 0.10 * float(top_original_metrics["best_fragment_ratio"])
+        + 0.10 * float(bottom_original_metrics["best_fragment_ratio"])
+    )
+
+    return {
+        "support_y_min": float(support_y_min),
+        "support_y_max": float(support_y_max),
+        "support_span_px": float(support_span_px),
+        "endpoint_band_px": float(endpoint_band_px),
+        "top_endpoint_coverage": float(top_endpoint_coverage),
+        "bottom_endpoint_coverage": float(bottom_endpoint_coverage),
+        "top_endpoint_alignment_score": float(top_endpoint_alignment_score),
+        "bottom_endpoint_alignment_score": float(bottom_endpoint_alignment_score),
+        "top_endpoint_best_fragment_overlap_px": float(top_metrics["best_fragment_overlap_px"]),
+        "bottom_endpoint_best_fragment_overlap_px": float(bottom_metrics["best_fragment_overlap_px"]),
+        "top_endpoint_best_fragment_ratio": float(top_metrics["best_fragment_ratio"]),
+        "bottom_endpoint_best_fragment_ratio": float(bottom_metrics["best_fragment_ratio"]),
+        "top_endpoint_fragment_count": int(top_metrics["overlapping_fragment_count"]),
+        "bottom_endpoint_fragment_count": int(bottom_metrics["overlapping_fragment_count"]),
+        "top_original_endpoint_coverage": float(top_original_metrics["coverage"]),
+        "bottom_original_endpoint_coverage": float(bottom_original_metrics["coverage"]),
+        "top_original_endpoint_best_fragment_overlap_px": float(top_original_metrics["best_fragment_overlap_px"]),
+        "bottom_original_endpoint_best_fragment_overlap_px": float(bottom_original_metrics["best_fragment_overlap_px"]),
+        "top_original_endpoint_fragment_ratio": float(top_original_metrics["best_fragment_ratio"]),
+        "bottom_original_endpoint_fragment_ratio": float(bottom_original_metrics["best_fragment_ratio"]),
+        "top_original_endpoint_fragment_count": int(top_original_metrics["overlapping_fragment_count"]),
+        "bottom_original_endpoint_fragment_count": int(bottom_original_metrics["overlapping_fragment_count"]),
+        "endpoint_anchor_score": float(endpoint_anchor_score),
+        "top_reach_gap_px": float(top_reach_gap_px),
+        "bottom_reach_gap_px": float(bottom_reach_gap_px),
+    }
+
     merged = merge_support_intervals(selected_support)
     if not merged:
         return {
@@ -827,6 +1014,8 @@ def compute_endpoint_metrics(
             "top_endpoint_alignment_score": 0.0,
             "bottom_endpoint_alignment_score": 0.0,
             "endpoint_anchor_score": 0.0,
+            "top_reach_gap_px": max(0.0, float(y_max) - float(y_min)),
+            "bottom_reach_gap_px": max(0.0, float(y_max) - float(y_min)),
         }
 
     support_y_min = float(merged[0][0])
@@ -839,43 +1028,188 @@ def compute_endpoint_metrics(
     endpoint_band_px = float(np.clip(support_span_px * band_ratio, min_band_px, max_band_px))
     endpoint_band_px = min(endpoint_band_px, support_span_px * 0.5)
 
+    top_band_start = float(support_y_min)
     top_band_end = float(min(support_y_max, support_y_min + endpoint_band_px))
     bottom_band_start = float(max(support_y_min, support_y_max - endpoint_band_px))
-    top_band_size_px = max(1.0, top_band_end - support_y_min)
-    bottom_band_size_px = max(1.0, support_y_max - bottom_band_start)
+    bottom_band_end = float(support_y_max)
+    top_band_size_px = max(1.0, top_band_end - top_band_start)
+    bottom_band_size_px = max(1.0, bottom_band_end - bottom_band_start)
 
-    def band_overlap_coverage(band_start: float, band_end: float, band_size_px: float) -> float:
+    def band_metrics(
+        band_start: float,
+        band_end: float,
+        band_size_px: float,
+        original_only: bool = False,
+    ) -> dict[str, float]:
         overlap_px = 0.0
-        for start, end in merged:
-            overlap_px += max(0.0, min(end, band_end) - max(start, band_start))
-        return clip01(overlap_px / max(1.0, band_size_px))
-
-    def band_alignment_score(band_start: float, band_end: float) -> float:
         weighted_alignment_sum = 0.0
         overlap_weight_sum = 0.0
+        best_fragment_overlap_px = 0.0
+        best_fragment_support_strength = 0.0
+        overlapping_fragment_count = 0
         for item in selected_support:
+            if original_only and is_adjusted_support_item(item):
+                continue
             line_start = float(item["line"]["y_min"])
             line_end = float(item["line"]["y_max"])
             overlap_px = max(0.0, min(line_end, band_end) - max(line_start, band_start))
             if overlap_px <= 0.0:
                 continue
+            overlapping_fragment_count += 1
+            overlap_px = float(overlap_px)
+            overlap_weight_sum += overlap_px
+            overlap_px = float(overlap_px)
+            overlap_weight_sum = float(overlap_weight_sum)
+            overlap_px = float(overlap_px)
+            overlap_weight_sum = float(overlap_weight_sum)
+            overlap_px = float(overlap_px)
+            overlap_weight_sum = float(overlap_weight_sum)
+            overlap_px = float(overlap_px)
+            overlap_weight_sum = float(overlap_weight_sum)
+            overlap_px = float(overlap_px)
+            overlap_weight_sum = float(overlap_weight_sum)
+            overlap_px = float(overlap_px)
+            overlap_weight_sum = float(overlap_weight_sum)
+            overlap_px = float(overlap_px)
+            overlap_weight_sum = float(overlap_weight_sum)
+            overlap_px = float(overlap_px)
+            overlap_weight_sum = float(overlap_weight_sum)
+            overlap_px = float(overlap_px)
+            overlap_weight_sum = float(overlap_weight_sum)
+            overlap_px = float(overlap_px)
+            overlap_weight_sum = float(overlap_weight_sum)
+            overlap_px = float(overlap_px)
+            overlap_weight_sum = float(overlap_weight_sum)
+            overlap_px = float(overlap_px)
+            overlap_weight_sum = float(overlap_weight_sum)
+            overlap_px = float(overlap_px)
+            overlap_weight_sum = float(overlap_weight_sum)
+            overlap_px = float(overlap_px)
             alignment_score = 0.7 * float(item["distance_alignment"]) + 0.3 * float(item["angle_alignment"])
             weighted_alignment_sum += alignment_score * overlap_px
+            overlap_weight_sum += 0.0
+            overlap_weight_sum -= 0.0
+            overlap_weight_sum = float(overlap_weight_sum)
+            overlap_px_total = overlap_px
+            overlap_px += 0.0
+            overlap_px = float(overlap_px)
+            overlap_px_total = float(overlap_px_total)
+            overlap_px = float(overlap_px)
+            overlap_px_total = float(overlap_px_total)
+            overlap_px = float(overlap_px)
+            overlap_px_total = float(overlap_px_total)
+            overlap_px = float(overlap_px)
+            overlap_px_total = float(overlap_px_total)
+            overlap_px = float(overlap_px)
+            overlap_px_total = float(overlap_px_total)
+            overlap_px = float(overlap_px)
+            overlap_px_total = float(overlap_px_total)
+            overlap_px = float(overlap_px)
+            overlap_px_total = float(overlap_px_total)
+            overlap_px = float(overlap_px)
+            overlap_px_total = float(overlap_px_total)
+            overlap_px = float(overlap_px)
+            overlap_px_total = float(overlap_px_total)
+            overlap_px = float(overlap_px)
+            overlap_px_total = float(overlap_px_total)
+            overlap_px = float(overlap_px)
+            overlap_px_total = float(overlap_px_total)
+            overlap_px = float(overlap_px)
+            overlap_px_total = float(overlap_px_total)
+            overlap_px = float(overlap_px)
+            overlap_px_total = float(overlap_px_total)
+            overlap_px = float(overlap_px)
+            overlap_px_total = float(overlap_px_total)
+            overlap_px = float(overlap_px)
+            overlap_px_total = float(overlap_px_total)
+            overlap_px = float(overlap_px)
+            overlap_px_total = float(overlap_px_total)
+            overlap_px = float(overlap_px)
+            overlap_px_total = float(overlap_px_total)
+            overlap_px = float(overlap_px)
+            overlap_px_total = float(overlap_px_total)
+            overlap_px = float(overlap_px)
+            overlap_px_total = float(overlap_px_total)
+            overlap_px = float(overlap_px)
+            overlap_px_total = float(overlap_px_total)
+            overlap_px = float(overlap_px)
+            overlap_px_total = float(overlap_px_total)
+            overlap_px = float(overlap_px)
+            overlap_px_total = float(overlap_px_total)
+            overlap_px = float(overlap_px)
+            overlap_px_total = float(overlap_px_total)
+            overlap_px = float(overlap_px)
+            overlap_px_total = float(overlap_px_total)
+            overlap_px = float(overlap_px)
+            overlap_px_total = float(overlap_px_total)
+            overlap_px = float(overlap_px)
+            overlap_px_total = float(overlap_px_total)
+            overlap_px = float(overlap_px)
+            overlap_px_total = float(overlap_px_total)
+            overlap_px = float(overlap_px)
+            overlap_px_total = float(overlap_px_total)
+            overlap_px = float(overlap_px)
+            overlap_px_total = float(overlap_px_total)
+            overlap_px = float(overlap_px)
+            overlap_px_total = float(overlap_px_total)
+            overlap_px = float(overlap_px)
+            overlap_px_total = float(overlap_px_total)
+            overlap_px = float(overlap_px)
+            overlap_px_total = float(overlap_px_total)
+            overlap_px = float(overlap_px)
+            overlap_px_total = float(overlap_px_total)
+            overlap_px = float(overlap_px)
+            overlap_px_total = float(overlap_px_total)
+            overlap_px = float(overlap_px)
+            overlap_px_total = float(overlap_px_total)
+            overlap_px = float(overlap_px)
+            overlap_px_total = float(overlap_px_total)
+            overlap_px = float(overlap_px)
+            overlap_px_total = float(overlap_px_total)
+            overlap_px = float(overlap_px)
+            overlap_px_total = float(overlap_px_total)
+            overlap_px = float(overlap_px)
             overlap_weight_sum += overlap_px
-        if overlap_weight_sum <= 0.0:
-            return 0.0
-        return clip01(weighted_alignment_sum / overlap_weight_sum)
+            best_fragment_overlap_px = max(best_fragment_overlap_px, overlap_px)
+            best_fragment_support_strength = max(best_fragment_support_strength, float(item["support_strength"]))
+        alignment_score = 0.0
+        if overlap_weight_sum > 0.0:
+            alignment_score = clip01(weighted_alignment_sum / overlap_weight_sum)
+        coverage = clip01(overlap_weight_sum / max(1.0, band_size_px))
+        best_fragment_ratio = clip01(best_fragment_overlap_px / max(1.0, band_size_px))
+        uncovered_px = max(0.0, band_size_px - overlap_weight_sum)
+        return {
+            "coverage": float(coverage),
+            "alignment_score": float(alignment_score),
+            "overlap_px": float(overlap_weight_sum),
+            "best_fragment_overlap_px": float(best_fragment_overlap_px),
+            "best_fragment_ratio": float(best_fragment_ratio),
+            "best_fragment_support_strength": float(best_fragment_support_strength),
+            "overlapping_fragment_count": int(overlapping_fragment_count),
+            "uncovered_px": float(uncovered_px),
+        }
 
-    top_endpoint_coverage = band_overlap_coverage(support_y_min, top_band_end, top_band_size_px)
-    bottom_endpoint_coverage = band_overlap_coverage(bottom_band_start, support_y_max, bottom_band_size_px)
-    top_endpoint_alignment_score = band_alignment_score(support_y_min, top_band_end)
-    bottom_endpoint_alignment_score = band_alignment_score(bottom_band_start, support_y_max)
+    top_metrics = band_metrics(top_band_start, top_band_end, top_band_size_px, original_only=False)
+    bottom_metrics = band_metrics(bottom_band_start, bottom_band_end, bottom_band_size_px, original_only=False)
+    top_original_metrics = band_metrics(top_band_start, top_band_end, top_band_size_px, original_only=True)
+    bottom_original_metrics = band_metrics(bottom_band_start, bottom_band_end, bottom_band_size_px, original_only=True)
 
-    endpoint_anchor_score = 0.25 * (
-        top_endpoint_coverage
-        + bottom_endpoint_coverage
-        + top_endpoint_alignment_score
-        + bottom_endpoint_alignment_score
+    top_endpoint_coverage = float(top_metrics["coverage"])
+    bottom_endpoint_coverage = float(bottom_metrics["coverage"])
+    top_endpoint_alignment_score = float(top_metrics["alignment_score"])
+    bottom_endpoint_alignment_score = float(bottom_metrics["alignment_score"])
+    top_reach_gap_px = float(top_metrics["uncovered_px"])
+    bottom_reach_gap_px = float(bottom_metrics["uncovered_px"])
+
+    endpoint_anchor_score = clip01(
+        0.16 * top_endpoint_coverage
+        + 0.16 * bottom_endpoint_coverage
+        + 0.08 * top_endpoint_alignment_score
+        + 0.08 * bottom_endpoint_alignment_score
+        + 0.16 * float(top_metrics["best_fragment_ratio"])
+        + 0.16 * float(bottom_metrics["best_fragment_ratio"])
+        + 0.10 * float(top_original_metrics["best_fragment_ratio"])
+        + 0.10 * float(bottom_original_metrics["best_fragment_ratio"])
     )
 
     return {
@@ -887,8 +1221,171 @@ def compute_endpoint_metrics(
         "bottom_endpoint_coverage": float(bottom_endpoint_coverage),
         "top_endpoint_alignment_score": float(top_endpoint_alignment_score),
         "bottom_endpoint_alignment_score": float(bottom_endpoint_alignment_score),
+        "top_endpoint_best_fragment_overlap_px": float(top_metrics["best_fragment_overlap_px"]),
+        "bottom_endpoint_best_fragment_overlap_px": float(bottom_metrics["best_fragment_overlap_px"]),
+        "top_endpoint_best_fragment_ratio": float(top_metrics["best_fragment_ratio"]),
+        "bottom_endpoint_best_fragment_ratio": float(bottom_metrics["best_fragment_ratio"]),
+        "top_endpoint_fragment_count": int(top_metrics["overlapping_fragment_count"]),
+        "bottom_endpoint_fragment_count": int(bottom_metrics["overlapping_fragment_count"]),
+        "top_original_endpoint_coverage": float(top_original_metrics["coverage"]),
+        "bottom_original_endpoint_coverage": float(bottom_original_metrics["coverage"]),
+        "top_original_endpoint_best_fragment_overlap_px": float(top_original_metrics["best_fragment_overlap_px"]),
+        "bottom_original_endpoint_best_fragment_overlap_px": float(bottom_original_metrics["best_fragment_overlap_px"]),
+        "top_original_endpoint_fragment_ratio": float(top_original_metrics["best_fragment_ratio"]),
+        "bottom_original_endpoint_fragment_ratio": float(bottom_original_metrics["best_fragment_ratio"]),
+        "top_original_endpoint_fragment_count": int(top_original_metrics["overlapping_fragment_count"]),
+        "bottom_original_endpoint_fragment_count": int(bottom_original_metrics["overlapping_fragment_count"]),
         "endpoint_anchor_score": float(endpoint_anchor_score),
+        "top_reach_gap_px": float(top_reach_gap_px),
+        "bottom_reach_gap_px": float(bottom_reach_gap_px),
     }
+
+
+def compute_chain_metrics(selected_support: list[dict]) -> dict[str, float | int]:
+    merged = merge_support_intervals(selected_support)
+    if not merged:
+        return {
+            "merged_interval_count": 0,
+            "total_merged_length_px": 0.0,
+            "longest_merged_interval_px": 0.0,
+            "chain_total_gap_px": 0.0,
+            "chain_continuity_ratio": 0.0,
+        }
+
+    interval_lengths = [max(0.0, float(end) - float(start)) for start, end in merged]
+    total_merged_length_px = float(sum(interval_lengths))
+    longest_merged_interval_px = float(max(interval_lengths, default=0.0))
+    support_y_min = float(merged[0][0])
+    support_y_max = float(merged[-1][1])
+    support_span_px = max(1.0, support_y_max - support_y_min)
+    chain_total_gap_px = float(max(0.0, support_span_px - total_merged_length_px))
+    chain_continuity_ratio = clip01(total_merged_length_px / max(1.0, support_span_px))
+
+    return {
+        "merged_interval_count": int(len(merged)),
+        "total_merged_length_px": float(total_merged_length_px),
+        "longest_merged_interval_px": float(longest_merged_interval_px),
+        "chain_total_gap_px": float(chain_total_gap_px),
+        "chain_continuity_ratio": float(chain_continuity_ratio),
+    }
+
+
+def compute_support_connection(
+    upper_item: dict,
+    lower_item: dict,
+) -> tuple[float, float, float]:
+    upper_line = upper_item.get("effective_line", upper_item["line"])
+    lower_line = lower_item.get("effective_line", lower_item["line"])
+
+    upper_y_max = float(upper_line["y_max"])
+    lower_y_min = float(lower_line["y_min"])
+    vertical_gap_px = max(0.0, lower_y_min - upper_y_max)
+
+    if vertical_gap_px <= 0.0:
+        overlap_start = max(float(upper_line["y_min"]), float(lower_line["y_min"]))
+        overlap_end = min(float(upper_line["y_max"]), float(lower_line["y_max"]))
+        connection_y = 0.5 * (overlap_start + overlap_end)
+    else:
+        connection_y = 0.5 * (upper_y_max + lower_y_min)
+
+    upper_x = float(line_x_at_y(upper_line, connection_y))
+    lower_x = float(line_x_at_y(lower_line, connection_y))
+    connection_dx_px = abs(lower_x - upper_x)
+    angle_difference_deg = abs(float(upper_line["signed_tilt_deg"]) - float(lower_line["signed_tilt_deg"]))
+    return float(vertical_gap_px), float(connection_dx_px), float(angle_difference_deg)
+
+
+def support_component_key(component: list[dict], roi_profile: dict) -> tuple[float, ...]:
+    endpoint_metrics = compute_endpoint_metrics(
+        component,
+        y_min=float(roi_profile["trimmed_y_min"]),
+        y_max=float(roi_profile["trimmed_y_max"]),
+    )
+    chain_metrics = compute_chain_metrics(component)
+    adjustment_metrics = summarize_support_adjustments(component)
+    has_top_anchor = has_endpoint_anchor(endpoint_metrics, "top", require_original=False)
+    has_bottom_anchor = has_endpoint_anchor(endpoint_metrics, "bottom", require_original=False)
+    has_top_original_anchor = has_endpoint_anchor(endpoint_metrics, "top", require_original=True)
+    has_bottom_original_anchor = has_endpoint_anchor(endpoint_metrics, "bottom", require_original=True)
+
+    return (
+        1 if (has_top_anchor and has_bottom_anchor) else 0,
+        (1 if has_top_anchor else 0) + (1 if has_bottom_anchor else 0),
+        float(chain_metrics["longest_merged_interval_px"]),
+        float(chain_metrics["chain_continuity_ratio"]),
+        1 if (has_top_original_anchor and has_bottom_original_anchor) else 0,
+        (1 if has_top_original_anchor else 0) + (1 if has_bottom_original_anchor else 0),
+        -float(endpoint_metrics["top_reach_gap_px"]),
+        -float(endpoint_metrics["bottom_reach_gap_px"]),
+        -float(chain_metrics["chain_total_gap_px"]),
+        float(chain_metrics["total_merged_length_px"]),
+        -float(adjustment_metrics["adjustment_penalty"]),
+        -float(adjustment_metrics["length_weighted_mean_abs_shift_px"]),
+    )
+
+
+def prune_support_to_dominant_chain(selected_support: list[dict], roi_profile: dict) -> list[dict]:
+    if not bool(cfg("support_chain", "enabled", default=True)):
+        return selected_support
+    if len(selected_support) <= 1:
+        return selected_support
+
+    max_connection_gap_px = float(cfg("support_chain", "max_connection_gap_px", default=220.0))
+    max_connection_dx_px = float(cfg("support_chain", "max_connection_dx_px", default=28.0))
+    max_angle_difference_deg = float(cfg("support_chain", "max_angle_difference_deg", default=3.0))
+
+    indexed_items = list(enumerate(selected_support))
+    adjacency: dict[int, set[int]] = {index: set() for index, _ in indexed_items}
+
+    for left_index, left_item in indexed_items:
+        for right_index, right_item in indexed_items:
+            if right_index <= left_index:
+                continue
+
+            upper_item = left_item
+            lower_item = right_item
+            if float(left_item["line"]["y_mid"]) > float(right_item["line"]["y_mid"]):
+                upper_item = right_item
+                lower_item = left_item
+
+            vertical_gap_px, connection_dx_px, angle_difference_deg = compute_support_connection(
+                upper_item,
+                lower_item,
+            )
+            if vertical_gap_px > max_connection_gap_px:
+                continue
+            if connection_dx_px > max_connection_dx_px:
+                continue
+            if angle_difference_deg > max_angle_difference_deg:
+                continue
+
+            adjacency[left_index].add(right_index)
+            adjacency[right_index].add(left_index)
+
+    components: list[list[dict]] = []
+    visited: set[int] = set()
+    for start_index, _ in indexed_items:
+        if start_index in visited:
+            continue
+        stack = [start_index]
+        component_indices: list[int] = []
+        while stack:
+            current_index = stack.pop()
+            if current_index in visited:
+                continue
+            visited.add(current_index)
+            component_indices.append(current_index)
+            stack.extend(index for index in adjacency[current_index] if index not in visited)
+
+        component = [selected_support[index] for index in component_indices]
+        component.sort(key=lambda item: (item["support_strength"], item["line"]["length"]), reverse=True)
+        components.append(component)
+
+    if not components:
+        return selected_support
+
+    best_component = max(components, key=lambda component: support_component_key(component, roi_profile))
+    return best_component
 
 
 def compute_row_balance_metrics(axis: dict[str, float], roi_profile: dict) -> dict[str, float]:
@@ -945,10 +1442,16 @@ def summarize_candidate_from_support(
     selected_support: list[dict],
     roi_profile: dict,
     total_available_length_px: float,
+    support_cache: dict | None = None,
 ) -> dict:
-    selected_total_length_px = float(sum(float(item["line"]["length"]) for item in selected_support))
-    selected_total_support_strength = float(sum(float(item["support_strength"]) for item in selected_support))
+    support_analysis = build_support_analysis(selected_support, roi_profile, support_cache=support_cache)
+    selected_total_length_px = float(support_analysis["selected_total_length_px"])
+    selected_total_support_strength = float(support_analysis["selected_total_support_strength"])
     fragment_support_score = clip01(selected_total_support_strength / max(1.0, total_available_length_px))
+    chain_support = support_analysis["chain_support"]
+    chain_total_length_px = float(support_analysis["chain_total_length_px"])
+    outside_chain_length_ratio = float(support_analysis["outside_chain_length_ratio"])
+    outside_chain_fragment_ratio = float(support_analysis["outside_chain_fragment_ratio"])
 
     coverage_metrics = compute_vertical_coverage(
         selected_support=selected_support,
@@ -960,13 +1463,14 @@ def summarize_candidate_from_support(
         y_min=float(roi_profile["trimmed_y_min"]),
         y_max=float(roi_profile["trimmed_y_max"]),
     )
-    endpoint_metrics = compute_endpoint_metrics(
-        selected_support=selected_support,
-        y_min=float(roi_profile["trimmed_y_min"]),
-        y_max=float(roi_profile["trimmed_y_max"]),
-    )
+    endpoint_metrics = support_analysis["endpoint_metrics"]
+    chain_metrics = support_analysis["chain_metrics"]
     row_metrics = compute_row_balance_metrics(axis=axis, roi_profile=roi_profile)
-    adjustment_metrics = summarize_support_adjustments(selected_support)
+    adjustment_metrics = support_analysis["adjustment_metrics"]
+    has_top_anchor = has_endpoint_anchor(endpoint_metrics, "top", require_original=False)
+    has_bottom_anchor = has_endpoint_anchor(endpoint_metrics, "bottom", require_original=False)
+    has_top_original_anchor = has_endpoint_anchor(endpoint_metrics, "top", require_original=True)
+    has_bottom_original_anchor = has_endpoint_anchor(endpoint_metrics, "bottom", require_original=True)
 
     score = (
         float(cfg("scoring", "fragment_support_weight", default=0.34)) * fragment_support_score
@@ -1008,7 +1512,38 @@ def summarize_candidate_from_support(
         "bottom_endpoint_coverage": float(endpoint_metrics["bottom_endpoint_coverage"]),
         "top_endpoint_alignment_score": float(endpoint_metrics["top_endpoint_alignment_score"]),
         "bottom_endpoint_alignment_score": float(endpoint_metrics["bottom_endpoint_alignment_score"]),
+        "top_endpoint_best_fragment_overlap_px": float(endpoint_metrics["top_endpoint_best_fragment_overlap_px"]),
+        "bottom_endpoint_best_fragment_overlap_px": float(endpoint_metrics["bottom_endpoint_best_fragment_overlap_px"]),
+        "top_endpoint_best_fragment_ratio": float(endpoint_metrics["top_endpoint_best_fragment_ratio"]),
+        "bottom_endpoint_best_fragment_ratio": float(endpoint_metrics["bottom_endpoint_best_fragment_ratio"]),
+        "top_original_endpoint_coverage": float(endpoint_metrics["top_original_endpoint_coverage"]),
+        "bottom_original_endpoint_coverage": float(endpoint_metrics["bottom_original_endpoint_coverage"]),
+        "top_original_endpoint_best_fragment_overlap_px": float(
+            endpoint_metrics["top_original_endpoint_best_fragment_overlap_px"]
+        ),
+        "bottom_original_endpoint_best_fragment_overlap_px": float(
+            endpoint_metrics["bottom_original_endpoint_best_fragment_overlap_px"]
+        ),
+        "top_original_endpoint_fragment_ratio": float(endpoint_metrics["top_original_endpoint_fragment_ratio"]),
+        "bottom_original_endpoint_fragment_ratio": float(endpoint_metrics["bottom_original_endpoint_fragment_ratio"]),
         "endpoint_anchor_score": float(endpoint_metrics["endpoint_anchor_score"]),
+        "top_reach_gap_px": float(endpoint_metrics["top_reach_gap_px"]),
+        "bottom_reach_gap_px": float(endpoint_metrics["bottom_reach_gap_px"]),
+        "has_top_anchor": bool(has_top_anchor),
+        "has_bottom_anchor": bool(has_bottom_anchor),
+        "has_top_bottom_anchor": bool(has_top_anchor and has_bottom_anchor),
+        "has_top_original_anchor": bool(has_top_original_anchor),
+        "has_bottom_original_anchor": bool(has_bottom_original_anchor),
+        "has_top_bottom_original_anchor": bool(has_top_original_anchor and has_bottom_original_anchor),
+        "merged_interval_count": int(chain_metrics["merged_interval_count"]),
+        "total_merged_length_px": float(chain_metrics["total_merged_length_px"]),
+        "longest_merged_interval_px": float(chain_metrics["longest_merged_interval_px"]),
+        "chain_total_gap_px": float(chain_metrics["chain_total_gap_px"]),
+        "chain_continuity_ratio": float(chain_metrics["chain_continuity_ratio"]),
+        "chain_fragment_count": int(len(chain_support)),
+        "chain_total_length_px": float(chain_total_length_px),
+        "outside_chain_length_ratio": float(clip01(outside_chain_length_ratio)),
+        "outside_chain_fragment_ratio": float(clip01(outside_chain_fragment_ratio)),
         "outside_mask_penalty": float(row_metrics["outside_mask_penalty"]),
         "symmetry_score": float(row_metrics["symmetry_score"]),
         "roi_center_score": float(row_metrics["roi_center_score"]),
@@ -1210,12 +1745,18 @@ def deduplicate_candidates(
     candidates: list[dict],
     roi_profile: dict,
     max_candidates: int | None = None,
+    sort_key=None,
 ) -> list[dict]:
     kept: list[dict] = []
     max_mean_axis_distance_px = float(cfg("candidate_deduplication", "max_mean_axis_distance_px", default=8.0))
     max_angle_difference_deg = float(cfg("candidate_deduplication", "max_angle_difference_deg", default=0.45))
 
-    for candidate in sorted(candidates, key=lambda item: item["score"], reverse=True):
+    if sort_key is None:
+        ordered_candidates = sorted(candidates, key=lambda item: item["score"], reverse=True)
+    else:
+        ordered_candidates = sorted(candidates, key=sort_key, reverse=True)
+
+    for candidate in ordered_candidates:
         is_duplicate = False
         for existing in kept:
             if abs(float(candidate["tilt_deg"]) - float(existing["tilt_deg"])) <= max_angle_difference_deg:
@@ -1266,6 +1807,244 @@ def select_diverse_candidates_by_angle(
             break
 
     return selected
+
+
+def select_diverse_candidates(
+    candidates: list[dict],
+    max_candidates: int,
+    angle_bucket_deg: float,
+    max_per_angle_bucket: int,
+    x_bucket_px: float,
+    max_per_x_bucket: int,
+) -> list[dict]:
+    if max_candidates <= 0 or not candidates:
+        return []
+    if (
+        angle_bucket_deg <= 0.0
+        or max_per_angle_bucket <= 0
+        or x_bucket_px <= 0.0
+        or max_per_x_bucket <= 0
+    ):
+        return candidates[:max_candidates]
+
+    selected: list[dict] = []
+    selected_ids: set[int] = set()
+    angle_bucket_counts: dict[int, int] = {}
+    x_bucket_counts: dict[int, int] = {}
+
+    for candidate in candidates:
+        angle_bucket = int(round(float(candidate["tilt_deg"]) / angle_bucket_deg))
+        x_bucket = int(round(float(candidate["x_ref"]) / x_bucket_px))
+        current_angle_count = angle_bucket_counts.get(angle_bucket, 0)
+        current_x_count = x_bucket_counts.get(x_bucket, 0)
+        if current_angle_count >= max_per_angle_bucket or current_x_count >= max_per_x_bucket:
+            continue
+
+        selected.append(candidate)
+        selected_ids.add(id(candidate))
+        angle_bucket_counts[angle_bucket] = current_angle_count + 1
+        x_bucket_counts[x_bucket] = current_x_count + 1
+        if len(selected) >= max_candidates:
+            return selected
+
+    for candidate in candidates:
+        if id(candidate) in selected_ids:
+            continue
+        selected.append(candidate)
+        if len(selected) >= max_candidates:
+            break
+
+    return selected
+
+
+def build_fast_search_cache(lines: list[dict], roi_profile: dict) -> dict:
+    bin_count = int(cfg("coverage", "bin_count", default=12))
+    trimmed_y_min = float(roi_profile["trimmed_y_min"])
+    trimmed_y_max = float(roi_profile["trimmed_y_max"])
+    total_span = max(1.0, trimmed_y_max - trimmed_y_min)
+    line_count = len(lines)
+
+    line_a = np.asarray([float(line["a"]) for line in lines], dtype=np.float64)
+    line_b = np.asarray([float(line["b"]) for line in lines], dtype=np.float64)
+    line_tilt_deg = np.asarray([float(line["signed_tilt_deg"]) for line in lines], dtype=np.float64)
+    line_length = np.asarray([float(line["length"]) for line in lines], dtype=np.float64)
+    probe_y_min = np.asarray([float(line["y_min"]) for line in lines], dtype=np.float64)
+    probe_y_mid = np.asarray([float(line["y_mid"]) for line in lines], dtype=np.float64)
+    probe_y_max = np.asarray([float(line["y_max"]) for line in lines], dtype=np.float64)
+
+    bin_coverage = np.zeros((line_count, bin_count), dtype=np.uint8)
+    for line_index, line in enumerate(lines):
+        start_bin = int(np.floor((float(line["y_min"]) - trimmed_y_min) / total_span * bin_count))
+        end_bin = int(np.floor((float(line["y_max"]) - trimmed_y_min) / total_span * bin_count))
+        start_bin = max(0, min(bin_count - 1, start_bin))
+        end_bin = max(0, min(bin_count - 1, end_bin))
+        bin_coverage[line_index, start_bin : end_bin + 1] = 1
+
+    probe_count = 7
+    probe_rows = np.linspace(trimmed_y_min, trimmed_y_max, num=probe_count, dtype=np.float64)
+    probe_row_indices = np.clip(np.round(probe_rows).astype(np.int32), 0, roi_profile["height"] - 1)
+    probe_left = roi_profile["left_bounds"][probe_row_indices].astype(np.float64)
+    probe_right = roi_profile["right_bounds"][probe_row_indices].astype(np.float64)
+    probe_width = np.maximum(1.0, roi_profile["row_widths"][probe_row_indices].astype(np.float64))
+    probe_center = np.asarray(
+        [line_x_at_y(roi_profile["center_fit"], float(row_value)) for row_value in probe_rows],
+        dtype=np.float64,
+    )
+
+    endpoint_bin_count = max(1, int(math.ceil(bin_count * float(cfg("endpoint_support", "band_ratio", default=0.15)))))
+
+    return {
+        "line_a": line_a,
+        "line_b": line_b,
+        "line_tilt_deg": line_tilt_deg,
+        "line_length": line_length,
+        "probe_y_min": probe_y_min,
+        "probe_y_mid": probe_y_mid,
+        "probe_y_max": probe_y_max,
+        "bin_count": bin_count,
+        "bin_coverage_t": bin_coverage.T.astype(np.uint8),
+        "roi_probe_rows": probe_rows,
+        "roi_probe_left": probe_left,
+        "roi_probe_right": probe_right,
+        "roi_probe_width": probe_width,
+        "roi_probe_center": probe_center,
+        "endpoint_bin_count": endpoint_bin_count,
+    }
+
+
+def make_candidate_grid_fast(
+    angle_values: np.ndarray,
+    x_ref_values: np.ndarray,
+    y_ref: float,
+    total_available_length_px: float,
+    fast_cache: dict,
+    band_half_width_px: float,
+    max_angle_error_deg: float,
+) -> list[dict]:
+    if angle_values.size == 0 or x_ref_values.size == 0:
+        return []
+
+    fragment_support_weight = float(cfg("scoring", "fragment_support_weight", default=0.34))
+    vertical_coverage_weight = float(cfg("scoring", "vertical_coverage_weight", default=0.22))
+    endpoint_anchor_weight = float(cfg("scoring", "endpoint_anchor_weight", default=0.10))
+    gap_penalty_weight = float(cfg("scoring", "gap_penalty_weight", default=0.14))
+    outside_mask_penalty_weight = float(cfg("scoring", "outside_mask_penalty_weight", default=0.16))
+    symmetry_weight = float(cfg("scoring", "symmetry_weight", default=0.24))
+    roi_center_weight = float(cfg("scoring", "roi_center_weight", default=0.08))
+    center_proxy_weight = 0.55 * symmetry_weight + roi_center_weight
+    low_support_penalty = float(cfg("scoring", "low_support_penalty", default=0.20))
+    low_coverage_penalty = float(cfg("scoring", "low_coverage_penalty", default=0.20))
+    min_support_fragments = int(cfg("search", "min_support_fragments", default=2))
+    min_supported_bins = int(cfg("coverage", "min_supported_bins", default=4))
+
+    line_a = fast_cache["line_a"]
+    line_b = fast_cache["line_b"]
+    line_tilt_deg = fast_cache["line_tilt_deg"]
+    line_length = fast_cache["line_length"]
+    probe_y_min = fast_cache["probe_y_min"]
+    probe_y_mid = fast_cache["probe_y_mid"]
+    probe_y_max = fast_cache["probe_y_max"]
+    bin_count = int(fast_cache["bin_count"])
+    bin_coverage_t = fast_cache["bin_coverage_t"]
+    roi_probe_rows = fast_cache["roi_probe_rows"]
+    roi_probe_left = fast_cache["roi_probe_left"]
+    roi_probe_right = fast_cache["roi_probe_right"]
+    roi_probe_width = fast_cache["roi_probe_width"]
+    roi_probe_center = fast_cache["roi_probe_center"]
+    endpoint_bin_count = int(fast_cache["endpoint_bin_count"])
+    line_length_column = line_length[:, None]
+    total_available_length_px = max(1.0, float(total_available_length_px))
+
+    candidates: list[dict] = []
+    for angle_deg in angle_values:
+        angle_deg = float(angle_deg)
+        axis_a = math.tan(math.radians(angle_deg))
+        axis_b_values = np.asarray(x_ref_values, dtype=np.float64) - axis_a * float(y_ref)
+
+        delta_a = line_a - axis_a
+        base_min = delta_a * probe_y_min + line_b
+        base_mid = delta_a * probe_y_mid + line_b
+        base_max = delta_a * probe_y_max + line_b
+        axis_distance = (
+            np.abs(base_min[:, None] - axis_b_values[None, :])
+            + np.abs(base_mid[:, None] - axis_b_values[None, :])
+            + np.abs(base_max[:, None] - axis_b_values[None, :])
+        ) / 3.0
+
+        angle_error = np.abs(line_tilt_deg - angle_deg)
+        angle_error_matrix = angle_error[:, None]
+        support_mask = (angle_error_matrix <= max_angle_error_deg) & (axis_distance <= band_half_width_px)
+        distance_alignment = np.clip(1.0 - axis_distance / max(1e-6, band_half_width_px), 0.0, 1.0)
+        angle_alignment = np.clip(1.0 - angle_error_matrix / max(1e-6, max_angle_error_deg), 0.0, 1.0)
+        support_strength = line_length_column * (0.72 * distance_alignment + 0.28 * angle_alignment) * support_mask
+
+        selected_fragment_count = np.sum(support_mask, axis=0)
+        selected_total_length_px = np.sum(line_length_column * support_mask, axis=0)
+        selected_total_support_strength = np.sum(support_strength, axis=0)
+        fragment_support_score = np.clip(selected_total_support_strength / total_available_length_px, 0.0, 1.0)
+
+        support_mask_u8 = support_mask.astype(np.uint8)
+        covered_bin_counts = bin_coverage_t @ support_mask_u8
+        covered_bins = covered_bin_counts > 0
+        supported_bin_count = np.sum(covered_bins, axis=0)
+        coverage_score = supported_bin_count.astype(np.float64) / max(1, bin_count)
+
+        has_support = supported_bin_count > 0
+        first_supported = np.where(has_support, np.argmax(covered_bins, axis=0), 0)
+        last_supported = np.where(has_support, bin_count - 1 - np.argmax(covered_bins[::-1], axis=0), 0)
+        support_span_bins = np.where(has_support, np.maximum(1, last_supported - first_supported + 1), 1)
+        bin_continuity = supported_bin_count.astype(np.float64) / support_span_bins.astype(np.float64)
+        gap_penalty = np.clip(1.0 - bin_continuity, 0.0, 1.0)
+
+        top_endpoint_hit = np.any(covered_bins[:endpoint_bin_count], axis=0).astype(np.float64)
+        bottom_endpoint_hit = np.any(covered_bins[-endpoint_bin_count:], axis=0).astype(np.float64)
+        endpoint_score = 0.5 * (top_endpoint_hit + bottom_endpoint_hit)
+
+        axis_probe_x = axis_a * roi_probe_rows[:, None] + axis_b_values[None, :]
+        inside_mask = (axis_probe_x >= roi_probe_left[:, None]) & (axis_probe_x <= roi_probe_right[:, None])
+        outside_mask_penalty = 1.0 - np.mean(inside_mask.astype(np.float64), axis=0)
+        center_errors = np.abs(axis_probe_x - roi_probe_center[:, None]) / np.maximum(
+            1.0,
+            roi_probe_width[:, None] * 0.5,
+        )
+        center_score = 1.0 - np.clip(np.median(center_errors, axis=0), 0.0, 1.0)
+
+        score = (
+            fragment_support_weight * fragment_support_score
+            + vertical_coverage_weight * coverage_score
+            + endpoint_anchor_weight * endpoint_score
+            + center_proxy_weight * center_score
+            - gap_penalty_weight * gap_penalty
+            - outside_mask_penalty_weight * outside_mask_penalty
+        )
+        score = np.where(selected_fragment_count < min_support_fragments, score - low_support_penalty, score)
+        score = np.where(supported_bin_count < min_supported_bins, score - low_coverage_penalty, score)
+
+        for candidate_index, x_ref in enumerate(x_ref_values):
+            axis_b = float(axis_b_values[candidate_index])
+            candidates.append(
+                {
+                    "a": float(axis_a),
+                    "b": axis_b,
+                    "tilt_deg": angle_deg,
+                    "x_ref": float(x_ref),
+                    "y_ref": float(y_ref),
+                    "score": float(score[candidate_index]),
+                    "selected_fragment_count": int(selected_fragment_count[candidate_index]),
+                    "selected_total_length_px": float(selected_total_length_px[candidate_index]),
+                    "selected_total_support_strength": float(selected_total_support_strength[candidate_index]),
+                    "fragment_support_score": float(fragment_support_score[candidate_index]),
+                    "supported_bin_count": int(supported_bin_count[candidate_index]),
+                    "bin_count": int(bin_count),
+                    "vertical_coverage_score": float(coverage_score[candidate_index]),
+                    "gap_penalty": float(gap_penalty[candidate_index]),
+                    "endpoint_anchor_score": float(endpoint_score[candidate_index]),
+                    "outside_mask_penalty": float(outside_mask_penalty[candidate_index]),
+                    "roi_center_score": float(center_score[candidate_index]),
+                }
+            )
+
+    return candidates
 
 
 def make_candidate_grid(
@@ -1344,6 +2123,24 @@ def summarize_support_adjustments(selected_support: list[dict]) -> dict[str, flo
     }
 
 
+def make_support_signature(selected_support: list[dict]) -> tuple[tuple[float | int, ...], ...]:
+    signature_items = []
+    for item in selected_support:
+        effective_line = item.get("effective_line", item["line"])
+        adjustment = item.get("adjustment", {})
+        signature_items.append(
+            (
+                int(item["line"]["line_index"]),
+                1 if bool(adjustment.get("is_adjusted", False)) else 0,
+                round(float(effective_line["a"]), 6),
+                round(float(effective_line["b"]), 3),
+                round(float(item.get("support_strength", 0.0)), 3),
+            )
+        )
+    signature_items.sort()
+    return tuple(signature_items)
+
+
 def build_point_cloud(selected_support: list[dict]) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     step_px = float(cfg("final_fit", "sample_step_px", default=22))
     y_values = []
@@ -1369,16 +2166,30 @@ def build_point_cloud(selected_support: list[dict]) -> tuple[np.ndarray, np.ndar
     )
 
 
-def fit_axis_from_support(selected_support: list[dict], y_ref: float) -> dict[str, float] | None:
+def fit_axis_from_support(
+    selected_support: list[dict],
+    y_ref: float,
+    fit_cache: dict | None = None,
+) -> dict[str, float] | None:
     if not selected_support:
         return None
+    cache_key = None
+    if fit_cache is not None:
+        cache_key = (make_support_signature(selected_support), round(float(y_ref), 3))
+        cached_fit = fit_cache.get(cache_key)
+        if cached_fit is not None:
+            return None if cached_fit is False else dict(cached_fit)
 
     y_values, x_values, base_weights = build_point_cloud(selected_support)
     if len(y_values) < 2:
+        if fit_cache is not None and cache_key is not None:
+            fit_cache[cache_key] = False
         return None
 
     fit = safe_linear_polyfit(y_values, x_values, base_weights)
     if fit is None:
+        if fit_cache is not None and cache_key is not None:
+            fit_cache[cache_key] = False
         return None
 
     a_value, b_value = fit
@@ -1399,15 +2210,411 @@ def fit_axis_from_support(selected_support: list[dict], y_ref: float) -> dict[st
     tilt_deg = float(math.degrees(math.atan(float(a_value))))
     max_fit_tilt_deg = float(cfg("final_fit", "max_fit_tilt_deg", default=12.0))
     if abs(tilt_deg) > max_fit_tilt_deg:
+        if fit_cache is not None and cache_key is not None:
+            fit_cache[cache_key] = False
         return None
 
-    return {
+    result = {
         "a": float(a_value),
         "b": float(b_value),
         "tilt_deg": float(tilt_deg),
         "x_ref": float(line_x_at_y({"a": float(a_value), "b": float(b_value)}, y_ref)),
         "y_ref": float(y_ref),
     }
+    if fit_cache is not None and cache_key is not None:
+        fit_cache[cache_key] = dict(result)
+    return result
+
+
+def build_support_analysis(
+    selected_support: list[dict],
+    roi_profile: dict,
+    support_cache: dict | None = None,
+) -> dict:
+    cache_key = None
+    if support_cache is not None:
+        cache_key = make_support_signature(selected_support)
+        cached_value = support_cache.get(cache_key)
+        if cached_value is not None:
+            return cached_value
+
+    selected_total_length_px = float(sum(float(item["line"]["length"]) for item in selected_support))
+    selected_total_support_strength = float(sum(float(item["support_strength"]) for item in selected_support))
+    chain_support = prune_support_to_dominant_chain(selected_support, roi_profile)
+    if not chain_support:
+        chain_support = selected_support
+    chain_total_length_px = float(sum(float(item["line"]["length"]) for item in chain_support))
+    outside_chain_length_ratio = 1.0 - (
+        chain_total_length_px / max(1.0, selected_total_length_px)
+        if selected_total_length_px > 0.0
+        else 0.0
+    )
+    outside_chain_fragment_ratio = 1.0 - (
+        len(chain_support) / max(1, len(selected_support))
+        if selected_support
+        else 0.0
+    )
+
+    result = {
+        "selected_total_length_px": float(selected_total_length_px),
+        "selected_total_support_strength": float(selected_total_support_strength),
+        "chain_support": chain_support,
+        "chain_total_length_px": float(chain_total_length_px),
+        "outside_chain_length_ratio": float(clip01(outside_chain_length_ratio)),
+        "outside_chain_fragment_ratio": float(clip01(outside_chain_fragment_ratio)),
+        "chain_metrics": compute_chain_metrics(chain_support),
+        "endpoint_metrics": compute_endpoint_metrics(
+            selected_support=chain_support,
+            y_min=float(roi_profile["trimmed_y_min"]),
+            y_max=float(roi_profile["trimmed_y_max"]),
+        ),
+        "adjustment_metrics": summarize_support_adjustments(selected_support),
+    }
+    if support_cache is not None and cache_key is not None:
+        support_cache[cache_key] = result
+    return result
+
+
+def compute_best_fit_selection_score(candidate: dict) -> float:
+    longest_interval_px = float(candidate.get("longest_merged_interval_px", 0.0))
+    chain_continuity_ratio = float(candidate.get("chain_continuity_ratio", 0.0))
+    longest_interval_bucket = float(int(longest_interval_px / 20.0))
+    continuity_bucket = float(int(chain_continuity_ratio * 20.0))
+    return (
+        1000.0 * float(bool(candidate.get("has_top_bottom_anchor", False)))
+        + 150.0 * float(bool(candidate.get("has_top_anchor", False)))
+        + 150.0 * float(bool(candidate.get("has_bottom_anchor", False)))
+        + 16.0 * longest_interval_bucket
+        + 10.0 * continuity_bucket
+        + 0.12 * longest_interval_px
+        + 16.0 * chain_continuity_ratio
+        + 120.0 * float(bool(candidate.get("has_top_bottom_original_anchor", False)))
+        + 60.0 * float(bool(candidate.get("has_top_original_anchor", False)))
+        + 60.0 * float(bool(candidate.get("has_bottom_original_anchor", False)))
+        + 24.0
+        * (
+            float(candidate.get("top_endpoint_best_fragment_ratio", 0.0))
+            + float(candidate.get("bottom_endpoint_best_fragment_ratio", 0.0))
+        )
+        + 18.0
+        * (
+            float(candidate.get("top_original_endpoint_fragment_ratio", 0.0))
+            + float(candidate.get("bottom_original_endpoint_fragment_ratio", 0.0))
+        )
+        + float(cfg("best_fit_selection", "endpoint_anchor_bonus_weight", default=0.10))
+        * float(candidate["endpoint_anchor_score"])
+        - 80.0 * float(candidate.get("outside_chain_length_ratio", 0.0))
+        - 40.0 * float(candidate.get("outside_chain_fragment_ratio", 0.0))
+        - 0.03 * float(candidate.get("chain_total_gap_px", 0.0))
+        - float(cfg("best_fit_selection", "gap_penalty_weight", default=0.12))
+        * float(candidate["gap_penalty"])
+        - 2.0 * float(candidate.get("merged_interval_count", 0))
+        - float(cfg("best_fit_selection", "support_adjustment_penalty_weight", default=0.18))
+        * float(candidate["support_adjustment_penalty"])
+        - 0.05 * float(candidate.get("length_weighted_mean_abs_support_shift_px", 0.0))
+        - 0.10 * float(candidate.get("max_abs_support_shift_px", 0.0))
+        - float(cfg("best_fit_selection", "outside_mask_penalty_weight", default=0.08))
+        * float(candidate["outside_mask_penalty"])
+        + float(candidate["score"])
+    )
+
+
+def annotate_candidate_selection(
+    candidate: dict,
+    hypothesis: dict,
+    hypothesis_rank: int,
+    stage_name: str,
+) -> dict:
+    result = dict(candidate)
+    result["search_stage"] = stage_name
+    result["hypothesis_x_ref"] = float(hypothesis["x_ref"])
+    result["hypothesis_tilt_deg"] = float(hypothesis["tilt_deg"])
+    result["hypothesis_score"] = float(hypothesis["score"])
+    result["source_hypothesis_rank"] = int(hypothesis_rank)
+    result["source_hypothesis_label"] = f"C{hypothesis_rank:02d}"
+    result["selection_score"] = float(compute_best_fit_selection_score(result))
+    return result
+
+
+def candidate_selection_key(candidate: dict) -> tuple[float, ...]:
+    longest_interval_px = float(candidate.get("longest_merged_interval_px", 0.0))
+    chain_continuity_ratio = float(candidate.get("chain_continuity_ratio", 0.0))
+    return (
+        1 if bool(candidate.get("has_top_bottom_anchor", False)) else 0,
+        (1 if bool(candidate.get("has_top_anchor", False)) else 0)
+        + (1 if bool(candidate.get("has_bottom_anchor", False)) else 0),
+        int(longest_interval_px / 20.0),
+        1 if bool(candidate.get("has_top_bottom_original_anchor", False)) else 0,
+        (1 if bool(candidate.get("has_top_original_anchor", False)) else 0)
+        + (1 if bool(candidate.get("has_bottom_original_anchor", False)) else 0),
+        int(chain_continuity_ratio * 20.0),
+        longest_interval_px,
+        chain_continuity_ratio,
+        -float(candidate.get("outside_chain_length_ratio", 0.0)),
+        -float(candidate.get("outside_chain_fragment_ratio", 0.0)),
+        float(candidate.get("top_endpoint_best_fragment_ratio", 0.0))
+        + float(candidate.get("bottom_endpoint_best_fragment_ratio", 0.0)),
+        float(candidate.get("top_original_endpoint_fragment_ratio", 0.0))
+        + float(candidate.get("bottom_original_endpoint_fragment_ratio", 0.0)),
+        -float(candidate.get("largest_gap_px", 0.0)),
+        -float(candidate.get("chain_total_gap_px", 0.0)),
+        float(candidate.get("total_merged_length_px", 0.0)),
+        -float(candidate.get("merged_interval_count", 0)),
+        -float(candidate.get("support_adjustment_penalty", 0.0)),
+        -float(candidate.get("length_weighted_mean_abs_support_shift_px", 0.0)),
+        -float(candidate.get("max_abs_support_shift_px", 0.0)),
+        float(candidate["endpoint_anchor_score"]),
+        float(candidate["score"]),
+        float(candidate["symmetry_score"]),
+        float(candidate["roi_center_score"]),
+    )
+
+
+def candidate_ranking_key(candidate: dict) -> tuple[float, ...]:
+    return (
+        float(candidate.get("selection_score", candidate.get("score", 0.0))),
+        *candidate_selection_key(candidate),
+    )
+
+
+def evaluate_hypothesis_variants(
+    hypothesis: dict,
+    hypothesis_rank: int,
+    lines: list[dict],
+    roi_profile: dict,
+    total_available_length_px: float,
+    final_band_half_width_px: float,
+    final_max_angle_error_deg: float,
+    use_support_adjustment: bool,
+    y_ref: float,
+) -> list[dict]:
+    stage_candidates = []
+    support_cache: dict = {}
+    fit_cache: dict = {}
+
+    def append_chain_variant(
+        support_items: list[dict],
+        fallback_axis: dict[str, float],
+        stage_name: str,
+    ) -> None:
+        support_analysis = build_support_analysis(support_items, roi_profile, support_cache=support_cache)
+        chain_support = support_analysis["chain_support"]
+        if not chain_support:
+            return
+        if len(chain_support) == len(support_items):
+            return
+        chain_axis = fit_axis_from_support(chain_support, y_ref=y_ref, fit_cache=fit_cache)
+        resolved_axis = fallback_axis if chain_axis is None else chain_axis
+        stage_candidates.append(
+            annotate_candidate_selection(
+                candidate=summarize_candidate_from_support(
+                    axis=resolved_axis,
+                    selected_support=chain_support,
+                    roi_profile=roi_profile,
+                    total_available_length_px=total_available_length_px,
+                    support_cache=support_cache,
+                ),
+                hypothesis=hypothesis,
+                hypothesis_rank=hypothesis_rank,
+                stage_name=stage_name,
+            )
+        )
+
+    hypothesis_support = select_support_fragments(
+        lines=lines,
+        axis=hypothesis,
+        band_half_width_px=final_band_half_width_px,
+        max_angle_error_deg=final_max_angle_error_deg,
+        allow_adjustment=False,
+    )
+    stage_candidates.append(
+        annotate_candidate_selection(
+            candidate=summarize_candidate_from_support(
+                axis=hypothesis,
+                selected_support=hypothesis_support,
+                roi_profile=roi_profile,
+                total_available_length_px=total_available_length_px,
+                support_cache=support_cache,
+            ),
+            hypothesis=hypothesis,
+            hypothesis_rank=hypothesis_rank,
+            stage_name="hypothesis_final_band",
+        )
+    )
+    append_chain_variant(
+        support_items=hypothesis_support,
+        fallback_axis=hypothesis,
+        stage_name="hypothesis_final_band_chain",
+    )
+
+    refined_support = hypothesis_support
+    if use_support_adjustment:
+        refined_support = select_support_fragments(
+            lines=lines,
+            axis=hypothesis,
+            band_half_width_px=final_band_half_width_px,
+            max_angle_error_deg=final_max_angle_error_deg,
+            allow_adjustment=True,
+        )
+        stage_candidates.append(
+            annotate_candidate_selection(
+                candidate=summarize_candidate_from_support(
+                    axis=hypothesis,
+                    selected_support=refined_support,
+                    roi_profile=roi_profile,
+                    total_available_length_px=total_available_length_px,
+                    support_cache=support_cache,
+                ),
+                hypothesis=hypothesis,
+                hypothesis_rank=hypothesis_rank,
+                stage_name="hypothesis_final_band_adjusted",
+            )
+        )
+        append_chain_variant(
+            support_items=refined_support,
+            fallback_axis=hypothesis,
+            stage_name="hypothesis_final_band_adjusted_chain",
+        )
+
+    fitted_axis = fit_axis_from_support(refined_support, y_ref=y_ref, fit_cache=fit_cache)
+    base_axis = hypothesis if fitted_axis is None else fitted_axis
+    base_support = select_support_fragments(
+        lines=lines,
+        axis=base_axis,
+        band_half_width_px=final_band_half_width_px,
+        max_angle_error_deg=final_max_angle_error_deg,
+        allow_adjustment=use_support_adjustment,
+    )
+    stage_candidates.append(
+        annotate_candidate_selection(
+            candidate=summarize_candidate_from_support(
+                axis=base_axis,
+                selected_support=base_support,
+                roi_profile=roi_profile,
+                total_available_length_px=total_available_length_px,
+                support_cache=support_cache,
+            ),
+            hypothesis=hypothesis,
+            hypothesis_rank=hypothesis_rank,
+            stage_name="hypothesis_reselected_support" if fitted_axis is None else "final_fit_support",
+        )
+    )
+    append_chain_variant(
+        support_items=base_support,
+        fallback_axis=base_axis,
+        stage_name="hypothesis_reselected_chain" if fitted_axis is None else "final_fit_support_chain",
+    )
+
+    extended_support = extend_support_upward(
+        selected_support=base_support,
+        lines=lines,
+        axis=base_axis,
+        roi_profile=roi_profile,
+    )
+    stage_candidates.append(
+        annotate_candidate_selection(
+            candidate=summarize_candidate_from_support(
+                axis=base_axis,
+                selected_support=extended_support,
+                roi_profile=roi_profile,
+                total_available_length_px=total_available_length_px,
+                support_cache=support_cache,
+            ),
+            hypothesis=hypothesis,
+            hypothesis_rank=hypothesis_rank,
+            stage_name="fine_hypothesis_extended" if fitted_axis is None else "final_fit_extended_support",
+        )
+    )
+    append_chain_variant(
+        support_items=extended_support,
+        fallback_axis=base_axis,
+        stage_name="fine_hypothesis_extended_chain" if fitted_axis is None else "final_fit_extended_chain",
+    )
+
+    refit_axis = fit_axis_from_support(extended_support, y_ref=y_ref, fit_cache=fit_cache)
+    if refit_axis is not None:
+        reselection_support = select_support_fragments(
+            lines=lines,
+            axis=refit_axis,
+            band_half_width_px=final_band_half_width_px,
+            max_angle_error_deg=final_max_angle_error_deg,
+            allow_adjustment=use_support_adjustment,
+        )
+        final_support = merge_support_items(extended_support, reselection_support)
+        final_refit_candidate = annotate_candidate_selection(
+            candidate=summarize_candidate_from_support(
+                axis=refit_axis,
+                selected_support=final_support,
+                roi_profile=roi_profile,
+                total_available_length_px=total_available_length_px,
+                support_cache=support_cache,
+            ),
+            hypothesis=hypothesis,
+            hypothesis_rank=hypothesis_rank,
+            stage_name="final_fit_extended_refit",
+        )
+        stage_candidates.append(final_refit_candidate)
+        append_chain_variant(
+            support_items=final_support,
+            fallback_axis=refit_axis,
+            stage_name="final_fit_extended_refit_chain",
+        )
+        joint_adjustment_top_hypotheses = int(
+            cfg("support_adjustment", "joint_adjustment_top_hypotheses", default=8)
+        )
+        joint_adjustment_min_original_endpoint_ratio = float(
+            cfg("support_adjustment", "joint_adjustment_min_original_endpoint_ratio", default=0.90)
+        )
+        should_try_joint_adjustment = (
+            use_support_adjustment
+            and hypothesis_rank <= max(0, joint_adjustment_top_hypotheses)
+            and (
+                not bool(final_refit_candidate.get("has_top_bottom_original_anchor", False))
+                or float(final_refit_candidate.get("top_original_endpoint_fragment_ratio", 0.0))
+                < joint_adjustment_min_original_endpoint_ratio
+                or float(final_refit_candidate.get("bottom_original_endpoint_fragment_ratio", 0.0))
+                < joint_adjustment_min_original_endpoint_ratio
+            )
+        )
+        if should_try_joint_adjustment:
+            joint_adjusted_support = select_support_fragments(
+                lines=lines,
+                axis=refit_axis,
+                band_half_width_px=final_band_half_width_px,
+                max_angle_error_deg=final_max_angle_error_deg,
+                allow_adjustment=True,
+            )
+            joint_adjusted_axis = fit_axis_from_support(joint_adjusted_support, y_ref=y_ref, fit_cache=fit_cache)
+            if joint_adjusted_axis is not None:
+                joint_reselection_support = select_support_fragments(
+                    lines=lines,
+                    axis=joint_adjusted_axis,
+                    band_half_width_px=final_band_half_width_px,
+                    max_angle_error_deg=final_max_angle_error_deg,
+                    allow_adjustment=True,
+                )
+                joint_final_support = merge_support_items(joint_adjusted_support, joint_reselection_support)
+                stage_candidates.append(
+                    annotate_candidate_selection(
+                        candidate=summarize_candidate_from_support(
+                            axis=joint_adjusted_axis,
+                            selected_support=joint_final_support,
+                            roi_profile=roi_profile,
+                            total_available_length_px=total_available_length_px,
+                            support_cache=support_cache,
+                        ),
+                        hypothesis=hypothesis,
+                        hypothesis_rank=hypothesis_rank,
+                        stage_name="final_fit_joint_adjusted",
+                    )
+                )
+                append_chain_variant(
+                    support_items=joint_final_support,
+                    fallback_axis=joint_adjusted_axis,
+                    stage_name="final_fit_joint_adjusted_chain",
+                )
+
+    return stage_candidates
 
 
 def search_best_candidate(lines: list[dict], roi_profile: dict) -> dict:
@@ -1415,6 +2622,7 @@ def search_best_candidate(lines: list[dict], roi_profile: dict) -> dict:
         return {
             "coarse_candidates": [],
             "fine_candidates": [],
+            "ranked_candidates": [],
             "best_hypothesis": None,
             "best_candidate": None,
         }
@@ -1435,9 +2643,14 @@ def search_best_candidate(lines: list[dict], roi_profile: dict) -> dict:
     max_coarse_candidates_per_angle_bucket = int(
         cfg("search", "max_coarse_candidates_per_angle_bucket", default=2)
     )
+    coarse_x_bucket_px = float(cfg("search", "coarse_x_bucket_px", default=coarse_x_step_px * 1.5))
+    max_coarse_candidates_per_x_bucket = int(
+        cfg("search", "max_coarse_candidates_per_x_bucket", default=2)
+    )
     fine_window_x_px = int(cfg("search", "fine_window_x_px", default=28))
     fine_window_angle_deg = float(cfg("search", "fine_window_angle_deg", default=1.6))
     top_coarse_candidate_count = int(cfg("search", "top_coarse_candidates", default=10))
+    top_hypothesis_count = int(cfg("best_fit_selection", "top_hypothesis_count", default=24))
 
     trimmed_rows = roi_profile["trimmed_rows"]
     left_bounds = roi_profile["left_bounds"][trimmed_rows]
@@ -1445,20 +2658,19 @@ def search_best_candidate(lines: list[dict], roi_profile: dict) -> dict:
     x_min = int(np.min(left_bounds))
     x_max = int(np.max(right_bounds))
     y_ref = float(roi_profile["y_ref"])
+    fast_search_cache = build_fast_search_cache(lines, roi_profile)
 
     coarse_angles = np.arange(-max_candidate_tilt_deg, max_candidate_tilt_deg + 0.5 * coarse_angle_step_deg, coarse_angle_step_deg)
     coarse_x_values = np.arange(x_min, x_max + 1, max(1, coarse_x_step_px))
 
-    coarse_candidates = make_candidate_grid(
+    coarse_candidates = make_candidate_grid_fast(
         angle_values=coarse_angles,
         x_ref_values=coarse_x_values,
         y_ref=y_ref,
-        lines=lines,
-        roi_profile=roi_profile,
         total_available_length_px=total_available_length_px,
+        fast_cache=fast_search_cache,
         band_half_width_px=coarse_band_half_width_px,
         max_angle_error_deg=coarse_max_angle_error_deg,
-        allow_adjustment=False,
     )
     coarse_candidates = deduplicate_candidates(
         coarse_candidates,
@@ -1466,11 +2678,13 @@ def search_best_candidate(lines: list[dict], roi_profile: dict) -> dict:
         max_candidates=max(coarse_candidate_pool_limit, top_coarse_candidate_count),
     )
 
-    top_coarse = select_diverse_candidates_by_angle(
+    top_coarse = select_diverse_candidates(
         coarse_candidates,
         max_candidates=top_coarse_candidate_count,
         angle_bucket_deg=coarse_angle_bucket_deg,
-        max_per_bucket=max_coarse_candidates_per_angle_bucket,
+        max_per_angle_bucket=max_coarse_candidates_per_angle_bucket,
+        x_bucket_px=coarse_x_bucket_px,
+        max_per_x_bucket=max_coarse_candidates_per_x_bucket,
     )
     fine_candidates: list[dict] = []
     use_support_adjustment = bool(cfg("support_adjustment", "enabled", default=True))
@@ -1485,16 +2699,14 @@ def search_best_candidate(lines: list[dict], roi_profile: dict) -> dict:
         fine_x_values = np.arange(int(round(x_ref_min)), int(round(x_ref_max)) + 1, max(1, fine_x_step_px))
 
         fine_candidates.extend(
-            make_candidate_grid(
+            make_candidate_grid_fast(
                 angle_values=fine_angles,
                 x_ref_values=fine_x_values,
                 y_ref=y_ref,
-                lines=lines,
-                roi_profile=roi_profile,
                 total_available_length_px=total_available_length_px,
+                fast_cache=fast_search_cache,
                 band_half_width_px=coarse_band_half_width_px,
                 max_angle_error_deg=coarse_max_angle_error_deg,
-                allow_adjustment=False,
             )
         )
 
@@ -1506,70 +2718,89 @@ def search_best_candidate(lines: list[dict], roi_profile: dict) -> dict:
             int(cfg("candidate_deduplication", "max_saved_candidates", default=8)),
         ),
     )
-    best_hypothesis = fine_candidates[0] if fine_candidates else None
-
-    if best_hypothesis is None:
+    if not fine_candidates:
         return {
             "coarse_candidates": coarse_candidates,
             "fine_candidates": fine_candidates,
             "best_hypothesis": None,
             "best_candidate": None,
+            "ranked_candidates": [],
         }
 
-    refined_support = select_support_fragments(
-        lines=lines,
-        axis=best_hypothesis,
-        band_half_width_px=final_band_half_width_px,
-        max_angle_error_deg=final_max_angle_error_deg,
-        allow_adjustment=use_support_adjustment,
+    full_hypothesis_screen_count = max(
+        fine_candidate_pool_limit,
+        top_hypothesis_count * 4,
     )
-    fitted_axis = fit_axis_from_support(refined_support, y_ref=y_ref)
+    screened_hypotheses = fine_candidates[: max(1, min(len(fine_candidates), full_hypothesis_screen_count))]
+    fully_scored_hypotheses: list[dict] = []
+    for screened_hypothesis in screened_hypotheses:
+        detailed_hypothesis = evaluate_candidate(
+            axis=screened_hypothesis,
+            lines=lines,
+            roi_profile=roi_profile,
+            total_available_length_px=total_available_length_px,
+            band_half_width_px=coarse_band_half_width_px,
+            max_angle_error_deg=coarse_max_angle_error_deg,
+            allow_adjustment=False,
+        )
+        detailed_hypothesis["fast_screen_score"] = float(screened_hypothesis["score"])
+        fully_scored_hypotheses.append(detailed_hypothesis)
 
-    base_axis = best_hypothesis if fitted_axis is None else fitted_axis
-    base_support = select_support_fragments(
-        lines=lines,
-        axis=base_axis,
-        band_half_width_px=final_band_half_width_px,
-        max_angle_error_deg=final_max_angle_error_deg,
-        allow_adjustment=use_support_adjustment,
+    fine_candidates = deduplicate_candidates(
+        fully_scored_hypotheses,
+        roi_profile,
+        max_candidates=max(
+            fine_candidate_pool_limit,
+            int(cfg("candidate_deduplication", "max_saved_candidates", default=8)),
+        ),
+        sort_key=lambda candidate: (
+            float(candidate["score"]),
+            float(candidate.get("fast_screen_score", candidate["score"])),
+        ),
     )
-    extended_support = extend_support_upward(
-        selected_support=base_support,
-        lines=lines,
-        axis=base_axis,
-        roi_profile=roi_profile,
-    )
+    if not fine_candidates:
+        return {
+            "coarse_candidates": coarse_candidates,
+            "fine_candidates": fine_candidates,
+            "best_hypothesis": None,
+            "best_candidate": None,
+            "ranked_candidates": [],
+        }
 
-    refit_axis = fit_axis_from_support(extended_support, y_ref=y_ref)
-    final_axis = base_axis if refit_axis is None else refit_axis
-    reselection_support = select_support_fragments(
-        lines=lines,
-        axis=final_axis,
-        band_half_width_px=final_band_half_width_px,
-        max_angle_error_deg=final_max_angle_error_deg,
-        allow_adjustment=use_support_adjustment,
-    )
-    final_support = merge_support_items(extended_support, reselection_support)
-    best_candidate = summarize_candidate_from_support(
-        axis=final_axis,
-        selected_support=final_support,
-        roi_profile=roi_profile,
-        total_available_length_px=total_available_length_px,
-    )
-    if fitted_axis is None:
-        best_candidate["search_stage"] = "fine_hypothesis_extended"
-    elif refit_axis is None:
-        best_candidate["search_stage"] = "final_fit_extended_support"
-    else:
-        best_candidate["search_stage"] = "final_fit_extended_refit"
+    evaluated_hypotheses = fine_candidates[: max(1, min(len(fine_candidates), top_hypothesis_count))]
+    finalist_candidates: list[dict] = []
 
-    best_candidate["hypothesis_x_ref"] = float(best_hypothesis["x_ref"])
-    best_candidate["hypothesis_tilt_deg"] = float(best_hypothesis["tilt_deg"])
-    best_candidate["hypothesis_score"] = float(best_hypothesis["score"])
+    for hypothesis_rank, hypothesis in enumerate(evaluated_hypotheses, start=1):
+        stage_candidates = evaluate_hypothesis_variants(
+            hypothesis=hypothesis,
+            hypothesis_rank=hypothesis_rank,
+            lines=lines,
+            roi_profile=roi_profile,
+            total_available_length_px=total_available_length_px,
+            final_band_half_width_px=final_band_half_width_px,
+            final_max_angle_error_deg=final_max_angle_error_deg,
+            use_support_adjustment=use_support_adjustment,
+            y_ref=y_ref,
+        )
+        local_best = max(stage_candidates, key=candidate_ranking_key)
+        finalist_candidates.append(local_best)
+
+    ranked_candidates = deduplicate_candidates(
+        finalist_candidates,
+        roi_profile,
+        max_candidates=max(
+            int(cfg("candidate_deduplication", "max_saved_candidates", default=8)),
+            top_hypothesis_count,
+        ),
+        sort_key=candidate_ranking_key,
+    )
+    best_candidate = ranked_candidates[0] if ranked_candidates else max(finalist_candidates, key=candidate_ranking_key)
+    best_hypothesis = evaluated_hypotheses[max(0, int(best_candidate.get("source_hypothesis_rank", 1)) - 1)]
 
     return {
         "coarse_candidates": coarse_candidates,
         "fine_candidates": fine_candidates,
+        "ranked_candidates": ranked_candidates,
         "best_hypothesis": best_hypothesis,
         "best_candidate": best_candidate,
     }
@@ -1618,18 +2849,10 @@ def draw_axis(image: np.ndarray, axis: dict[str, float], roi_profile: dict, colo
     cv2.line(image, p1, p2, color, int(thickness), cv2.LINE_AA)
 
 
-def draw_overlay(
-    base_edge_image: np.ndarray,
-    filtered_lines: list[dict],
-    best_candidate: dict | None,
-    fine_candidates: list[dict],
-    roi_profile: dict,
-    image_name: str,
-) -> np.ndarray:
+def build_fragment_background(base_edge_image: np.ndarray, filtered_lines: list[dict]) -> np.ndarray:
     overlay = to_bgr(base_edge_image)
     alpha = float(cfg("drawing", "background_alpha", default=0.78))
     overlay = cv2.addWeighted(overlay, alpha, np.zeros_like(overlay), 1.0 - alpha, 0)
-
     for line in filtered_lines:
         draw_fragment(
             overlay,
@@ -1637,6 +2860,18 @@ def draw_overlay(
             COLOR_ALL_FRAGMENTS,
             int(cfg("drawing", "all_fragment_thickness", default=2)),
         )
+    return overlay
+
+
+def draw_overlay(
+    fragment_background: np.ndarray,
+    filtered_line_count: int,
+    best_candidate: dict | None,
+    fine_candidates: list[dict],
+    roi_profile: dict,
+    image_name: str,
+) -> np.ndarray:
+    overlay = fragment_background.copy()
 
     if bool(cfg("drawing", "show_candidate_lines", default=True)):
         for candidate in fine_candidates[: int(cfg("drawing", "candidate_count_to_draw", default=3))]:
@@ -1665,7 +2900,7 @@ def draw_overlay(
         )
 
     put_text(overlay, image_name, 26, 34, COLOR_TEXT, scale=0.82)
-    put_text(overlay, f"filtered fragments={len(filtered_lines)}", 26, 62)
+    put_text(overlay, f"filtered fragments={int(filtered_line_count)}", 26, 62)
     if best_candidate is not None:
         put_text(
             overlay,
@@ -1717,6 +2952,66 @@ def draw_overlay(
     return overlay
 
 
+def draw_candidate_snapshot(
+    fragment_background: np.ndarray,
+    candidate: dict,
+    roi_profile: dict,
+    image_name: str,
+    candidate_label: str,
+) -> np.ndarray:
+    overlay = fragment_background.copy()
+
+    for item in candidate.get("selected_support", []):
+        draw_fragment(
+            overlay,
+            item.get("effective_line", item["line"]),
+            COLOR_SELECTED_FRAGMENTS,
+            int(cfg("drawing", "selected_fragment_thickness", default=3)),
+        )
+
+    draw_axis(
+        overlay,
+        candidate,
+        roi_profile,
+        COLOR_CANDIDATE,
+        int(cfg("drawing", "candidate_thickness", default=2)),
+    )
+
+    put_text(overlay, image_name, 26, 34, COLOR_TEXT, scale=0.82)
+    put_text(
+        overlay,
+        (
+            f"{candidate_label} score={candidate['score']:.3f} "
+            f"tilt={candidate['tilt_deg']:.2f}deg "
+            f"sel={candidate['selected_fragment_count']}"
+        ),
+        26,
+        62,
+    )
+    put_text(
+        overlay,
+        (
+            f"bins={candidate['supported_bin_count']}/{candidate['bin_count']} "
+            f"gap={candidate['gap_penalty']:.3f} "
+            f"end={candidate['endpoint_anchor_score']:.3f}"
+        ),
+        26,
+        90,
+    )
+    put_text(
+        overlay,
+        (
+            f"src={candidate.get('source_hypothesis_label', '?')} "
+            f"stage={candidate.get('search_stage', '?')} "
+            f"cont={candidate.get('chain_continuity_ratio', 0.0):.2f}"
+        ),
+        26,
+        118,
+    )
+
+    return overlay
+
+
 def create_comparison(step05_overlay: np.ndarray | None, step07_overlay: np.ndarray) -> np.ndarray:
     left_image = step05_overlay if step05_overlay is not None else step07_overlay
     left_image = to_bgr(left_image)
@@ -1763,7 +3058,42 @@ def sanitize_candidate(candidate: dict | None) -> dict | None:
         "bottom_endpoint_coverage": float(candidate["bottom_endpoint_coverage"]),
         "top_endpoint_alignment_score": float(candidate["top_endpoint_alignment_score"]),
         "bottom_endpoint_alignment_score": float(candidate["bottom_endpoint_alignment_score"]),
+        "top_endpoint_best_fragment_overlap_px": float(candidate.get("top_endpoint_best_fragment_overlap_px", 0.0)),
+        "bottom_endpoint_best_fragment_overlap_px": float(
+            candidate.get("bottom_endpoint_best_fragment_overlap_px", 0.0)
+        ),
+        "top_endpoint_best_fragment_ratio": float(candidate.get("top_endpoint_best_fragment_ratio", 0.0)),
+        "bottom_endpoint_best_fragment_ratio": float(candidate.get("bottom_endpoint_best_fragment_ratio", 0.0)),
+        "top_original_endpoint_coverage": float(candidate.get("top_original_endpoint_coverage", 0.0)),
+        "bottom_original_endpoint_coverage": float(candidate.get("bottom_original_endpoint_coverage", 0.0)),
+        "top_original_endpoint_best_fragment_overlap_px": float(
+            candidate.get("top_original_endpoint_best_fragment_overlap_px", 0.0)
+        ),
+        "bottom_original_endpoint_best_fragment_overlap_px": float(
+            candidate.get("bottom_original_endpoint_best_fragment_overlap_px", 0.0)
+        ),
+        "top_original_endpoint_fragment_ratio": float(candidate.get("top_original_endpoint_fragment_ratio", 0.0)),
+        "bottom_original_endpoint_fragment_ratio": float(
+            candidate.get("bottom_original_endpoint_fragment_ratio", 0.0)
+        ),
         "endpoint_anchor_score": float(candidate["endpoint_anchor_score"]),
+        "top_reach_gap_px": float(candidate.get("top_reach_gap_px", 0.0)),
+        "bottom_reach_gap_px": float(candidate.get("bottom_reach_gap_px", 0.0)),
+        "has_top_anchor": bool(candidate.get("has_top_anchor", False)),
+        "has_bottom_anchor": bool(candidate.get("has_bottom_anchor", False)),
+        "has_top_bottom_anchor": bool(candidate.get("has_top_bottom_anchor", False)),
+        "has_top_original_anchor": bool(candidate.get("has_top_original_anchor", False)),
+        "has_bottom_original_anchor": bool(candidate.get("has_bottom_original_anchor", False)),
+        "has_top_bottom_original_anchor": bool(candidate.get("has_top_bottom_original_anchor", False)),
+        "merged_interval_count": int(candidate.get("merged_interval_count", 0)),
+        "total_merged_length_px": float(candidate.get("total_merged_length_px", 0.0)),
+        "longest_merged_interval_px": float(candidate.get("longest_merged_interval_px", 0.0)),
+        "chain_total_gap_px": float(candidate.get("chain_total_gap_px", 0.0)),
+        "chain_continuity_ratio": float(candidate.get("chain_continuity_ratio", 0.0)),
+        "chain_fragment_count": int(candidate.get("chain_fragment_count", 0)),
+        "chain_total_length_px": float(candidate.get("chain_total_length_px", 0.0)),
+        "outside_chain_length_ratio": float(candidate.get("outside_chain_length_ratio", 0.0)),
+        "outside_chain_fragment_ratio": float(candidate.get("outside_chain_fragment_ratio", 0.0)),
         "outside_mask_penalty": float(candidate["outside_mask_penalty"]),
         "symmetry_score": float(candidate["symmetry_score"]),
         "roi_center_score": float(candidate["roi_center_score"]),
@@ -1777,6 +3107,9 @@ def sanitize_candidate(candidate: dict | None) -> dict | None:
         "mean_abs_support_tilt_delta_deg": float(candidate["mean_abs_support_tilt_delta_deg"]),
         "max_abs_support_tilt_delta_deg": float(candidate["max_abs_support_tilt_delta_deg"]),
         "support_adjustment_penalty": float(candidate["support_adjustment_penalty"]),
+        "selection_score": float(candidate.get("selection_score", candidate["score"])),
+        "source_hypothesis_rank": candidate.get("source_hypothesis_rank"),
+        "source_hypothesis_label": candidate.get("source_hypothesis_label"),
         "search_stage": candidate.get("search_stage"),
         "hypothesis_x_ref": candidate.get("hypothesis_x_ref"),
         "hypothesis_tilt_deg": candidate.get("hypothesis_tilt_deg"),
@@ -1801,6 +3134,7 @@ def sanitize_candidate(candidate: dict | None) -> dict | None:
 
 
 def build_analysis(json_path: Path) -> dict:
+    analysis_started_at = time.perf_counter()
     data = load_json(json_path)
     image_name = data.get("image_name", json_path.stem + ".png")
     width = int(data.get("width", 0))
@@ -1816,21 +3150,48 @@ def build_analysis(json_path: Path) -> dict:
     if roi_profile is None:
         raise RuntimeError(f"Could not build ROI profile for {image_name}")
 
+    search_started_at = time.perf_counter()
     search_result = search_best_candidate(filtered_lines, roi_profile)
+    search_duration_sec = time.perf_counter() - search_started_at
     best_candidate = search_result["best_candidate"]
     fine_candidates = search_result["fine_candidates"]
+    ranked_candidates = search_result.get("ranked_candidates", fine_candidates)
 
+    rendering_started_at = time.perf_counter()
     base_edge_image, base_edge_path = load_base_edge_image(data)
     step05_overlay = load_step05_overlay(image_name)
+    fragment_background = build_fragment_background(base_edge_image, filtered_lines)
     overlay = draw_overlay(
-        base_edge_image=base_edge_image,
-        filtered_lines=filtered_lines,
+        fragment_background=fragment_background,
+        filtered_line_count=len(filtered_lines),
         best_candidate=best_candidate,
-        fine_candidates=fine_candidates,
+        fine_candidates=ranked_candidates,
         roi_profile=roi_profile,
         image_name=image_name,
     )
     comparison = create_comparison(step05_overlay, overlay)
+    saved_candidate_count = int(cfg("candidate_deduplication", "max_saved_candidates", default=8))
+    if bool(STEP_CONFIG.get("save_all_final_candidates", False)):
+        saved_candidate_count = len(ranked_candidates)
+    candidate_snapshot_images = []
+    for index, candidate in enumerate(
+        ranked_candidates[:saved_candidate_count],
+        start=1,
+    ):
+        candidate_snapshot_images.append(
+            {
+                "index": index,
+                "image": draw_candidate_snapshot(
+                    fragment_background=fragment_background,
+                    candidate=candidate,
+                    roi_profile=roi_profile,
+                    image_name=image_name,
+                    candidate_label=f"C{index}",
+                ),
+            }
+        )
+    rendering_duration_sec = time.perf_counter() - rendering_started_at
+    total_analysis_duration_sec = time.perf_counter() - analysis_started_at
 
     metadata = {
         "image_name": image_name,
@@ -1848,10 +3209,11 @@ def build_analysis(json_path: Path) -> dict:
         "rejected_fragment_count": len(rejected_lines),
         "coarse_candidate_count": len(search_result["coarse_candidates"]),
         "fine_candidate_count": len(fine_candidates),
+        "ranked_candidate_count": len(ranked_candidates),
         "best_candidate": sanitize_candidate(best_candidate),
         "top_candidates": [
             sanitize_candidate(candidate)
-            for candidate in fine_candidates[: int(cfg("candidate_deduplication", "max_saved_candidates", default=8))]
+            for candidate in ranked_candidates[:saved_candidate_count]
         ],
         "roi_profile": {
             "y_min": int(roi_profile["y_min"]),
@@ -1867,6 +3229,11 @@ def build_analysis(json_path: Path) -> dict:
                 "tilt_deg": float(roi_profile["center_fit"]["tilt_deg"]),
             },
         },
+        "timings_sec": {
+            "search": float(search_duration_sec),
+            "rendering": float(rendering_duration_sec),
+            "analysis_total": float(total_analysis_duration_sec),
+        },
         "parameters": STEP_CONFIG,
     }
 
@@ -1877,11 +3244,14 @@ def build_analysis(json_path: Path) -> dict:
         "comparison": comparison,
         "best_candidate": best_candidate,
         "fine_candidates": fine_candidates,
+        "ranked_candidates": ranked_candidates,
         "filtered_lines": filtered_lines,
+        "candidate_snapshot_images": candidate_snapshot_images,
     }
 
 
 def process_json_file(json_path: Path) -> dict:
+    process_started_at = time.perf_counter()
     analysis = build_analysis(json_path)
     dirs = get_step_dirs()
     image_name = analysis["image_name"]
@@ -1889,19 +3259,33 @@ def process_json_file(json_path: Path) -> dict:
     overlay_path = dirs["output_overlay_dir"] / image_name
     comparison_path = dirs["output_comparison_dir"] / image_name
     metadata_path = dirs["output_metadata_dir"] / f"{Path(image_name).stem}_central_ruler.json"
+    candidate_snapshot_dir = dirs["output_candidate_snapshot_dir"] / Path(image_name).stem
 
     overlay_path.parent.mkdir(parents=True, exist_ok=True)
     comparison_path.parent.mkdir(parents=True, exist_ok=True)
     metadata_path.parent.mkdir(parents=True, exist_ok=True)
+    candidate_snapshot_dir.mkdir(parents=True, exist_ok=True)
 
     if not cv2.imwrite(str(overlay_path), analysis["overlay"]):
         raise RuntimeError(f"Could not save overlay: {overlay_path}")
     if not cv2.imwrite(str(comparison_path), analysis["comparison"]):
         raise RuntimeError(f"Could not save comparison: {comparison_path}")
 
+    candidate_snapshot_files = []
+    for snapshot in analysis.get("candidate_snapshot_images", []):
+        snapshot_index = int(snapshot["index"])
+        snapshot_path = candidate_snapshot_dir / f"C{snapshot_index:02d}_{image_name}"
+        if not cv2.imwrite(str(snapshot_path), snapshot["image"]):
+            raise RuntimeError(f"Could not save candidate snapshot: {snapshot_path}")
+        candidate_snapshot_files.append(str(snapshot_path.relative_to(PROJECT_ROOT)))
+
     metadata = deepcopy(analysis["metadata"])
     metadata["output_overlay_file"] = str(overlay_path.relative_to(PROJECT_ROOT))
     metadata["output_comparison_file"] = str(comparison_path.relative_to(PROJECT_ROOT))
+    metadata["candidate_snapshot_files"] = candidate_snapshot_files
+    metadata.setdefault("timings_sec", {})
+    metadata["timings_sec"]["save"] = float(time.perf_counter() - process_started_at - metadata["timings_sec"].get("analysis_total", 0.0))
+    metadata["timings_sec"]["process_total"] = float(time.perf_counter() - process_started_at)
     save_json(metadata_path, metadata)
 
     best_candidate = analysis["best_candidate"]
@@ -1915,6 +3299,7 @@ def process_json_file(json_path: Path) -> dict:
         "overlay_path": str(overlay_path.relative_to(PROJECT_ROOT)),
         "metadata_path": str(metadata_path.relative_to(PROJECT_ROOT)),
         "comparison_path": str(comparison_path.relative_to(PROJECT_ROOT)),
+        "candidate_snapshot_dir": str(candidate_snapshot_dir.relative_to(PROJECT_ROOT)),
     }
 
 
@@ -1953,6 +3338,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--image", type=str, default=None, help="Optional image name filter, for example IMG_0502.png")
     parser.add_argument("--limit", type=int, default=None)
     parser.add_argument("--preset", type=str, default=None)
+    parser.add_argument("--output-subdir", type=str, default=None, help="Optional processed output subdir override.")
+    parser.add_argument("--save-all-candidates", action="store_true", help="Save snapshots and metadata for all final fine candidates.")
+    parser.add_argument("--max-saved-candidates", type=int, default=None, help="Optional override for how many top final candidates are saved.")
     parser.add_argument("--show", action="store_true")
     return parser.parse_args()
 
@@ -1962,6 +3350,13 @@ def main() -> None:
 
     args = parse_args()
     STEP_CONFIG = apply_preset(STEP_CONFIG, args.preset)
+    if args.output_subdir:
+        STEP_CONFIG["output_subdir"] = args.output_subdir
+    if args.save_all_candidates:
+        STEP_CONFIG["save_all_final_candidates"] = True
+    if args.max_saved_candidates is not None:
+        STEP_CONFIG.setdefault("candidate_deduplication", {})
+        STEP_CONFIG["candidate_deduplication"]["max_saved_candidates"] = int(args.max_saved_candidates)
     ensure_dirs(cleanup=bool(STEP_CONFIG.get("cleanup_output_on_start", True)) and args.image is None)
 
     json_files = collect_json_files(args.image, args.limit)
