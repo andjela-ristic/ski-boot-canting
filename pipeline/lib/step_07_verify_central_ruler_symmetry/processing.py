@@ -139,6 +139,8 @@ def build_analysis(metadata_path: Path) -> dict:
         "comparison": comparison,
         "snapshots": snapshots,
         "winner_rectified_edge": winner["_rectified_edge"],
+        "evaluation_mask": corridor_mask,
+        "evaluation_edge_mask": edge_mask,
     }
 
 
@@ -152,7 +154,9 @@ def process_metadata_file(metadata_path: Path) -> dict:
     output_metadata_path = dirs["output_metadata_dir"] / f"{stem}_symmetry.json"
     snapshot_dir = dirs["output_candidate_snapshot_dir"] / stem
     rectified_path = dirs["output_rectified_dir"] / image_name
-    for path in [overlay_path.parent, comparison_path.parent, output_metadata_path.parent, snapshot_dir, rectified_path.parent]:
+    evaluation_mask_path = dirs["output_evaluation_mask_dir"] / image_name
+    evaluation_edge_path = dirs["output_evaluation_edge_dir"] / image_name
+    for path in [overlay_path.parent, comparison_path.parent, output_metadata_path.parent, snapshot_dir, rectified_path.parent, evaluation_mask_path.parent, evaluation_edge_path.parent]:
         path.mkdir(parents=True, exist_ok=True)
     if not cv2.imwrite(str(overlay_path), analysis["overlay"]):
         raise RuntimeError(f"Could not save overlay: {overlay_path}")
@@ -160,6 +164,10 @@ def process_metadata_file(metadata_path: Path) -> dict:
         raise RuntimeError(f"Could not save comparison: {comparison_path}")
     if not cv2.imwrite(str(rectified_path), analysis["winner_rectified_edge"]):
         raise RuntimeError(f"Could not save rectified winner: {rectified_path}")
+    if not cv2.imwrite(str(evaluation_mask_path), analysis["evaluation_mask"]):
+        raise RuntimeError(f"Could not save Step 07 evaluation mask: {evaluation_mask_path}")
+    if not cv2.imwrite(str(evaluation_edge_path), analysis["evaluation_edge_mask"]):
+        raise RuntimeError(f"Could not save Step 07 evaluation edge mask: {evaluation_edge_path}")
     snapshot_files = []
     for snapshot in analysis["snapshots"]:
         path = snapshot_dir / f"{snapshot['candidate_label']}_{image_name}"
@@ -171,6 +179,9 @@ def process_metadata_file(metadata_path: Path) -> dict:
         "output_overlay_file": relative_project_path(overlay_path),
         "output_comparison_file": relative_project_path(comparison_path),
         "output_rectified_file": relative_project_path(rectified_path),
+        "output_evaluation_mask_file": relative_project_path(evaluation_mask_path),
+        "output_evaluation_edge_file": relative_project_path(evaluation_edge_path),
+        "evaluation_mask_role": "candidate_independent_support_mask_not_shape_ground_truth",
         "candidate_snapshot_files": snapshot_files,
     })
     metadata["timings_sec"]["process_total"] = float(time.perf_counter() - started)
@@ -189,6 +200,8 @@ def process_metadata_file(metadata_path: Path) -> dict:
         "comparison_path": relative_project_path(comparison_path),
         "metadata_path": relative_project_path(output_metadata_path),
         "candidate_snapshot_dir": relative_project_path(snapshot_dir),
+        "evaluation_mask_path": relative_project_path(evaluation_mask_path),
+        "evaluation_edge_path": relative_project_path(evaluation_edge_path),
     }
 
 

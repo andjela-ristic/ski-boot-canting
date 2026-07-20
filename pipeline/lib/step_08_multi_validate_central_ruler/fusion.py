@@ -1,209 +1,241 @@
 from __future__ import annotations
 
 import math
-from copy import deepcopy
 
 import numpy as np
 
 from .context import cfg, clip01
-from .geometry import axis_tilt_deg, mean_axis_distance
+from .geometry import candidates_equivalent
 
 
-def _geometric_mean(values: list[float], floor: float = 1e-6) -> float:
+VALIDATOR_NAMES = (
+    "step_07_symmetry",
+    "segment_consistency",
+    "perturbation_stability",
+    "fragment_evidence",
+)
+
+
+def _weighted_geometric_mean(values: list[float], weights: list[float], floor: float = 1e-6) -> float:
     if not values:
         return 0.0
     array = np.maximum(np.asarray(values, dtype=np.float64), floor)
-    return float(math.exp(float(np.mean(np.log(array)))))
+    weight_array = np.maximum(np.asarray(weights, dtype=np.float64), 0.0)
+    if float(np.sum(weight_array)) <= 0:
+        weight_array = np.ones_like(array)
+    weight_array /= float(np.sum(weight_array))
+    return float(math.exp(float(np.sum(weight_array * np.log(array)))))
 
 
-def _score_table(candidates: list[dict], validators: list[str]) -> None:
-    count = len(candidates)
-    for validator in validators:
+def _validator_weights(section: str) -> dict[str, float]:
+    prefix = {
+        "step_07_symmetry": "symmetry_weight",
+        "segment_consistency": "segment_consistency_weight",
+        "perturbation_stability": "perturbation_stability_weight",
+        "fragment_evidence": "fragment_evidence_weight",
+    }
+    return {name: float(cfg(section, key, default=0.0)) for name, key in prefix.items()}
+
+
+def _assign_validator_ranks(candidates: list[dict]) -> None:
+    for validator_name in VALIDATOR_NAMES:
         available = [
-            (index, float(candidate["validators"][validator]["score"]))
-            for index, candidate in enumerate(candidates)
-            if validator in candidate["validators"]
-            and candidate["validators"][validator].get("available")
-            and candidate["validators"][validator].get("score") is not None
+            candidate
+            for candidate in candidates
+            if candidate.get("validators", {}).get(validator_name, {}).get("available")
+            and candidate["validators"][validator_name].get("score") is not None
         ]
-        available.sort(key=lambda item: (item[1], -item[0]), reverse=True)
-        ranks = {index: rank for rank, (index, _) in enumerate(available, start=1)}
-        denominator = max(1, len(available))
-        for index, candidate in enumerate(candidates):
-            result = candidate["validators"].get(validator)
-            if not result or not result.get("available") or result.get("score") is None:
-                continue
-            rank = ranks[index]
+        available.sort(
+            key=lambda candidate: (
+                float(candidate["validators"][validator_name]["score"]),
+                -int(candidate.get("source_rank", 9999)),
+            ),
+            reverse=True,
+        )
+        denominator = max(1, len(available) - 1)
+        for rank, candidate in enumerate(available, start=1):
+            result = candidate["validators"][validator_name]
             result["rank"] = int(rank)
-            result["rank_percentile"] = clip01(1.0 - (rank - 1) / denominator)
+            result["rank_percentile"] = float(1.0 - (rank - 1) / denominator) if len(available) > 1 else 1.0
 
 
-def compute_candidate_fusion(candidates: list[dict], validator_names: list[str] | None = None) -> list[dict]:
-    validators = list(validator_names or cfg("fusion", "validator_names", default=[]))
-    _score_table(candidates, validators)
-    minimum = int(cfg("fusion", "minimum_available_validators", default=4))
-    floor = float(cfg("fusion", "absolute_score_floor", default=0.0001))
-    invalid_scale = float(cfg("fusion", "invalid_candidate_scale", default=0.45))
-    require_step07_valid = bool(cfg("fusion", "require_step_07_valid", default=True))
+def compute_candidate_validation_scores(candidates: list[dict]) -> list[dict]:
+    _assign_validator_ranks(candidates)
+    weights = _validator_weights("candidate_score")
+    floor = float(cfg("candidate_score", "missing_component_floor", default=0.0001))
+    require_step07_valid = bool(cfg("candidate_validation", "require_step_07_valid", default=True))
     for candidate in candidates:
-        absolute, ranks, names = [], [], []
-        for validator in validators:
-            result = candidate["validators"].get(validator)
-            if not result or not result.get("available") or result.get("score") is None:
+        values = []
+        value_weights = []
+        available_names = []
+        rejection_reasons = []
+        for name in VALIDATOR_NAMES:
+            result = candidate.get("validators", {}).get(name, {})
+            weight = max(0.0, weights.get(name, 0.0))
+            if weight <= 0 or not result.get("available") or result.get("score") is None:
                 continue
-            absolute.append(max(floor, clip01(result["score"])))
-            ranks.append(max(floor, clip01(result.get("rank_percentile", 0.0))))
-            names.append(validator)
-        evidence = _geometric_mean(absolute, floor)
-        rank_consensus = float(np.mean(ranks)) if ranks else 0.0
-        score = math.sqrt(max(0.0, evidence * rank_consensus))
-        rejection = []
-        if len(names) < minimum:
-            rejection.append("insufficient_available_validators")
-        step07 = candidate["validators"].get("step_07_symmetry", {})
-        if require_step07_valid and step07.get("available") and not step07.get("step_07_valid", True):
-            rejection.append("step_07_candidate_invalid")
-        balance = candidate["validators"].get("roi_balance", {})
-        if balance.get("available") and balance.get("axis_inside_ratio", 1.0) < float(cfg("roi_balance", "minimum_axis_inside_ratio", default=0.70)):
-            rejection.append("axis_leaves_roi_core")
-        valid = not rejection
+            values.append(max(floor, clip01(float(result["score"]))))
+            value_weights.append(weight)
+            available_names.append(name)
+        availability = sum(value_weights) / max(sum(max(0.0, weights[name]) for name in VALIDATOR_NAMES), 1e-9)
+        score = _weighted_geometric_mean(values, value_weights, floor) * availability
+        step07_result = candidate.get("validators", {}).get("step_07_symmetry", {})
+        if require_step07_valid and step07_result.get("available") and not step07_result.get("step_07_valid", True):
+            rejection_reasons.append("step_07_candidate_invalid")
+        mask_result = candidate.get("validators", {}).get("evaluation_mask_support", {})
+        if mask_result.get("available") and not mask_result.get("valid", False):
+            rejection_reasons.append("axis_leaves_step_07_evaluation_mask")
+        valid = not rejection_reasons
         if not valid:
-            score *= invalid_scale
+            score *= 0.45
         candidate.update({
-            "available_validator_count": int(len(names)),
-            "available_validators": names,
-            "evidence_quality": clip01(evidence),
-            "rank_consensus": clip01(rank_consensus),
+            "available_validators": available_names,
+            "validator_availability": float(availability),
             "multi_validation_score": clip01(score),
             "multi_validation_percent": 100.0 * clip01(score),
             "validation_valid": bool(valid),
-            "rejection_reasons": rejection,
+            "rejection_reasons": rejection_reasons,
         })
     return sorted(
         candidates,
         key=lambda candidate: (
             bool(candidate["validation_valid"]),
             float(candidate["multi_validation_score"]),
-            float(candidate["evidence_quality"]),
-            float(candidate["rank_consensus"]),
+            float(candidate.get("validators", {}).get("step_07_symmetry", {}).get("score") or 0.0),
             -int(candidate.get("source_rank", 9999)),
         ),
         reverse=True,
     )
 
 
-def candidates_equivalent(first: dict, second: dict, y_min: int, y_max: int) -> bool:
-    distance = mean_axis_distance(
-        first,
-        second,
-        y_min,
-        y_max,
-        int(cfg("equivalence", "sample_count", default=24)),
-    )
-    tilt = abs(axis_tilt_deg(first) - axis_tilt_deg(second))
-    return (
-        distance <= float(cfg("equivalence", "max_mean_axis_distance_px", default=5.0))
-        and tilt <= float(cfg("equivalence", "max_tilt_difference_deg", default=0.25))
-    )
-
-
-def _winner_for_subset(candidates: list[dict], validator_subset: list[str]) -> dict:
-    copied = deepcopy(candidates)
-    ranked = compute_candidate_fusion(copied, validator_subset)
-    return ranked[0]
-
-
-def compute_confidence(ranked: list[dict], validator_names: list[str], y_min: int, y_max: int) -> dict:
-    winner = ranked[0]
-    distinct_runner = None
-    for candidate in ranked[1:]:
-        if not candidates_equivalent(winner, candidate, y_min, y_max):
-            distinct_runner = candidate
-            break
-    if distinct_runner is None:
-        raw_margin = float(winner["multi_validation_score"])
-        margin_component = 1.0
+def select_final_candidate(ranked: list[dict], step07_winner_label: str) -> tuple[dict, dict]:
+    step07_winner = next((candidate for candidate in ranked if str(candidate["candidate_label"]) == str(step07_winner_label)), None)
+    if step07_winner is None:
+        step07_winner = max(
+            ranked,
+            key=lambda candidate: float(candidate.get("validators", {}).get("step_07_symmetry", {}).get("score") or 0.0),
+        )
+    ensemble_winner = ranked[0]
+    mode = str(cfg("selection", "mode", default="validate_step_07_winner"))
+    allow_override = bool(cfg("selection", "allow_candidate_override", default=False))
+    if mode == "ensemble_override" and allow_override:
+        final = ensemble_winner
+        reason = "ensemble_override_enabled"
     else:
-        raw_margin = max(0.0, float(winner["multi_validation_score"]) - float(distinct_runner["multi_validation_score"]))
-        scale = max(1e-6, float(cfg("confidence", "distinct_margin_saturation", default=0.10)))
-        margin_component = clip01(raw_margin / scale)
+        final = step07_winner
+        reason = "step_07_winner_validated_without_override"
+    return final, {
+        "selection_mode": mode,
+        "allow_candidate_override": allow_override,
+        "selection_reason": reason,
+        "step_07_winner_label": str(step07_winner["candidate_label"]),
+        "ensemble_recommendation_label": str(ensemble_winner["candidate_label"]),
+        "ensemble_recommends_same_or_equivalent": None,
+    }
 
-    top_votes = 0
+
+def _distinct_step07_margin(final_candidate: dict, candidates: list[dict], y_min: int, y_max: int) -> tuple[float, str | None]:
+    final_score = float(final_candidate.get("validators", {}).get("step_07_symmetry", {}).get("score") or 0.0)
+    alternatives = sorted(
+        candidates,
+        key=lambda candidate: float(candidate.get("validators", {}).get("step_07_symmetry", {}).get("score") or 0.0),
+        reverse=True,
+    )
+    runner = next(
+        (candidate for candidate in alternatives if not candidates_equivalent(final_candidate, candidate, y_min, y_max)),
+        None,
+    )
+    if runner is None:
+        return final_score, None
+    runner_score = float(runner.get("validators", {}).get("step_07_symmetry", {}).get("score") or 0.0)
+    return max(0.0, final_score - runner_score), str(runner["candidate_label"])
+
+
+def compute_confidence(final_candidate: dict, ranked: list[dict], y_min: int, y_max: int) -> dict:
+    weights = _validator_weights("confidence")
+    values = []
+    value_weights = []
+    component_values = {}
+    for name in VALIDATOR_NAMES:
+        result = final_candidate.get("validators", {}).get(name, {})
+        weight = max(0.0, weights.get(name, 0.0))
+        if weight <= 0 or not result.get("available") or result.get("score") is None:
+            continue
+        value = clip01(float(result["score"]))
+        component_values[name] = value
+        values.append(max(1e-6, value))
+        value_weights.append(weight)
+
+    raw_margin, runner_label = _distinct_step07_margin(final_candidate, ranked, y_min, y_max)
+    margin_saturation = max(1e-6, float(cfg("confidence", "distinct_margin_saturation", default=0.08)))
+    margin_component = clip01(raw_margin / margin_saturation)
+    margin_weight = max(0.0, float(cfg("confidence", "distinct_margin_weight", default=0.10)))
+    values.append(max(1e-6, margin_component))
+    value_weights.append(margin_weight)
+    component_values["distinct_step_07_margin"] = margin_component
+
+    # Agreement is reported and used only as a mild confidence modifier. It
+    # cannot replace the Step 07 winner or dominate the actual evidence.
+    votes = 0
     available_votes = 0
-    winner_rank_values = []
-    for validator in validator_names:
-        result = winner["validators"].get(validator)
-        if not result or not result.get("available"):
+    rank_percentiles = []
+    for name in VALIDATOR_NAMES:
+        final_result = final_candidate.get("validators", {}).get(name, {})
+        if not final_result.get("available") or final_result.get("score") is None:
             continue
         available_votes += 1
-        winner_rank_values.append(float(result.get("rank_percentile", 0.0)))
-        top_candidate = max(
-            (candidate for candidate in ranked if candidate["validators"].get(validator, {}).get("available")),
-            key=lambda candidate: float(candidate["validators"][validator]["score"]),
-            default=None,
-        )
-        if top_candidate is not None and candidates_equivalent(winner, top_candidate, y_min, y_max):
-            top_votes += 1
-    vote_ratio = top_votes / max(1, available_votes)
-    mean_rank = float(np.mean(winner_rank_values)) if winner_rank_values else 0.0
-    agreement = math.sqrt(max(0.0, mean_rank * (0.5 + 0.5 * vote_ratio)))
+        rank_percentiles.append(float(final_result.get("rank_percentile", 0.0)))
+        available_candidates = [
+            candidate for candidate in ranked
+            if candidate.get("validators", {}).get(name, {}).get("available")
+            and candidate["validators"][name].get("score") is not None
+        ]
+        if available_candidates:
+            validator_winner = max(available_candidates, key=lambda candidate: float(candidate["validators"][name]["score"]))
+            if candidates_equivalent(final_candidate, validator_winner, y_min, y_max):
+                votes += 1
+    vote_ratio = votes / max(1, available_votes)
+    mean_rank = float(np.mean(rank_percentiles)) if rank_percentiles else 0.0
+    agreement = clip01(0.5 * vote_ratio + 0.5 * mean_rank)
 
-    scenarios: list[tuple[str, list[str]]] = [("all_validators", list(validator_names))]
-    if len(validator_names) > 2:
-        scenarios.extend((f"without_{name}", [v for v in validator_names if v != name]) for name in validator_names)
-    stable = 0
-    scenario_results = []
-    for scenario_name, subset in scenarios:
-        scenario_winner = _winner_for_subset(ranked, subset)
-        equivalent = candidates_equivalent(winner, scenario_winner, y_min, y_max)
-        stable += int(equivalent)
-        scenario_results.append({
-            "scenario": scenario_name,
-            "validators": subset,
-            "winner_label": scenario_winner["candidate_label"],
-            "equivalent_to_final_winner": bool(equivalent),
-        })
-    ensemble_stability = stable / max(1, len(scenarios))
+    configured_total_weight = sum(max(0.0, weights[name]) for name in VALIDATOR_NAMES) + margin_weight
+    available_weight = sum(value_weights)
+    availability = available_weight / max(configured_total_weight, 1e-9)
+    confidence = _weighted_geometric_mean(values, value_weights) * availability
+    confidence *= 0.82 + 0.18 * agreement
 
-    availability = len(winner.get("available_validators", [])) / max(1, len(validator_names))
-    components = [
-        max(1e-6, float(winner["evidence_quality"])),
-        max(1e-6, clip01(agreement)),
-        max(1e-6, clip01(margin_component)),
-        max(1e-6, clip01(ensemble_stability)),
-    ]
-    confidence = 100.0 * availability * _geometric_mean(components)
-    confidence = float(np.clip(confidence, 0.0, 100.0))
-    if not winner.get("validation_valid", False):
-        confidence *= 0.50
+    mask_result = final_candidate.get("validators", {}).get("evaluation_mask_support", {})
+    if mask_result.get("available") and not mask_result.get("valid", False):
+        confidence *= 0.45
+    if not final_candidate.get("validation_valid", False):
+        confidence *= 0.55
+    confidence_percent = 100.0 * clip01(confidence)
 
     accepted = float(cfg("confidence", "accepted_min_percent", default=82.0))
     accepted_low = float(cfg("confidence", "accepted_low_confidence_min_percent", default=68.0))
     manual = float(cfg("confidence", "manual_review_min_percent", default=52.0))
-    if confidence >= accepted and winner.get("validation_valid"):
+    if confidence_percent >= accepted and final_candidate.get("validation_valid", False):
         decision = "accepted"
-    elif confidence >= accepted_low and winner.get("validation_valid"):
+    elif confidence_percent >= accepted_low and final_candidate.get("validation_valid", False):
         decision = "accepted_low_confidence"
-    elif confidence >= manual:
+    elif confidence_percent >= manual:
         decision = "manual_review"
     else:
         decision = "recapture_required"
 
     return {
-        "confidence_percent": float(confidence),
+        "confidence_percent": float(confidence_percent),
         "calibration_status": "uncalibrated_estimated_confidence",
         "decision": decision,
-        "evidence_quality": float(winner["evidence_quality"]),
-        "validator_agreement": clip01(agreement),
-        "validator_agreement_percent": 100.0 * clip01(agreement),
+        "confidence_components": component_values,
+        "validator_agreement": float(agreement),
+        "validator_agreement_percent": 100.0 * float(agreement),
         "validator_top_vote_ratio": float(vote_ratio),
-        "winner_margin": float(raw_margin),
-        "winner_margin_percent": 100.0 * float(raw_margin),
-        "distinct_margin_component": clip01(margin_component),
-        "ensemble_stability": float(ensemble_stability),
-        "ensemble_stability_percent": 100.0 * float(ensemble_stability),
+        "validator_mean_rank_percentile": float(mean_rank),
         "validator_availability": float(availability),
         "validator_availability_percent": 100.0 * float(availability),
-        "distinct_runner_up_label": None if distinct_runner is None else distinct_runner["candidate_label"],
-        "leave_one_validator_out": scenario_results,
+        "distinct_step_07_margin": float(raw_margin),
+        "distinct_step_07_margin_percent": 100.0 * float(raw_margin),
+        "distinct_margin_component": float(margin_component),
+        "distinct_runner_up_label": runner_label,
     }

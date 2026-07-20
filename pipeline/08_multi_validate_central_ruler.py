@@ -8,8 +8,8 @@ from lib import step_08_multi_validate_central_ruler_lib as step08_lib
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Step 08: combine the existing Step 07 symmetry result with independent "
-            "geometric validators and estimate final-axis confidence."
+            "Step 08: validate the existing Step 07 winner using saved segment results, "
+            "Step 06 fragment evidence, and perturbation stability."
         )
     )
     parser.add_argument("--image", type=str, default=None, help="Optional image-name filter, for example IMG_0502.png")

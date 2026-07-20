@@ -643,98 +643,79 @@ step_08_multi_validate_central_ruler:
   cleanup_output_on_start: true
   candidate_limit: 10
 
-  # Step 08 reads the completed Step 07 score from metadata. It does not run
-  # mirror verification again.
-  roi_preparation:
-    keep_largest_component: true
-    close_kernel_size: 7
-    close_iterations: 1
-    row_smoothing_window: 41
-    row_width_cap_quantile: 0.72
-    row_width_cap_scale: 1.08
-    minimum_half_width_px: 55
-    sample_row_step_px: 6
+  # Step 07 already selects the symmetry winner. Step 08 validates that winner
+  # and estimates confidence; it does not silently replace it by default.
+  selection:
+    mode: validate_step_07_winner
+    allow_candidate_override: false
 
-  medial_axis:
+  # This is the exact candidate-independent mask saved by Step 07. It is used
+  # only to clip evidence and verify that the axis stays in the valid region.
+  # Its synthetic symmetric boundary is never scored as boot geometry.
+  evaluation_mask:
+    require_saved_step_07_mask: true
+    minimum_axis_inside_ratio: 0.82
+    sample_row_step_px: 4
+
+  segment_consistency:
     enabled: true
-    minimum_peak_radius_px: 4.0
-    huber_delta_px: 16.0
-    huber_iterations: 6
-    normalized_distance_sigma: 0.085
-    tilt_difference_sigma_deg: 2.5
-    distance_weight: 0.82
-    tilt_weight: 0.18
-    minimum_valid_row_ratio: 0.55
+    minimum_valid_segments: 8
+    minimum_valid_segments_per_zone: 2
+    lower_quantile: 0.25
+    median_weight: 0.24
+    lower_quantile_weight: 0.26
+    zone_harmonic_weight: 0.34
+    valid_ratio_weight: 0.16
+    dispersion_scale: 0.24
 
-  structural_anchors:
+  # Reuses the 12 segment scores already calculated by Step 07. No mirror or
+  # chamfer work is repeated. It checks whether the same axis remains best when
+  # one segment or one whole top/middle/bottom zone is omitted.
+  perturbation_stability:
     enabled: true
-    zones:
-      - name: top
-        start_ratio: 0.08
-        end_ratio: 0.30
-      - name: middle
-        start_ratio: 0.36
-        end_ratio: 0.66
-      - name: bottom
-        start_ratio: 0.76
-        end_ratio: 0.97
-    normalized_distance_sigma: 0.11
-    minimum_valid_rows_per_zone: 8
+    include_leave_one_segment_out: true
+    include_leave_one_zone_out: true
+    include_odd_even_subsets: true
+    minimum_segments_per_scenario: 6
+    max_mean_axis_distance_px: 5.0
+    max_tilt_difference_deg: 0.25
+    axis_sample_count: 24
 
-  # Reuses already-computed Step 06 metrics; it does not rerun Hough or chain search.
   fragment_evidence:
     enabled: true
     span_saturation: 0.65
     coverage_saturation: 0.35
     minimum_available_metrics: 3
 
-  roi_balance:
-    enabled: true
-    minimum_axis_inside_ratio: 0.70
-    valid_ratio_power: 0.35
-
-  fusion:
-    validator_names:
-      - step_07_symmetry
-      - medial_axis
-      - structural_anchors
-      - fragment_evidence
-      - roi_balance
-    minimum_available_validators: 4
-    absolute_score_floor: 0.0001
-    invalid_candidate_scale: 0.45
+  candidate_validation:
     require_step_07_valid: true
+
+  candidate_score:
+    symmetry_weight: 0.42
+    segment_consistency_weight: 0.25
+    perturbation_stability_weight: 0.21
+    fragment_evidence_weight: 0.12
+    missing_component_floor: 0.0001
+
+  confidence:
+    symmetry_weight: 0.34
+    segment_consistency_weight: 0.22
+    perturbation_stability_weight: 0.22
+    fragment_evidence_weight: 0.12
+    distinct_margin_weight: 0.10
+    distinct_margin_saturation: 0.08
+    accepted_min_percent: 82.0
+    accepted_low_confidence_min_percent: 68.0
+    manual_review_min_percent: 52.0
 
   equivalence:
     max_mean_axis_distance_px: 5.0
     max_tilt_difference_deg: 0.25
     sample_count: 24
 
-  confidence:
-    distinct_margin_saturation: 0.10
-    accepted_min_percent: 82.0
-    accepted_low_confidence_min_percent: 68.0
-    manual_review_min_percent: 52.0
-
   drawing:
     axis_thickness: 4
     other_axis_thickness: 1
-    medial_axis_thickness: 2
-    anchor_radius: 9
+    evaluation_mask_boundary_thickness: 2
     font_scale: 0.60
     background_alpha: 0.84
-
-  test_presets:
-    - name: default
-      override: {}
-    - name: no_fragment_evidence
-      override:
-        fragment_evidence:
-          enabled: false
-        fusion:
-          validator_names:
-            - step_07_symmetry
-            - medial_axis
-            - structural_anchors
-            - roi_balance
-          minimum_available_validators: 3

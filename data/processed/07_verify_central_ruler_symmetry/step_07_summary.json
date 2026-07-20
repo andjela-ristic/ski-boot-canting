@@ -11,7 +11,9 @@
     "overlay_path": "data\\processed\\07_verify_central_ruler_symmetry\\overlay\\IMG_0502.png",
     "comparison_path": "data\\processed\\07_verify_central_ruler_symmetry\\comparison\\IMG_0502.png",
     "metadata_path": "data\\processed\\07_verify_central_ruler_symmetry\\metadata\\IMG_0502_symmetry.json",
-    "candidate_snapshot_dir": "data\\processed\\07_verify_central_ruler_symmetry\\candidate_snapshots\\IMG_0502"
+    "candidate_snapshot_dir": "data\\processed\\07_verify_central_ruler_symmetry\\candidate_snapshots\\IMG_0502",
+    "evaluation_mask_path": "data\\processed\\07_verify_central_ruler_symmetry\\evaluation_mask\\IMG_0502.png",
+    "evaluation_edge_path": "data\\processed\\07_verify_central_ruler_symmetry\\evaluation_edges\\IMG_0502.png"
   },
   {
     "image_name": "IMG_0503.png",
@@ -25,7 +27,9 @@
     "overlay_path": "data\\processed\\07_verify_central_ruler_symmetry\\overlay\\IMG_0503.png",
     "comparison_path": "data\\processed\\07_verify_central_ruler_symmetry\\comparison\\IMG_0503.png",
     "metadata_path": "data\\processed\\07_verify_central_ruler_symmetry\\metadata\\IMG_0503_symmetry.json",
-    "candidate_snapshot_dir": "data\\processed\\07_verify_central_ruler_symmetry\\candidate_snapshots\\IMG_0503"
+    "candidate_snapshot_dir": "data\\processed\\07_verify_central_ruler_symmetry\\candidate_snapshots\\IMG_0503",
+    "evaluation_mask_path": "data\\processed\\07_verify_central_ruler_symmetry\\evaluation_mask\\IMG_0503.png",
+    "evaluation_edge_path": "data\\processed\\07_verify_central_ruler_symmetry\\evaluation_edges\\IMG_0503.png"
   },
   {
     "image_name": "IMG_0504.png",
@@ -39,7 +43,9 @@
     "overlay_path": "data\\processed\\07_verify_central_ruler_symmetry\\overlay\\IMG_0504.png",
     "comparison_path": "data\\processed\\07_verify_central_ruler_symmetry\\comparison\\IMG_0504.png",
     "metadata_path": "data\\processed\\07_verify_central_ruler_symmetry\\metadata\\IMG_0504_symmetry.json",
-    "candidate_snapshot_dir": "data\\processed\\07_verify_central_ruler_symmetry\\candidate_snapshots\\IMG_0504"
+    "candidate_snapshot_dir": "data\\processed\\07_verify_central_ruler_symmetry\\candidate_snapshots\\IMG_0504",
+    "evaluation_mask_path": "data\\processed\\07_verify_central_ruler_symmetry\\evaluation_mask\\IMG_0504.png",
+    "evaluation_edge_path": "data\\processed\\07_verify_central_ruler_symmetry\\evaluation_edges\\IMG_0504.png"
   },
   {
     "image_name": "IMG_0505.png",
@@ -53,7 +59,9 @@
     "overlay_path": "data\\processed\\07_verify_central_ruler_symmetry\\overlay\\IMG_0505.png",
     "comparison_path": "data\\processed\\07_verify_central_ruler_symmetry\\comparison\\IMG_0505.png",
     "metadata_path": "data\\processed\\07_verify_central_ruler_symmetry\\metadata\\IMG_0505_symmetry.json",
-    "candidate_snapshot_dir": "data\\processed\\07_verify_central_ruler_symmetry\\candidate_snapshots\\IMG_0505"
+    "candidate_snapshot_dir": "data\\processed\\07_verify_central_ruler_symmetry\\candidate_snapshots\\IMG_0505",
+    "evaluation_mask_path": "data\\processed\\07_verify_central_ruler_symmetry\\evaluation_mask\\IMG_0505.png",
+    "evaluation_edge_path": "data\\processed\\07_verify_central_ruler_symmetry\\evaluation_edges\\IMG_0505.png"
   },
   {
     "image_name": "IMG_0506.png",
@@ -67,7 +75,9 @@
     "overlay_path": "data\\processed\\07_verify_central_ruler_symmetry\\overlay\\IMG_0506.png",
     "comparison_path": "data\\processed\\07_verify_central_ruler_symmetry\\comparison\\IMG_0506.png",
     "metadata_path": "data\\processed\\07_verify_central_ruler_symmetry\\metadata\\IMG_0506_symmetry.json",
-    "candidate_snapshot_dir": "data\\processed\\07_verify_central_ruler_symmetry\\candidate_snapshots\\IMG_0506"
+    "candidate_snapshot_dir": "data\\processed\\07_verify_central_ruler_symmetry\\candidate_snapshots\\IMG_0506",
+    "evaluation_mask_path": "data\\processed\\07_verify_central_ruler_symmetry\\evaluation_mask\\IMG_0506.png",
+    "evaluation_edge_path": "data\\processed\\07_verify_central_ruler_symmetry\\evaluation_edges\\IMG_0506.png"
   },
   {
     "image_name": "IMG_0507.png",
@@ -81,7 +91,9 @@
     "overlay_path": "data\\processed\\07_verify_central_ruler_symmetry\\overlay\\IMG_0507.png",
     "comparison_path": "data\\processed\\07_verify_central_ruler_symmetry\\comparison\\IMG_0507.png",
     "metadata_path": "data\\processed\\07_verify_central_ruler_symmetry\\metadata\\IMG_0507_symmetry.json",
-    "candidate_snapshot_dir": "data\\processed\\07_verify_central_ruler_symmetry\\candidate_snapshots\\IMG_0507"
+    "candidate_snapshot_dir": "data\\processed\\07_verify_central_ruler_symmetry\\candidate_snapshots\\IMG_0507",
+    "evaluation_mask_path": "data\\processed\\07_verify_central_ruler_symmetry\\evaluation_mask\\IMG_0507.png",
+    "evaluation_edge_path": "data\\processed\\07_verify_central_ruler_symmetry\\evaluation_edges\\IMG_0507.png"
   },
   {
     "image_name": "IMG_0508.png",
@@ -95,7 +107,9 @@
     "overlay_path": "data\\processed\\07_verify_central_ruler_symmetry\\overlay\\IMG_0508.png",
     "comparison_path": "data\\processed\\07_verify_central_ruler_symmetry\\comparison\\IMG_0508.png",
     "metadata_path": "data\\processed\\07_verify_central_ruler_symmetry\\metadata\\IMG_0508_symmetry.json",
-    "candidate_snapshot_dir": "data\\processed\\07_verify_central_ruler_symmetry\\candidate_snapshots\\IMG_0508"
+    "candidate_snapshot_dir": "data\\processed\\07_verify_central_ruler_symmetry\\candidate_snapshots\\IMG_0508",
+    "evaluation_mask_path": "data\\processed\\07_verify_central_ruler_symmetry\\evaluation_mask\\IMG_0508.png",
+    "evaluation_edge_path": "data\\processed\\07_verify_central_ruler_symmetry\\evaluation_edges\\IMG_0508.png"
   },
   {
     "image_name": "IMG_0509.png",
@@ -109,7 +123,9 @@
     "overlay_path": "data\\processed\\07_verify_central_ruler_symmetry\\overlay\\IMG_0509.png",
     "comparison_path": "data\\processed\\07_verify_central_ruler_symmetry\\comparison\\IMG_0509.png",
     "metadata_path": "data\\processed\\07_verify_central_ruler_symmetry\\metadata\\IMG_0509_symmetry.json",
-    "candidate_snapshot_dir": "data\\processed\\07_verify_central_ruler_symmetry\\candidate_snapshots\\IMG_0509"
+    "candidate_snapshot_dir": "data\\processed\\07_verify_central_ruler_symmetry\\candidate_snapshots\\IMG_0509",
+    "evaluation_mask_path": "data\\processed\\07_verify_central_ruler_symmetry\\evaluation_mask\\IMG_0509.png",
+    "evaluation_edge_path": "data\\processed\\07_verify_central_ruler_symmetry\\evaluation_edges\\IMG_0509.png"
   },
   {
     "image_name": "IMG_0510.png",
@@ -123,7 +139,9 @@
     "overlay_path": "data\\processed\\07_verify_central_ruler_symmetry\\overlay\\IMG_0510.png",
     "comparison_path": "data\\processed\\07_verify_central_ruler_symmetry\\comparison\\IMG_0510.png",
     "metadata_path": "data\\processed\\07_verify_central_ruler_symmetry\\metadata\\IMG_0510_symmetry.json",
-    "candidate_snapshot_dir": "data\\processed\\07_verify_central_ruler_symmetry\\candidate_snapshots\\IMG_0510"
+    "candidate_snapshot_dir": "data\\processed\\07_verify_central_ruler_symmetry\\candidate_snapshots\\IMG_0510",
+    "evaluation_mask_path": "data\\processed\\07_verify_central_ruler_symmetry\\evaluation_mask\\IMG_0510.png",
+    "evaluation_edge_path": "data\\processed\\07_verify_central_ruler_symmetry\\evaluation_edges\\IMG_0510.png"
   },
   {
     "image_name": "IMG_0511.png",
@@ -137,7 +155,9 @@
     "overlay_path": "data\\processed\\07_verify_central_ruler_symmetry\\overlay\\IMG_0511.png",
     "comparison_path": "data\\processed\\07_verify_central_ruler_symmetry\\comparison\\IMG_0511.png",
     "metadata_path": "data\\processed\\07_verify_central_ruler_symmetry\\metadata\\IMG_0511_symmetry.json",
-    "candidate_snapshot_dir": "data\\processed\\07_verify_central_ruler_symmetry\\candidate_snapshots\\IMG_0511"
+    "candidate_snapshot_dir": "data\\processed\\07_verify_central_ruler_symmetry\\candidate_snapshots\\IMG_0511",
+    "evaluation_mask_path": "data\\processed\\07_verify_central_ruler_symmetry\\evaluation_mask\\IMG_0511.png",
+    "evaluation_edge_path": "data\\processed\\07_verify_central_ruler_symmetry\\evaluation_edges\\IMG_0511.png"
   },
   {
     "image_name": "IMG_0512.png",
@@ -151,6 +171,8 @@
     "overlay_path": "data\\processed\\07_verify_central_ruler_symmetry\\overlay\\IMG_0512.png",
     "comparison_path": "data\\processed\\07_verify_central_ruler_symmetry\\comparison\\IMG_0512.png",
     "metadata_path": "data\\processed\\07_verify_central_ruler_symmetry\\metadata\\IMG_0512_symmetry.json",
-    "candidate_snapshot_dir": "data\\processed\\07_verify_central_ruler_symmetry\\candidate_snapshots\\IMG_0512"
+    "candidate_snapshot_dir": "data\\processed\\07_verify_central_ruler_symmetry\\candidate_snapshots\\IMG_0512",
+    "evaluation_mask_path": "data\\processed\\07_verify_central_ruler_symmetry\\evaluation_mask\\IMG_0512.png",
+    "evaluation_edge_path": "data\\processed\\07_verify_central_ruler_symmetry\\evaluation_edges\\IMG_0512.png"
   }
 ]

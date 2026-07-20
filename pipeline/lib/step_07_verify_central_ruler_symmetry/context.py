@@ -41,7 +41,6 @@ DEFAULT_STEP_CONFIG = {
     "inherit_step_06_output": True,
     "input_subdir": "06_search_central_ruler",
     "input_metadata_subdir": "metadata",
-    "visual_background_subdir": "01_illumination_normalized",
     "output_subdir": "07_verify_central_ruler_symmetry",
     "cleanup_output_on_start": True,
     "candidate_limit": 10,
@@ -210,6 +209,8 @@ def get_step_dirs() -> dict[str, Path]:
         "output_metadata_dir": output_dir / "metadata",
         "output_candidate_snapshot_dir": output_dir / "candidate_snapshots",
         "output_rectified_dir": output_dir / "rectified",
+        "output_evaluation_mask_dir": output_dir / "evaluation_mask",
+        "output_evaluation_edge_dir": output_dir / "evaluation_edges",
     }
 
 

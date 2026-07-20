@@ -6,7 +6,7 @@
   "step_06_metadata_file": "data\\processed\\06_search_central_ruler\\metadata\\IMG_0502_central_ruler.json",
   "edge_file": "data\\processed\\03_edges\\cleaned\\IMG_0502.png",
   "roi_mask_file": "data\\processed\\04_boot_roi_from_edges\\mask\\IMG_0502.png",
-  "visual_file": "data\\processed\\01_illumination_normalized\\IMG_0502.png",
+  "visual_file": "data\\processed\\03_edges\\cleaned\\IMG_0502.png",
   "segment_count": 12,
   "candidate_count": 10,
   "vertical_range": {
@@ -9975,7 +9975,6 @@
     "inherit_step_06_output": true,
     "input_subdir": "06_search_central_ruler",
     "input_metadata_subdir": "metadata",
-    "visual_background_subdir": "01_illumination_normalized",
     "output_subdir": "07_verify_central_ruler_symmetry",
     "cleanup_output_on_start": true,
     "candidate_limit": 10,
@@ -10093,17 +10092,21 @@
           }
         }
       }
-    ]
+    ],
+    "visual_background_subdir": "01_illumination_normalized"
   },
   "timings_sec": {
-    "verification": 0.9622955999802798,
-    "rendering": 3.383200599986594,
-    "analysis_total": 5.487463500001468,
-    "process_total": 13.412928499979898
+    "verification": 0.6266064000083134,
+    "rendering": 3.012377100007143,
+    "analysis_total": 4.544641899992712,
+    "process_total": 6.568685899954289
   },
   "output_overlay_file": "data\\processed\\07_verify_central_ruler_symmetry\\overlay\\IMG_0502.png",
   "output_comparison_file": "data\\processed\\07_verify_central_ruler_symmetry\\comparison\\IMG_0502.png",
   "output_rectified_file": "data\\processed\\07_verify_central_ruler_symmetry\\rectified\\IMG_0502.png",
+  "output_evaluation_mask_file": "data\\processed\\07_verify_central_ruler_symmetry\\evaluation_mask\\IMG_0502.png",
+  "output_evaluation_edge_file": "data\\processed\\07_verify_central_ruler_symmetry\\evaluation_edges\\IMG_0502.png",
+  "evaluation_mask_role": "candidate_independent_support_mask_not_shape_ground_truth",
   "candidate_snapshot_files": [
     "data\\processed\\07_verify_central_ruler_symmetry\\candidate_snapshots\\IMG_0502\\C02_IMG_0502.png",
     "data\\processed\\07_verify_central_ruler_symmetry\\candidate_snapshots\\IMG_0502\\C01_IMG_0502.png",
