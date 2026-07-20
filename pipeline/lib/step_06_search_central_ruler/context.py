@@ -143,8 +143,48 @@ DEFAULT_STEP_CONFIG = {
         "max_angle_difference_deg": 2.0,
         "min_vertical_advance_px": 8.0,
         "max_path_fit_rmse_px": 12.0,
-        "beam_width": 6,
-        "top_path_count": 40,
+        "beam_width": 10,
+        "top_path_count": 80,
+        # A coherent ruler can be interrupted by buckles, logos, or low-contrast
+        # plastic. Permit a very small number of long, strongly collinear
+        # bridges instead of forcing the path to live inside one dense cluster.
+        "allow_long_bridges": True,
+        "max_long_bridges": 1,
+        "max_long_bridge_gap_ratio": 0.38,
+        "max_long_bridge_gap_px": 720.0,
+        "long_bridge_base_max_dx_px": 13.0,
+        "long_bridge_dx_per_gap_ratio": 0.012,
+        "long_bridge_max_dx_px": 27.0,
+        "long_bridge_max_angle_difference_deg": 4.5,
+        "long_bridge_quality_scale": 0.52,
+        "min_bridge_distance_alignment": 0.12,
+        "min_bridge_angle_alignment": 0.10,
+    },
+    "structural_hypotheses": {
+        "enabled": True,
+        # Grid search is still the primary search. These hypotheses are a
+        # targeted recall fallback for sparse images such as 505 and 508.
+        "line_seed_enabled": True,
+        "pair_seed_enabled": True,
+        "roi_prior_seed_enabled": True,
+        "min_line_seed_length_px": 70.0,
+        "max_line_seed_count": 48,
+        "vertical_zone_count": 6,
+        "max_fragments_per_zone": 12,
+        "max_pair_source_fragments": 64,
+        "max_pair_seed_count": 320,
+        "min_pair_vertical_separation_ratio": 0.18,
+        "max_pair_vertical_separation_ratio": 0.96,
+        "max_pair_fragment_angle_error_deg": 6.5,
+        "pair_seed_min_axis_inside_ratio": 0.72,
+        "pair_seed_band_half_width_px": 21.0,
+        "pair_seed_max_angle_error_deg": 7.0,
+        "center_x_offset_ratios": [-0.10, -0.06, -0.03, 0.0, 0.03, 0.06, 0.10],
+        "center_angle_offsets_deg": [-4.0, -2.0, -1.0, 0.0, 1.0, 2.0, 4.0],
+        "max_structural_detailed_candidates": 96,
+        "reserved_pair_hypotheses": 12,
+        "reserved_line_hypotheses": 4,
+        "reserved_roi_prior_hypotheses": 6,
     },
     "fragment_nms": {
         "enabled": True,
@@ -159,6 +199,16 @@ DEFAULT_STEP_CONFIG = {
         "min_support_below_y_ref_ratio": 0.04,
         "max_fit_rmse_px": 14.0,
         "min_axis_inside_roi_ratio": 0.88,
+        # Alternative acceptance path for a sparse but genuinely top-to-bottom
+        # ruler. This avoids rejecting a correct axis only because buckles
+        # create one large empty interval.
+        "allow_sparse_spanning_support": True,
+        "sparse_min_chain_span_ratio": 0.52,
+        "sparse_min_unique_vertical_coverage": 0.10,
+        "sparse_min_support_above_y_ref_ratio": 0.025,
+        "sparse_min_support_below_y_ref_ratio": 0.025,
+        "sparse_max_fit_rmse_px": 10.0,
+        "sparse_min_support_fragments": 2,
     },
     "normalized_scoring": {
         "geometry": {
@@ -220,6 +270,19 @@ DEFAULT_STEP_CONFIG = {
         "max_mean_axis_distance_px": 5.0,
         "max_angle_difference_deg": 0.25,
         "max_saved_candidates": 10,
+        "progressive_fill_enabled": True,
+        "progressive_distance_scales": [1.0, 0.65, 0.35, 0.0],
+    },
+    "candidate_portfolio": {
+        "enabled": True,
+        "top_score_slots": 4,
+        "reserve_best_per_source": True,
+        "source_order": ["fragment_pair", "fragment_axis", "roi_prior"],
+        "min_score_ratio": 0.55,
+        "max_score_drop": 0.24,
+        "novelty_target_width_ratio": 0.08,
+        "score_weight": 0.55,
+        "novelty_weight": 0.45,
     },
     "scoring": {
         "fragment_support_weight": 0.34,

@@ -5,7 +5,7 @@ import math
 import numpy as np
 
 from . import context
-from .context import cfg
+from .context import cfg, clip01
 from .geometry import line_from_angle_and_anchor, line_x_at_y
 from .calculations import (
     build_line_selection_cache,
@@ -22,7 +22,9 @@ from .sorting import (
     annotate_candidate_selection,
     candidate_ranking_key,
     deduplicate_candidates,
+    mean_axis_distance_px,
     select_diverse_candidates,
+    select_ranked_candidate_portfolio,
     sort_candidates,
     unique_candidates_by_axis,
 )
@@ -246,6 +248,477 @@ def make_candidate_grid(
         for x_ref in x_ref_values
     ]
 
+
+
+def _axis_inside_roi_ratio(axis: dict, roi_profile: dict, sample_count: int = 11) -> float:
+    rows = np.linspace(
+        float(roi_profile["trimmed_y_min"]),
+        float(roi_profile["trimmed_y_max"]),
+        max(3, int(sample_count)),
+        dtype=np.float64,
+    )
+    row_indices = np.clip(
+        np.round(rows).astype(np.int32), 0, int(roi_profile["height"]) - 1
+    )
+    x_values = float(axis["a"]) * rows + float(axis["b"])
+    left = roi_profile["left_bounds"][row_indices].astype(np.float64)
+    right = roi_profile["right_bounds"][row_indices].astype(np.float64)
+    return float(np.mean((x_values >= left) & (x_values <= right)))
+
+
+def _structural_line_quality(line: dict, roi_profile: dict) -> float:
+    y_mid = int(
+        np.clip(
+            round(float(line["y_mid"])),
+            0,
+            int(roi_profile["height"]) - 1,
+        )
+    )
+    row_width = max(1.0, float(roi_profile["row_widths"][y_mid]))
+    center_x = float(line_x_at_y(roi_profile["center_fit"], float(y_mid)))
+    normalized_center_error = abs(float(line["x_mid"]) - center_x) / max(
+        1.0, 0.5 * row_width
+    )
+    center_score = clip01(1.0 - normalized_center_error / 0.72)
+    mask_support = clip01(float(line.get("mask_support_ratio", 1.0)))
+    inside_strength = clip01(
+        float(line.get("points_inside_mask", line.get("length", 0.0)))
+        / max(1.0, float(line.get("length", 1.0)))
+    )
+    return float(
+        max(1.0, float(line["length"]))
+        * (0.55 + 0.25 * mask_support + 0.20 * inside_strength)
+        * (0.30 + 0.70 * center_score)
+    )
+
+
+def _make_seed_axis(
+    a_value: float,
+    b_value: float,
+    y_ref: float,
+    source: str,
+    seed_score: float,
+    **metadata,
+) -> dict:
+    tilt_deg = float(math.degrees(math.atan(float(a_value))))
+    return {
+        "a": float(a_value),
+        "b": float(b_value),
+        "tilt_deg": tilt_deg,
+        "x_ref": float(a_value * y_ref + b_value),
+        "y_ref": float(y_ref),
+        "hypothesis_source": source,
+        "structural_seed_score": float(seed_score),
+        **metadata,
+    }
+
+
+def build_structural_seed_axes(lines: list[dict], roi_profile: dict) -> list[dict]:
+    """Create high-recall axes from real fragments and a weak ROI prior.
+
+    The normal grid remains authoritative. These seeds specifically recover axes
+    that lie between two strong local maxima or that are represented only by
+    separated upper/lower fragments.
+    """
+    if not bool(cfg("structural_hypotheses", "enabled", default=True)):
+        return []
+    if not lines:
+        return []
+
+    y_min = float(roi_profile["trimmed_y_min"])
+    y_max = float(roi_profile["trimmed_y_max"])
+    y_ref = float(roi_profile["y_ref"])
+    roi_span = max(1.0, y_max - y_min)
+    max_tilt_deg = float(cfg("search", "max_candidate_tilt_deg", default=12.0))
+    min_inside_ratio = float(
+        cfg(
+            "structural_hypotheses",
+            "pair_seed_min_axis_inside_ratio",
+            default=0.72,
+        )
+    )
+
+    quality_by_index = {
+        int(line["line_index"]): _structural_line_quality(line, roi_profile)
+        for line in lines
+    }
+    max_quality = max(quality_by_index.values(), default=1.0)
+    seed_axes: list[dict] = []
+
+    if bool(
+        cfg("structural_hypotheses", "line_seed_enabled", default=True)
+    ):
+        min_length = float(
+            cfg(
+                "structural_hypotheses",
+                "min_line_seed_length_px",
+                default=70.0,
+            )
+        )
+        max_count = max(
+            0,
+            int(
+                cfg(
+                    "structural_hypotheses",
+                    "max_line_seed_count",
+                    default=48,
+                )
+            ),
+        )
+        line_candidates = [
+            line
+            for line in lines
+            if float(line["length"]) >= min_length
+            and abs(float(line["signed_tilt_deg"])) <= max_tilt_deg
+        ]
+        line_candidates.sort(
+            key=lambda line: quality_by_index[int(line["line_index"])],
+            reverse=True,
+        )
+        for line in line_candidates[:max_count]:
+            axis = _make_seed_axis(
+                float(line["a"]),
+                float(line["b"]),
+                y_ref,
+                "fragment_axis",
+                quality_by_index[int(line["line_index"])] / max_quality,
+                seed_line_indices=[int(line["line_index"])],
+            )
+            if _axis_inside_roi_ratio(axis, roi_profile) >= min_inside_ratio:
+                seed_axes.append(axis)
+
+    if bool(
+        cfg("structural_hypotheses", "pair_seed_enabled", default=True)
+    ):
+        zone_count = max(
+            2,
+            int(
+                cfg(
+                    "structural_hypotheses", "vertical_zone_count", default=6
+                )
+            ),
+        )
+        per_zone = max(
+            1,
+            int(
+                cfg(
+                    "structural_hypotheses",
+                    "max_fragments_per_zone",
+                    default=12,
+                )
+            ),
+        )
+        max_sources = max(
+            2,
+            int(
+                cfg(
+                    "structural_hypotheses",
+                    "max_pair_source_fragments",
+                    default=64,
+                )
+            ),
+        )
+        zones: list[list[dict]] = [[] for _ in range(zone_count)]
+        for line in lines:
+            ratio = clip01((float(line["y_mid"]) - y_min) / roi_span)
+            zone_index = min(zone_count - 1, int(ratio * zone_count))
+            zones[zone_index].append(line)
+        source_lines: list[dict] = []
+        for zone in zones:
+            zone.sort(
+                key=lambda line: quality_by_index[int(line["line_index"])],
+                reverse=True,
+            )
+            source_lines.extend(zone[:per_zone])
+        source_lines = list(
+            {
+                int(line["line_index"]): line for line in source_lines
+            }.values()
+        )
+        source_lines.sort(
+            key=lambda line: quality_by_index[int(line["line_index"])],
+            reverse=True,
+        )
+        source_lines = source_lines[:max_sources]
+        source_lines.sort(key=lambda line: float(line["y_mid"]))
+
+        min_separation = roi_span * float(
+            cfg(
+                "structural_hypotheses",
+                "min_pair_vertical_separation_ratio",
+                default=0.18,
+            )
+        )
+        max_separation = roi_span * float(
+            cfg(
+                "structural_hypotheses",
+                "max_pair_vertical_separation_ratio",
+                default=0.96,
+            )
+        )
+        max_fragment_angle_error = float(
+            cfg(
+                "structural_hypotheses",
+                "max_pair_fragment_angle_error_deg",
+                default=6.5,
+            )
+        )
+        pair_candidates: list[dict] = []
+        for upper_index, upper in enumerate(source_lines):
+            y_upper = float(upper["y_mid"])
+            x_upper = float(line_x_at_y(upper, y_upper))
+            for lower in source_lines[upper_index + 1 :]:
+                y_lower = float(lower["y_mid"])
+                separation = y_lower - y_upper
+                if separation < min_separation:
+                    continue
+                if separation > max_separation:
+                    break
+                x_lower = float(line_x_at_y(lower, y_lower))
+                a_value = (x_lower - x_upper) / max(1e-6, separation)
+                tilt_deg = float(math.degrees(math.atan(a_value)))
+                if abs(tilt_deg) > max_tilt_deg:
+                    continue
+                if max(
+                    abs(float(upper["signed_tilt_deg"]) - tilt_deg),
+                    abs(float(lower["signed_tilt_deg"]) - tilt_deg),
+                ) > max_fragment_angle_error:
+                    continue
+                b_value = x_upper - a_value * y_upper
+                separation_ratio = separation / roi_span
+                line_quality = math.sqrt(
+                    quality_by_index[int(upper["line_index"])]
+                    * quality_by_index[int(lower["line_index"])]
+                ) / max_quality
+                angle_alignment = 1.0 - clip01(
+                    (
+                        abs(float(upper["signed_tilt_deg"]) - tilt_deg)
+                        + abs(float(lower["signed_tilt_deg"]) - tilt_deg)
+                    )
+                    / max(1e-6, 2.0 * max_fragment_angle_error)
+                )
+                axis = _make_seed_axis(
+                    a_value,
+                    b_value,
+                    y_ref,
+                    "fragment_pair",
+                    0.46 * clip01(separation_ratio)
+                    + 0.34 * clip01(line_quality)
+                    + 0.20 * clip01(angle_alignment),
+                    seed_line_indices=[
+                        int(upper["line_index"]),
+                        int(lower["line_index"]),
+                    ],
+                    seed_vertical_separation_ratio=float(separation_ratio),
+                )
+                inside_ratio = _axis_inside_roi_ratio(axis, roi_profile)
+                if inside_ratio < min_inside_ratio:
+                    continue
+                axis["structural_seed_inside_roi_ratio"] = inside_ratio
+                pair_candidates.append(axis)
+
+        pair_candidates.sort(
+            key=lambda axis: float(axis["structural_seed_score"]),
+            reverse=True,
+        )
+        pair_limit = max(
+            0,
+            int(
+                cfg(
+                    "structural_hypotheses",
+                    "max_pair_seed_count",
+                    default=320,
+                )
+            ),
+        )
+        seed_axes.extend(pair_candidates[:pair_limit])
+
+    if bool(
+        cfg("structural_hypotheses", "roi_prior_seed_enabled", default=True)
+    ):
+        center_fit = roi_profile["center_fit"]
+        center_x_ref = float(line_x_at_y(center_fit, y_ref))
+        center_tilt = float(center_fit.get("tilt_deg", 0.0))
+        reference_width = max(1.0, float(roi_profile["reference_width_px"]))
+        x_offset_ratios = cfg(
+            "structural_hypotheses",
+            "center_x_offset_ratios",
+            default=[-0.10, -0.06, -0.03, 0.0, 0.03, 0.06, 0.10],
+        )
+        angle_offsets = cfg(
+            "structural_hypotheses",
+            "center_angle_offsets_deg",
+            default=[-4.0, -2.0, -1.0, 0.0, 1.0, 2.0, 4.0],
+        )
+        for x_ratio in x_offset_ratios:
+            for angle_offset in angle_offsets:
+                tilt_deg = center_tilt + float(angle_offset)
+                if abs(tilt_deg) > max_tilt_deg:
+                    continue
+                x_ref = center_x_ref + float(x_ratio) * reference_width
+                axis = line_from_angle_and_anchor(tilt_deg, x_ref, y_ref)
+                axis.update(
+                    {
+                        "hypothesis_source": "roi_prior",
+                        "structural_seed_score": float(
+                            1.0
+                            - 0.55 * min(1.0, abs(float(x_ratio)) / 0.10)
+                            - 0.45 * min(1.0, abs(float(angle_offset)) / 4.0)
+                        ),
+                        "roi_prior_x_offset_ratio": float(x_ratio),
+                        "roi_prior_angle_offset_deg": float(angle_offset),
+                    }
+                )
+                if _axis_inside_roi_ratio(axis, roi_profile) >= min_inside_ratio:
+                    seed_axes.append(axis)
+
+    # First remove exact axes, then keep a source-balanced subset. Pair seeds
+    # receive the largest share because they are the important sparse fallback.
+    unique_axes = unique_candidates_by_axis(seed_axes)
+    max_total = max(
+        1,
+        int(
+            cfg(
+                "structural_hypotheses",
+                "max_structural_detailed_candidates",
+                default=96,
+            )
+        ),
+    )
+    source_limits = {
+        "fragment_pair": max(1, int(round(max_total * 0.58))),
+        "fragment_axis": max(1, int(round(max_total * 0.17))),
+        "roi_prior": max(1, int(round(max_total * 0.25))),
+    }
+    selected: list[dict] = []
+    for source in ("fragment_pair", "fragment_axis", "roi_prior"):
+        group = [
+            axis for axis in unique_axes if axis.get("hypothesis_source") == source
+        ]
+        group.sort(
+            key=lambda axis: float(axis.get("structural_seed_score", 0.0)),
+            reverse=True,
+        )
+        selected.extend(group[: source_limits[source]])
+    selected.sort(
+        key=lambda axis: float(axis.get("structural_seed_score", 0.0)),
+        reverse=True,
+    )
+    return selected[:max_total]
+
+
+def select_hypothesis_portfolio(
+    candidates: list[dict],
+    roi_profile: dict,
+    max_candidates: int,
+) -> list[dict]:
+    """Reserve some final-fit slots for structurally different seed families."""
+    if max_candidates <= 0 or not candidates:
+        return []
+    ordered = sort_candidates(
+        unique_candidates_by_axis(candidates), sort_key=candidate_ranking_key
+    )
+    source_quotas = {
+        "fragment_pair": max(
+            0,
+            int(
+                cfg(
+                    "structural_hypotheses",
+                    "reserved_pair_hypotheses",
+                    default=12,
+                )
+            ),
+        ),
+        "fragment_axis": max(
+            0,
+            int(
+                cfg(
+                    "structural_hypotheses",
+                    "reserved_line_hypotheses",
+                    default=4,
+                )
+            ),
+        ),
+        "roi_prior": max(
+            0,
+            int(
+                cfg(
+                    "structural_hypotheses",
+                    "reserved_roi_prior_hypotheses",
+                    default=6,
+                )
+            ),
+        ),
+    }
+    # Never let reservations consume every slot; the original grid keeps at
+    # least one third of the portfolio.
+    max_reserved = max(0, max_candidates - max(4, max_candidates // 3))
+    quota_sum = sum(source_quotas.values())
+    if quota_sum > max_reserved and quota_sum > 0:
+        scale = max_reserved / quota_sum
+        source_quotas = {
+            source: int(math.floor(value * scale))
+            for source, value in source_quotas.items()
+        }
+
+    probe_rows = np.linspace(
+        float(roi_profile["trimmed_y_min"]),
+        float(roi_profile["trimmed_y_max"]),
+        8,
+        dtype=np.float64,
+    )
+    duplicate_distance = float(
+        cfg(
+            "candidate_deduplication",
+            "max_mean_axis_distance_px",
+            default=5.0,
+        )
+    )
+    duplicate_angle = float(
+        cfg(
+            "candidate_deduplication",
+            "max_angle_difference_deg",
+            default=0.25,
+        )
+    )
+    selected: list[dict] = []
+
+    def append_if_distinct(candidate: dict) -> bool:
+        for existing in selected:
+            if (
+                abs(
+                    float(candidate["tilt_deg"])
+                    - float(existing["tilt_deg"])
+                )
+                <= duplicate_angle
+                and mean_axis_distance_px(
+                    candidate, existing, probe_rows=probe_rows
+                )
+                <= duplicate_distance
+            ):
+                return False
+        selected.append(candidate)
+        return True
+
+    for source in ("fragment_pair", "fragment_axis", "roi_prior"):
+        quota = source_quotas[source]
+        if quota <= 0:
+            continue
+        added = 0
+        for candidate in ordered:
+            if candidate.get("hypothesis_source", "grid") != source:
+                continue
+            if append_if_distinct(candidate):
+                added += 1
+            if added >= quota or len(selected) >= max_candidates:
+                break
+
+    for candidate in ordered:
+        if len(selected) >= max_candidates:
+            break
+        append_if_distinct(candidate)
+
+    return sort_candidates(selected, sort_key=candidate_ranking_key)
 
 def refresh_support_for_axis(
     lines: list[dict],
@@ -496,9 +969,12 @@ def search_best_candidate(
         ),
     )
 
-    detailed_hypotheses = [
-        evaluate_candidate(
-            axis=screened,
+    detailed_hypotheses: list[dict] = []
+    for screened in fine_screened:
+        screened_axis = dict(screened)
+        screened_axis.setdefault("hypothesis_source", "grid")
+        candidate = evaluate_candidate(
+            axis=screened_axis,
             lines=lines,
             roi_profile=roi_profile,
             total_available_length_px=total_available_length_px,
@@ -511,8 +987,58 @@ def search_best_candidate(
             selection_cache=support_selection_cache,
             line_selection_cache=line_selection_cache,
         )
-        for screened in fine_screened
-    ]
+        candidate["hypothesis_source"] = "grid"
+        detailed_hypotheses.append(candidate)
+
+    structural_axes = build_structural_seed_axes(lines, roi_profile)
+    structural_band_half_width_px = float(
+        cfg(
+            "structural_hypotheses",
+            "pair_seed_band_half_width_px",
+            default=21.0,
+        )
+    )
+    structural_max_angle_error_deg = float(
+        cfg(
+            "structural_hypotheses",
+            "pair_seed_max_angle_error_deg",
+            default=7.0,
+        )
+    )
+    for structural_axis in structural_axes:
+        candidate = evaluate_candidate(
+            axis=structural_axis,
+            lines=lines,
+            roi_profile=roi_profile,
+            total_available_length_px=total_available_length_px,
+            band_half_width_px=structural_band_half_width_px,
+            max_angle_error_deg=structural_max_angle_error_deg,
+            allow_adjustment=False,
+            support_cache=support_analysis_cache,
+            row_metrics_cache=row_metrics_cache,
+            candidate_summary_cache=candidate_summary_cache,
+            selection_cache=support_selection_cache,
+            line_selection_cache=line_selection_cache,
+        )
+        for metadata_key in (
+            "hypothesis_source",
+            "structural_seed_score",
+            "seed_line_indices",
+            "seed_vertical_separation_ratio",
+            "structural_seed_inside_roi_ratio",
+            "roi_prior_x_offset_ratio",
+            "roi_prior_angle_offset_deg",
+        ):
+            if metadata_key in structural_axis:
+                candidate[metadata_key] = structural_axis[metadata_key]
+        candidate["hypothesis_band_half_width_px"] = float(
+            structural_band_half_width_px
+        )
+        candidate["hypothesis_max_angle_error_deg"] = float(
+            structural_max_angle_error_deg
+        )
+        detailed_hypotheses.append(candidate)
+
     detailed_hypotheses = sort_candidates(
         unique_candidates_by_axis(detailed_hypotheses),
         sort_key=candidate_ranking_key,
@@ -523,11 +1049,10 @@ def search_best_candidate(
     top_hypothesis_count = max(
         1, int(cfg("best_fit_selection", "top_hypothesis_count", default=24))
     )
-    evaluated_hypotheses = deduplicate_candidates(
+    evaluated_hypotheses = select_hypothesis_portfolio(
         detailed_hypotheses,
         roi_profile,
         max_candidates=top_hypothesis_count,
-        sort_key=candidate_ranking_key,
     )
 
     final_candidate_pool: list[dict] = []
@@ -581,7 +1106,7 @@ def search_best_candidate(
         if save_all
         else max(1, int(cfg("candidate_deduplication", "max_saved_candidates", default=10)))
     )
-    ranked_candidates = deduplicate_candidates(
+    ranked_candidates = select_ranked_candidate_portfolio(
         rankable_candidates,
         roi_profile,
         max_candidates=max_saved,
@@ -601,5 +1126,7 @@ def search_best_candidate(
         "best_candidate": best_candidate,
         "raw_search_line_count": int(raw_line_count),
         "nms_line_count": int(len(lines)),
+        "structural_seed_count": int(len(structural_axes)),
+        "evaluated_hypothesis_count": int(len(evaluated_hypotheses)),
         "nms_removed_line_count": int(raw_line_count - len(lines)),
     }

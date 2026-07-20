@@ -444,33 +444,144 @@ def summarize_candidate_from_support(
         (largest_gap_ratio - soft_gap_ratio) / max(1e-6, hard_gap_ratio - soft_gap_ratio)
     )
 
+    dense_support_passed = (
+        chain_span_ratio
+        >= float(cfg("candidate_validation", "min_chain_span_ratio", default=0.22))
+        and unique_vertical_coverage
+        >= float(
+            cfg(
+                "candidate_validation",
+                "min_unique_vertical_coverage",
+                default=0.18,
+            )
+        )
+        and above_ratio
+        >= float(
+            cfg(
+                "candidate_validation",
+                "min_support_above_y_ref_ratio",
+                default=0.04,
+            )
+        )
+        and below_ratio
+        >= float(
+            cfg(
+                "candidate_validation",
+                "min_support_below_y_ref_ratio",
+                default=0.04,
+            )
+        )
+        and fit_rmse_px
+        <= float(cfg("candidate_validation", "max_fit_rmse_px", default=14.0))
+        and len(chain_support)
+        >= int(cfg("search", "min_support_fragments", default=2))
+    )
+
+    sparse_support_enabled = bool(
+        cfg(
+            "candidate_validation",
+            "allow_sparse_spanning_support",
+            default=True,
+        )
+    )
+    sparse_support_passed = bool(
+        sparse_support_enabled
+        and chain_span_ratio
+        >= float(
+            cfg(
+                "candidate_validation",
+                "sparse_min_chain_span_ratio",
+                default=0.52,
+            )
+        )
+        and unique_vertical_coverage
+        >= float(
+            cfg(
+                "candidate_validation",
+                "sparse_min_unique_vertical_coverage",
+                default=0.10,
+            )
+        )
+        and above_ratio
+        >= float(
+            cfg(
+                "candidate_validation",
+                "sparse_min_support_above_y_ref_ratio",
+                default=0.025,
+            )
+        )
+        and below_ratio
+        >= float(
+            cfg(
+                "candidate_validation",
+                "sparse_min_support_below_y_ref_ratio",
+                default=0.025,
+            )
+        )
+        and fit_rmse_px
+        <= float(
+            cfg(
+                "candidate_validation",
+                "sparse_max_fit_rmse_px",
+                default=10.0,
+            )
+        )
+        and len(chain_support)
+        >= int(
+            cfg(
+                "candidate_validation",
+                "sparse_min_support_fragments",
+                default=2,
+            )
+        )
+    )
+    support_distribution_passed = bool(
+        dense_support_passed or sparse_support_passed
+    )
+
     rejection_reasons: list[str] = []
-    if chain_span_ratio < float(
-        cfg("candidate_validation", "min_chain_span_ratio", default=0.22)
-    ):
-        rejection_reasons.append("chain_span_too_short")
-    if unique_vertical_coverage < float(
-        cfg("candidate_validation", "min_unique_vertical_coverage", default=0.18)
-    ):
-        rejection_reasons.append("vertical_coverage_too_low")
-    if above_ratio < float(
-        cfg("candidate_validation", "min_support_above_y_ref_ratio", default=0.04)
-    ):
-        rejection_reasons.append("insufficient_support_above_y_ref")
-    if below_ratio < float(
-        cfg("candidate_validation", "min_support_below_y_ref_ratio", default=0.04)
-    ):
-        rejection_reasons.append("insufficient_support_below_y_ref")
-    if fit_rmse_px > float(
-        cfg("candidate_validation", "max_fit_rmse_px", default=14.0)
-    ):
-        rejection_reasons.append("fit_rmse_too_high")
+    if not support_distribution_passed:
+        if chain_span_ratio < float(
+            cfg("candidate_validation", "min_chain_span_ratio", default=0.22)
+        ):
+            rejection_reasons.append("chain_span_too_short")
+        if unique_vertical_coverage < float(
+            cfg(
+                "candidate_validation",
+                "min_unique_vertical_coverage",
+                default=0.18,
+            )
+        ):
+            rejection_reasons.append("vertical_coverage_too_low")
+        if above_ratio < float(
+            cfg(
+                "candidate_validation",
+                "min_support_above_y_ref_ratio",
+                default=0.04,
+            )
+        ):
+            rejection_reasons.append("insufficient_support_above_y_ref")
+        if below_ratio < float(
+            cfg(
+                "candidate_validation",
+                "min_support_below_y_ref_ratio",
+                default=0.04,
+            )
+        ):
+            rejection_reasons.append("insufficient_support_below_y_ref")
+        if fit_rmse_px > float(
+            cfg("candidate_validation", "max_fit_rmse_px", default=14.0)
+        ):
+            rejection_reasons.append("fit_rmse_too_high")
+        if len(chain_support) < int(
+            cfg("search", "min_support_fragments", default=2)
+        ):
+            rejection_reasons.append("too_few_support_fragments")
+
     if float(row_metrics["axis_inside_roi_ratio"]) < float(
         cfg("candidate_validation", "min_axis_inside_roi_ratio", default=0.88)
     ):
         rejection_reasons.append("axis_outside_roi")
-    if len(chain_support) < int(cfg("search", "min_support_fragments", default=2)):
-        rejection_reasons.append("too_few_support_fragments")
 
     result = {
         **axis,
@@ -551,6 +662,16 @@ def summarize_candidate_from_support(
         "support_above_y_ref_ratio": float(above_ratio),
         "support_below_y_ref_ratio": float(below_ratio),
         "above_below_balance_score": float(above_below_balance_score),
+        "dense_support_validation_passed": bool(dense_support_passed),
+        "sparse_support_validation_passed": bool(sparse_support_passed),
+        "support_distribution_passed": bool(support_distribution_passed),
+        "support_distribution_mode": (
+            "dense"
+            if dense_support_passed
+            else "sparse_spanning"
+            if sparse_support_passed
+            else "rejected"
+        ),
         "mirror_left_to_right_score": 0.5,
         "mirror_right_to_left_score": 0.5,
         "mirror_symmetry_score": 0.5,

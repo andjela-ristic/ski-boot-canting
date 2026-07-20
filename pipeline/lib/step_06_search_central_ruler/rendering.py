@@ -198,7 +198,9 @@ def draw_candidate_snapshot(
     put_text(
         overlay,
         (
-            f"src={candidate.get('source_hypothesis_label', '?')} "
+            f"src={candidate.get('source_hypothesis_label', '?')}/"
+            f"{candidate.get('hypothesis_source', 'grid')} "
+            f"mode={candidate.get('support_distribution_mode', '?')} "
             f"cov={candidate.get('unique_vertical_coverage', 0.0):.2f} "
             f"span={candidate.get('chain_span_ratio', 0.0):.2f} "
             f"cont={candidate.get('chain_continuity_ratio', 0.0):.2f}"
@@ -246,6 +248,18 @@ def sanitize_candidate(candidate: dict | None) -> dict | None:
         "mirror_is_reliable": bool(candidate.get("mirror_is_reliable", False)),
         "validation_passed": bool(candidate.get("validation_passed", True)),
         "rejection_reasons": list(candidate.get("rejection_reasons", [])),
+        "dense_support_validation_passed": bool(
+            candidate.get("dense_support_validation_passed", False)
+        ),
+        "sparse_support_validation_passed": bool(
+            candidate.get("sparse_support_validation_passed", False)
+        ),
+        "support_distribution_passed": bool(
+            candidate.get("support_distribution_passed", False)
+        ),
+        "support_distribution_mode": candidate.get(
+            "support_distribution_mode", "unknown"
+        ),
         "chain_span_ratio": float(candidate.get("chain_span_ratio", 0.0)),
         "unique_vertical_coverage": float(candidate.get("unique_vertical_coverage", 0.0)),
         "fit_rmse_px": float(candidate.get("fit_rmse_px", 0.0)),
@@ -328,6 +342,29 @@ def sanitize_candidate(candidate: dict | None) -> dict | None:
         "selection_score": float(candidate.get("selection_score", candidate["score"])),
         "source_hypothesis_rank": candidate.get("source_hypothesis_rank"),
         "source_hypothesis_label": candidate.get("source_hypothesis_label"),
+        "hypothesis_source": candidate.get("hypothesis_source", "grid"),
+        "structural_seed_score": float(
+            candidate.get("structural_seed_score", 0.0)
+        ),
+        "seed_line_indices": [
+            int(value) for value in candidate.get("seed_line_indices", [])
+        ],
+        "seed_vertical_separation_ratio": float(
+            candidate.get("seed_vertical_separation_ratio", 0.0)
+        ),
+        "structural_seed_inside_roi_ratio": float(
+            candidate.get("structural_seed_inside_roi_ratio", 0.0)
+        ),
+        "roi_prior_x_offset_ratio": candidate.get("roi_prior_x_offset_ratio"),
+        "roi_prior_angle_offset_deg": candidate.get(
+            "roi_prior_angle_offset_deg"
+        ),
+        "hypothesis_band_half_width_px": candidate.get(
+            "hypothesis_band_half_width_px"
+        ),
+        "hypothesis_max_angle_error_deg": candidate.get(
+            "hypothesis_max_angle_error_deg"
+        ),
         "search_stage": candidate.get("search_stage"),
         "hypothesis_x_ref": candidate.get("hypothesis_x_ref"),
         "hypothesis_tilt_deg": candidate.get("hypothesis_tilt_deg"),

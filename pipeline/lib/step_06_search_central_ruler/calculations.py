@@ -880,10 +880,13 @@ def support_component_key(component: list[dict], roi_profile: dict) -> tuple[flo
     )
 
 def prune_support_to_dominant_chain(selected_support: list[dict], roi_profile: dict) -> list[dict]:
-    """Select the strongest top-to-bottom path in a directed acyclic fragment graph.
+    """Select one coherent directed ruler path.
 
-    Unlike the previous connected-component implementation, a single bridge cannot
-    merge two parallel structures into one component. Each result is one coherent path.
+    The ordinary edges keep the strict local-chain behaviour introduced by the
+    first refactor. A path may additionally use a very small number of long,
+    strongly collinear bridges. This matters when a real center ruler is hidden
+    by a buckle, logo, or an untextured plastic region: the correct evidence is
+    then split into two sparse groups and must not lose to one dense local group.
     """
     if not bool(cfg("support_chain", "enabled", default=True)):
         return list(selected_support)
@@ -897,11 +900,11 @@ def prune_support_to_dominant_chain(selected_support: list[dict], roi_profile: d
             float(item.get("effective_line", item["line"])["x_mid"]),
         ),
     )
-    roi_span = max(
-        1.0,
-        float(roi_profile["trimmed_y_max"]) - float(roi_profile["trimmed_y_min"]),
-    )
-    max_gap_px = min(
+    roi_y_min = float(roi_profile["trimmed_y_min"])
+    roi_y_max = float(roi_profile["trimmed_y_max"])
+    roi_span = max(1.0, roi_y_max - roi_y_min)
+
+    normal_max_gap_px = min(
         float(cfg("support_chain", "max_connection_gap_px", default=220.0)),
         roi_span * float(cfg("support_chain", "max_gap_ratio", default=0.10)),
     )
@@ -917,100 +920,275 @@ def prune_support_to_dominant_chain(selected_support: list[dict], roi_profile: d
     max_path_fit_rmse_px = float(
         cfg("support_chain", "max_path_fit_rmse_px", default=12.0)
     )
-    beam_width = max(1, int(cfg("support_chain", "beam_width", default=6)))
-    top_path_count = max(1, int(cfg("support_chain", "top_path_count", default=40)))
+    beam_width = max(1, int(cfg("support_chain", "beam_width", default=10)))
+    top_path_count = max(1, int(cfg("support_chain", "top_path_count", default=80)))
 
-    def edge_metrics(upper: dict, lower: dict) -> tuple[bool, float]:
+    allow_long_bridges = bool(
+        cfg("support_chain", "allow_long_bridges", default=True)
+    )
+    max_long_bridges = max(
+        0, int(cfg("support_chain", "max_long_bridges", default=1))
+    )
+    long_bridge_max_gap_px = min(
+        float(cfg("support_chain", "max_long_bridge_gap_px", default=720.0)),
+        roi_span
+        * float(cfg("support_chain", "max_long_bridge_gap_ratio", default=0.38)),
+    )
+    long_bridge_base_max_dx_px = float(
+        cfg("support_chain", "long_bridge_base_max_dx_px", default=13.0)
+    )
+    long_bridge_dx_per_gap_ratio = float(
+        cfg("support_chain", "long_bridge_dx_per_gap_ratio", default=0.012)
+    )
+    long_bridge_absolute_max_dx_px = float(
+        cfg("support_chain", "long_bridge_max_dx_px", default=27.0)
+    )
+    long_bridge_max_angle_difference_deg = float(
+        cfg(
+            "support_chain",
+            "long_bridge_max_angle_difference_deg",
+            default=4.5,
+        )
+    )
+    long_bridge_quality_scale = clip01(
+        float(cfg("support_chain", "long_bridge_quality_scale", default=0.52))
+    )
+    min_bridge_distance_alignment = float(
+        cfg("support_chain", "min_bridge_distance_alignment", default=0.12)
+    )
+    min_bridge_angle_alignment = float(
+        cfg("support_chain", "min_bridge_angle_alignment", default=0.10)
+    )
+
+    def edge_metrics(upper: dict, lower: dict) -> tuple[bool, float, bool]:
         upper_line = upper.get("effective_line", upper["line"])
         lower_line = lower.get("effective_line", lower["line"])
         vertical_advance = float(lower_line["y_max"]) - float(upper_line["y_max"])
         if vertical_advance < min_vertical_advance_px:
-            return False, 0.0
-        gap, dx, angle_delta = compute_support_connection(upper, lower)
-        if gap > max_gap_px:
-            return False, 0.0
-        adaptive_max_dx = min(absolute_max_dx_px, base_max_dx_px + dx_per_gap_ratio * gap)
-        if dx > adaptive_max_dx or angle_delta > max_angle_difference_deg:
-            return False, 0.0
-        edge_quality = (
-            1.0
-            - 0.45 * (dx / max(1e-6, adaptive_max_dx)) ** 2
-            - 0.35 * (gap / max(1e-6, max_gap_px)) ** 2
-            - 0.20 * (angle_delta / max(1e-6, max_angle_difference_deg)) ** 2
-        )
-        return True, float(max(0.0, edge_quality))
+            return False, 0.0, False
 
-    def fast_path_score(path_indices: tuple[int, ...], edge_quality_sum: float) -> float:
+        gap, dx, angle_delta = compute_support_connection(upper, lower)
+        if gap <= normal_max_gap_px:
+            adaptive_max_dx = min(
+                absolute_max_dx_px,
+                base_max_dx_px + dx_per_gap_ratio * gap,
+            )
+            if dx > adaptive_max_dx or angle_delta > max_angle_difference_deg:
+                return False, 0.0, False
+            edge_quality = (
+                1.0
+                - 0.45 * (dx / max(1e-6, adaptive_max_dx)) ** 2
+                - 0.35 * (gap / max(1e-6, normal_max_gap_px)) ** 2
+                - 0.20
+                * (angle_delta / max(1e-6, max_angle_difference_deg)) ** 2
+            )
+            return True, float(max(0.0, edge_quality)), False
+
+        if (
+            not allow_long_bridges
+            or max_long_bridges <= 0
+            or gap > long_bridge_max_gap_px
+        ):
+            return False, 0.0, False
+        if min(
+            float(upper.get("distance_alignment", 0.0)),
+            float(lower.get("distance_alignment", 0.0)),
+        ) < min_bridge_distance_alignment:
+            return False, 0.0, False
+        if min(
+            float(upper.get("angle_alignment", 0.0)),
+            float(lower.get("angle_alignment", 0.0)),
+        ) < min_bridge_angle_alignment:
+            return False, 0.0, False
+
+        bridge_max_dx = min(
+            long_bridge_absolute_max_dx_px,
+            long_bridge_base_max_dx_px + long_bridge_dx_per_gap_ratio * gap,
+        )
+        if (
+            dx > bridge_max_dx
+            or angle_delta > long_bridge_max_angle_difference_deg
+        ):
+            return False, 0.0, False
+
+        gap_fraction = (gap - normal_max_gap_px) / max(
+            1e-6, long_bridge_max_gap_px - normal_max_gap_px
+        )
+        edge_quality = long_bridge_quality_scale * (
+            1.0
+            - 0.45 * (dx / max(1e-6, bridge_max_dx)) ** 2
+            - 0.30 * clip01(gap_fraction) ** 2
+            - 0.25
+            * (
+                angle_delta
+                / max(1e-6, long_bridge_max_angle_difference_deg)
+            )
+            ** 2
+        )
+        return True, float(max(0.0, edge_quality)), True
+
+    def path_metrics(path_indices: tuple[int, ...]) -> dict[str, float]:
         support = [items[index] for index in path_indices]
         merged = merge_support_intervals(support)
+        if not merged:
+            return {
+                "unique_ratio": 0.0,
+                "span_ratio": 0.0,
+                "continuity": 0.0,
+                "alignment": 0.0,
+                "extent_ratio": 0.0,
+            }
         unique_length = interval_union_length(merged)
-        span = max(1.0, merged[-1][1] - merged[0][0]) if merged else 1.0
-        continuity = unique_length / span
-        alignment_weights = [max(1.0, float(item["line"]["length"])) for item in support]
+        span = max(1.0, merged[-1][1] - merged[0][0])
+        alignment_weights = [
+            max(1.0, float(item["line"]["length"])) for item in support
+        ]
         alignment_values = [
-            0.7 * float(item["distance_alignment"]) + 0.3 * float(item["angle_alignment"])
+            0.7 * float(item.get("distance_alignment", 0.0))
+            + 0.3 * float(item.get("angle_alignment", 0.0))
             for item in support
         ]
         alignment = float(np.average(alignment_values, weights=alignment_weights))
+        top_gap = max(0.0, merged[0][0] - roi_y_min)
+        bottom_gap = max(0.0, roi_y_max - merged[-1][1])
+        extent_ratio = clip01(1.0 - (top_gap + bottom_gap) / roi_span)
+        return {
+            "unique_ratio": clip01(unique_length / roi_span),
+            "span_ratio": clip01(span / roi_span),
+            "continuity": clip01(unique_length / span),
+            "alignment": clip01(alignment),
+            "extent_ratio": float(extent_ratio),
+        }
+
+    def fast_path_score(
+        path_indices: tuple[int, ...],
+        edge_quality_sum: float,
+        bridge_count: int,
+    ) -> float:
+        metrics = path_metrics(path_indices)
         edge_mean = edge_quality_sum / max(1, len(path_indices) - 1)
         return float(
-            0.50 * clip01(unique_length / roi_span)
-            + 0.20 * clip01(continuity)
-            + 0.15 * clip01(alignment)
-            + 0.15 * clip01(edge_mean if len(path_indices) > 1 else alignment)
+            0.25 * metrics["unique_ratio"]
+            + 0.27 * metrics["span_ratio"]
+            + 0.12 * metrics["continuity"]
+            + 0.16 * metrics["alignment"]
+            + 0.10 * metrics["extent_ratio"]
+            + 0.10
+            * clip01(edge_mean if len(path_indices) > 1 else metrics["alignment"])
+            - 0.025 * bridge_count
         )
 
-    # Each state is (fast_score, path_indices, cumulative_edge_quality).
-    states_by_end: list[list[tuple[float, tuple[int, ...], float]]] = []
-    all_states: list[tuple[float, tuple[int, ...], float]] = []
+    # State: (fast score, path indices, cumulative edge quality, bridge count).
+    states_by_end: list[list[tuple[float, tuple[int, ...], float, int]]] = []
+    all_states: list[tuple[float, tuple[int, ...], float, int]] = []
     for lower_index, lower_item in enumerate(items):
-        states: list[tuple[float, tuple[int, ...], float]] = [
-            (fast_path_score((lower_index,), 0.0), (lower_index,), 0.0)
+        states: list[tuple[float, tuple[int, ...], float, int]] = [
+            (fast_path_score((lower_index,), 0.0, 0), (lower_index,), 0.0, 0)
         ]
         for upper_index in range(lower_index):
-            compatible, edge_quality = edge_metrics(items[upper_index], lower_item)
+            compatible, edge_quality, is_long_bridge = edge_metrics(
+                items[upper_index], lower_item
+            )
             if not compatible:
                 continue
-            for _, path_indices, edge_quality_sum in states_by_end[upper_index]:
+            for _, path_indices, edge_quality_sum, bridge_count in states_by_end[
+                upper_index
+            ]:
+                new_bridge_count = bridge_count + int(is_long_bridge)
+                if new_bridge_count > max_long_bridges:
+                    continue
                 extended = (*path_indices, lower_index)
                 new_edge_quality_sum = edge_quality_sum + edge_quality
                 states.append(
                     (
-                        fast_path_score(extended, new_edge_quality_sum),
+                        fast_path_score(
+                            extended, new_edge_quality_sum, new_bridge_count
+                        ),
                         extended,
                         new_edge_quality_sum,
+                        new_bridge_count,
                     )
                 )
+
         states.sort(key=lambda state: state[0], reverse=True)
-        # Deduplicate identical paths and keep a small beam for this endpoint.
-        unique_states: list[tuple[float, tuple[int, ...], float]] = []
+        deduplicated_states: list[tuple[float, tuple[int, ...], float, int]] = []
         seen_paths: set[tuple[int, ...]] = set()
         for state in states:
             if state[1] in seen_paths:
                 continue
             seen_paths.add(state[1])
-            unique_states.append(state)
+            deduplicated_states.append(state)
+
+        # A pure score beam can delete the only long-span state before it
+        # reaches the bottom of the ROI. Reserve one slot for the widest path
+        # and one for the best bridged path whenever possible.
+        unique_states: list[tuple[float, tuple[int, ...], float, int]] = []
+        reserved_states: list[tuple[float, tuple[int, ...], float, int]] = []
+        if deduplicated_states:
+            reserved_states.append(
+                max(
+                    deduplicated_states,
+                    key=lambda state: (
+                        path_metrics(state[1])["span_ratio"],
+                        state[0],
+                    ),
+                )
+            )
+        bridged_states = [state for state in deduplicated_states if state[3] > 0]
+        if bridged_states:
+            reserved_states.append(max(bridged_states, key=lambda state: state[0]))
+
+        primary_limit = max(1, beam_width - len(reserved_states))
+        for state in deduplicated_states[:primary_limit]:
+            if state not in unique_states:
+                unique_states.append(state)
+        for state in reserved_states:
+            if state not in unique_states:
+                unique_states.append(state)
+        for state in deduplicated_states:
             if len(unique_states) >= beam_width:
                 break
+            if state not in unique_states:
+                unique_states.append(state)
+        unique_states = unique_states[:beam_width]
+
         states_by_end.append(unique_states)
         all_states.extend(unique_states)
 
     all_states.sort(key=lambda state: state[0], reverse=True)
+    final_states = list(all_states[:top_path_count])
+    if all_states:
+        widest_states = sorted(
+            all_states,
+            key=lambda state: (path_metrics(state[1])["span_ratio"], state[0]),
+            reverse=True,
+        )[: max(2, min(12, top_path_count // 4))]
+        for state in widest_states:
+            if state not in final_states:
+                final_states.append(state)
+        bridged_states = [state for state in all_states if state[3] > 0]
+        bridged_states.sort(key=lambda state: state[0], reverse=True)
+        for state in bridged_states[: max(2, min(12, top_path_count // 4))]:
+            if state not in final_states:
+                final_states.append(state)
+
     best_support: list[dict] | None = None
     best_key: tuple[float, ...] | None = None
-    for fast_score, path_indices, _ in all_states[:top_path_count]:
+    for fast_score, path_indices, _, bridge_count in final_states:
         support = [items[index] for index in path_indices]
         chain_metrics = compute_chain_metrics(support)
-        merged = merge_support_intervals(support)
-        unique_length = float(chain_metrics["total_merged_length_px"])
-        chain_span = max(1.0, merged[-1][1] - merged[0][0]) if merged else 1.0
+        metrics = path_metrics(path_indices)
 
         y_values: list[float] = []
         x_values: list[float] = []
         weights: list[float] = []
         for item in support:
             line = item.get("effective_line", item["line"])
-            for y_value in (float(line["y_min"]), float(line["y_mid"]), float(line["y_max"])):
+            for y_value in (
+                float(line["y_min"]),
+                float(line["y_mid"]),
+                float(line["y_max"]),
+            ):
                 y_values.append(y_value)
                 x_values.append(float(line_x_at_y(line, y_value)))
                 weights.append(max(1.0, float(line["length"])) / 3.0)
@@ -1021,29 +1199,47 @@ def prune_support_to_dominant_chain(selected_support: list[dict], roi_profile: d
             residuals = np.asarray(x_values) - (
                 float(fit[0]) * np.asarray(y_values) + float(fit[1])
             )
-            fit_rmse = float(np.sqrt(np.average(residuals**2, weights=np.asarray(weights))))
-        fit_score = math.exp(-fit_rmse / max(1.0, max_path_fit_rmse_px)) if math.isfinite(fit_rmse) else 0.0
+            fit_rmse = float(
+                np.sqrt(np.average(residuals**2, weights=np.asarray(weights)))
+            )
+        fit_score = (
+            math.exp(-fit_rmse / max(1.0, max_path_fit_rmse_px))
+            if math.isfinite(fit_rmse)
+            else 0.0
+        )
         quality = (
-            0.38 * clip01(unique_length / roi_span)
-            + 0.24 * clip01(unique_length / chain_span)
-            + 0.18 * clip01(fast_score)
-            + 0.20 * clip01(fit_score)
+            0.22 * metrics["unique_ratio"]
+            + 0.27 * metrics["span_ratio"]
+            + 0.12 * metrics["continuity"]
+            + 0.13 * metrics["alignment"]
+            + 0.08 * metrics["extent_ratio"]
+            + 0.18 * clip01(fit_score)
+            + 0.08 * clip01(fast_score)
+            - 0.025 * bridge_count
         )
         if fit_rmse > max_path_fit_rmse_px * 1.8:
             quality -= 0.25
         key = (
             float(quality),
-            float(unique_length / roi_span),
+            float(metrics["span_ratio"]),
+            float(metrics["unique_ratio"]),
+            float(metrics["extent_ratio"]),
             float(chain_metrics["chain_continuity_ratio"]),
             -float(fit_rmse),
             -float(chain_metrics["chain_total_gap_px"]),
+            -float(bridge_count),
         )
         if best_key is None or key > best_key:
             best_key = key
             best_support = support
 
     if not best_support:
-        return [max(items, key=lambda item: float(item.get("support_strength", 0.0)))]
+        return [
+            max(
+                items,
+                key=lambda item: float(item.get("support_strength", 0.0)),
+            )
+        ]
     return sorted(best_support, key=lambda item: float(item["line"]["y_mid"]))
 
 def merge_support_items(primary_support: list[dict], secondary_support: list[dict]) -> list[dict]:

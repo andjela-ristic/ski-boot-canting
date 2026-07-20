@@ -98,7 +98,12 @@ def build_analysis(json_path: Path) -> dict:
         "rejected_fragment_count": len(rejected_lines),
         "coarse_candidate_count": len(search_result["coarse_candidates"]),
         "fine_candidate_count": len(fine_candidates),
+        "structural_seed_count": int(search_result.get("structural_seed_count", 0)),
+        "evaluated_hypothesis_count": int(
+            search_result.get("evaluated_hypothesis_count", 0)
+        ),
         "ranked_candidate_count": ranked_candidate_total_count,
+        "saved_candidate_count": min(saved_candidate_count, len(ranked_candidates)),
         "best_candidate": sanitize_candidate(best_candidate),
         "top_candidates": [
             sanitize_candidate(candidate)
