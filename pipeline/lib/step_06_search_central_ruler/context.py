@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import hashlib
 import heapq
 import json
 import math
+import os
 import shutil
 import time
 import warnings
@@ -438,6 +440,47 @@ def save_json(path: Path, data: dict | list) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8") as handle:
         json.dump(data, handle, indent=2, ensure_ascii=False)
+
+
+def sha256_bytes(payload: bytes) -> str:
+    return hashlib.sha256(payload).hexdigest()
+
+
+def canonical_json_bytes(data: object) -> bytes:
+    return json.dumps(data, sort_keys=True, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+
+
+def sha256_json(data: object) -> str:
+    return sha256_bytes(canonical_json_bytes(data))
+
+
+def sha256_file(path: Path | None) -> str | None:
+    if path is None or not path.exists() or not path.is_file():
+        return None
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        while True:
+            chunk = handle.read(1024 * 1024)
+            if not chunk:
+                break
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def relative_project_path(path: Path | None) -> str | None:
+    if path is None:
+        return None
+    try:
+        return str(path.relative_to(PROJECT_ROOT))
+    except ValueError:
+        return str(path)
+
+
+def get_pipeline_config_path() -> Path:
+    config_path = os.environ.get("PIPELINE_CONFIG")
+    if config_path:
+        return resolve_project_path(config_path) or (PROJECT_ROOT / config_path)
+    return PROJECT_ROOT / "config" / "pipeline_config.yaml"
 
 def safe_linear_polyfit(
     y_values: np.ndarray | list[float],

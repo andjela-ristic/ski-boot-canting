@@ -6,10 +6,11 @@ import numpy as np
 
 from . import context
 from .context import cfg, clip01
-from .geometry import line_from_angle_and_anchor, line_x_at_y
+from .geometry import line_from_angle_and_anchor, line_geometry_key, line_x_at_y
 from .calculations import (
     build_line_selection_cache,
     fit_axis_from_support,
+    fragment_quality_sort_key,
     select_support_fragments,
     suppress_redundant_fragments,
 )
@@ -372,7 +373,10 @@ def build_structural_seed_axes(lines: list[dict], roi_profile: dict) -> list[dic
             and abs(float(line["signed_tilt_deg"])) <= max_tilt_deg
         ]
         line_candidates.sort(
-            key=lambda line: quality_by_index[int(line["line_index"])],
+            key=lambda line: (
+                quality_by_index[int(line["line_index"])],
+                *fragment_quality_sort_key(line),
+            ),
             reverse=True,
         )
         for line in line_candidates[:max_count]:
@@ -426,7 +430,10 @@ def build_structural_seed_axes(lines: list[dict], roi_profile: dict) -> list[dic
         source_lines: list[dict] = []
         for zone in zones:
             zone.sort(
-                key=lambda line: quality_by_index[int(line["line_index"])],
+                key=lambda line: (
+                    quality_by_index[int(line["line_index"])],
+                    *fragment_quality_sort_key(line),
+                ),
                 reverse=True,
             )
             source_lines.extend(zone[:per_zone])
@@ -436,11 +443,14 @@ def build_structural_seed_axes(lines: list[dict], roi_profile: dict) -> list[dic
             }.values()
         )
         source_lines.sort(
-            key=lambda line: quality_by_index[int(line["line_index"])],
+            key=lambda line: (
+                quality_by_index[int(line["line_index"])],
+                *fragment_quality_sort_key(line),
+            ),
             reverse=True,
         )
         source_lines = source_lines[:max_sources]
-        source_lines.sort(key=lambda line: float(line["y_mid"]))
+        source_lines.sort(key=line_geometry_key)
 
         min_separation = roi_span * float(
             cfg(
@@ -518,7 +528,10 @@ def build_structural_seed_axes(lines: list[dict], roi_profile: dict) -> list[dic
                 pair_candidates.append(axis)
 
         pair_candidates.sort(
-            key=lambda axis: float(axis["structural_seed_score"]),
+            key=lambda axis: (
+                float(axis["structural_seed_score"]),
+                *candidate_ranking_key(axis),
+            ),
             reverse=True,
         )
         pair_limit = max(
@@ -596,12 +609,18 @@ def build_structural_seed_axes(lines: list[dict], roi_profile: dict) -> list[dic
             axis for axis in unique_axes if axis.get("hypothesis_source") == source
         ]
         group.sort(
-            key=lambda axis: float(axis.get("structural_seed_score", 0.0)),
+            key=lambda axis: (
+                float(axis.get("structural_seed_score", 0.0)),
+                *candidate_ranking_key(axis),
+            ),
             reverse=True,
         )
         selected.extend(group[: source_limits[source]])
     selected.sort(
-        key=lambda axis: float(axis.get("structural_seed_score", 0.0)),
+        key=lambda axis: (
+            float(axis.get("structural_seed_score", 0.0)),
+            *candidate_ranking_key(axis),
+        ),
         reverse=True,
     )
     return selected[:max_total]

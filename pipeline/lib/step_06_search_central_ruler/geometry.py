@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+from copy import deepcopy
 
 import numpy as np
 
@@ -13,6 +14,56 @@ Line = dict[str, float | int | bool]
 
 def line_x_at_y(model: dict[str, float], y_value: float) -> float:
     return float(model["a"] * float(y_value) + model["b"])
+
+
+def ordered_line_endpoints(line: dict[str, float | int | bool]) -> tuple[float, float, float, float]:
+    first = (float(line["y1"]), float(line["x1"]))
+    second = (float(line["y2"]), float(line["x2"]))
+    if first <= second:
+        return (
+            float(line["x1"]),
+            float(line["y1"]),
+            float(line["x2"]),
+            float(line["y2"]),
+        )
+    return (
+        float(line["x2"]),
+        float(line["y2"]),
+        float(line["x1"]),
+        float(line["y1"]),
+    )
+
+
+def line_geometry_key(line: dict[str, float | int | bool]) -> tuple[float, ...]:
+    start_x, start_y, end_x, end_y = ordered_line_endpoints(line)
+    return (
+        float(line["y_mid"]),
+        float(line["x_mid"]),
+        float(line["signed_tilt_deg"]),
+        float(line["length"]),
+        start_y,
+        start_x,
+        end_y,
+        end_x,
+        float(line.get("mask_support_ratio", 0.0)),
+        float(line.get("points_inside_mask", 0.0)),
+        float(line.get("sampled_points", 0.0)),
+        float(line.get("vertical_deviation_degrees", 0.0)),
+        float(line.get("angle_degrees", 0.0)),
+        float(line.get("a", 0.0)),
+        float(line.get("b", 0.0)),
+        float(line.get("source_line_index", line.get("line_index", 0))),
+    )
+
+
+def canonicalize_lines(lines: list[dict[str, float | int | bool]]) -> list[dict[str, float | int | bool]]:
+    ordered = sorted(lines, key=line_geometry_key)
+    canonical_lines: list[dict[str, float | int | bool]] = []
+    for canonical_index, line in enumerate(ordered, start=1):
+        canonical_line = deepcopy(line)
+        canonical_line["canonical_index"] = int(canonical_index)
+        canonical_lines.append(canonical_line)
+    return canonical_lines
 
 def make_axis_signature(axis: dict[str, float]) -> tuple[float, float]:
     return (
@@ -141,6 +192,7 @@ def normalize_line(raw_line: dict, fallback_index: int) -> dict[str, float | int
 
     return {
         "line_index": int(raw_line.get("line_index", raw_line.get("id", fallback_index))),
+        "source_line_index": int(raw_line.get("line_index", raw_line.get("id", fallback_index))),
         "x1": x1,
         "y1": y1,
         "x2": x2,

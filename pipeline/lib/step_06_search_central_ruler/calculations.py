@@ -6,12 +6,34 @@ import numpy as np
 
 from .context import cfg, clip01, safe_linear_polyfit
 from .geometry import (
+    line_geometry_key,
     line_x_at_y,
     make_axis_signature,
     segment_axis_distance_px,
     segment_axis_intersection_y,
     segment_axis_min_distance_px,
 )
+
+
+def support_item_sort_key(item: dict) -> tuple[float, ...]:
+    line = item.get("effective_line", item["line"])
+    return (
+        float(item.get("support_strength", 0.0)),
+        float(item.get("distance_alignment", 0.0)),
+        float(item.get("angle_alignment", 0.0)),
+        float(item.get("line", {}).get("length", 0.0)),
+        *line_geometry_key(line),
+    )
+
+
+def fragment_quality_sort_key(line: dict) -> tuple[float, ...]:
+    return (
+        float(line.get("length", 0.0)),
+        float(line.get("mask_support_ratio", 0.0)),
+        float(line.get("points_inside_mask", 0.0)),
+        -float(line.get("vertical_deviation_degrees", abs(line.get("signed_tilt_deg", 0.0)))),
+        *line_geometry_key(line),
+    )
 
 
 def calculate_angle(line: dict[str, float | int | bool] | tuple[tuple[float, float], tuple[float, float]]) -> float:
@@ -362,7 +384,7 @@ def select_support_fragments(
 
         if not support_adjustment_enabled:
             selected = list(base_items_by_index.values())
-            selected.sort(key=lambda item: (item["support_strength"], item["line"]["length"]), reverse=True)
+            selected.sort(key=support_item_sort_key, reverse=True)
             if selection_cache is not None and cache_key is not None:
                 selection_cache[cache_key] = tuple(selected)
             return selected
@@ -401,7 +423,7 @@ def select_support_fragments(
             if best_item is not None:
                 selected.append(best_item)
 
-        selected.sort(key=lambda item: (item["support_strength"], item["line"]["length"]), reverse=True)
+        selected.sort(key=support_item_sort_key, reverse=True)
         if selection_cache is not None and cache_key is not None:
             selection_cache[cache_key] = tuple(selected)
         return selected
@@ -418,7 +440,7 @@ def select_support_fragments(
         if item is not None:
             selected.append(item)
 
-    selected.sort(key=lambda item: (item["support_strength"], item["line"]["length"]), reverse=True)
+    selected.sort(key=support_item_sort_key, reverse=True)
     if selection_cache is not None and cache_key is not None:
         selection_cache[cache_key] = tuple(selected)
     return selected
@@ -505,15 +527,8 @@ def suppress_redundant_fragments(lines: list[dict]) -> list[dict]:
         cfg("fragment_nms", "min_y_overlap_ratio", default=0.55)
     )
 
-    def quality(line: dict) -> tuple[float, ...]:
-        return (
-            float(line.get("length", 0.0)),
-            float(line.get("mask_support_ratio", 0.0)),
-            float(line.get("points_inside_mask", 0.0)),
-        )
-
     kept: list[dict] = []
-    for raw_line in sorted(lines, key=quality, reverse=True):
+    for raw_line in sorted(lines, key=fragment_quality_sort_key, reverse=True):
         line = dict(raw_line)
         line.setdefault("source_line_indices", [int(line["line_index"])])
         duplicate_of: dict | None = None
@@ -539,7 +554,7 @@ def suppress_redundant_fragments(lines: list[dict]) -> list[dict]:
         duplicate_of["source_line_indices"] = sorted(merged_sources)
         duplicate_of["nms_duplicate_count"] = max(0, len(merged_sources) - 1)
 
-    kept.sort(key=lambda line: (float(line["y_mid"]), float(line["x_mid"])))
+    kept.sort(key=line_geometry_key)
     return kept
 
 def is_adjusted_support_item(item: dict) -> bool:
@@ -903,6 +918,13 @@ def prune_support_to_dominant_chain(selected_support: list[dict], roi_profile: d
     roi_y_min = float(roi_profile["trimmed_y_min"])
     roi_y_max = float(roi_profile["trimmed_y_max"])
     roi_span = max(1.0, roi_y_max - roi_y_min)
+    total_selected_length_px = float(
+        sum(float(item["line"]["length"]) for item in selected_support)
+    )
+    total_selected_support_strength = float(
+        sum(float(item.get("support_strength", 0.0)) for item in selected_support)
+    )
+    total_selected_fragment_count = max(1, len(selected_support))
 
     normal_max_gap_px = min(
         float(cfg("support_chain", "max_connection_gap_px", default=220.0)),
@@ -1037,6 +1059,9 @@ def prune_support_to_dominant_chain(selected_support: list[dict], roi_profile: d
                 "continuity": 0.0,
                 "alignment": 0.0,
                 "extent_ratio": 0.0,
+                "support_length_ratio": 0.0,
+                "support_strength_ratio": 0.0,
+                "fragment_ratio": 0.0,
             }
         unique_length = interval_union_length(merged)
         span = max(1.0, merged[-1][1] - merged[0][0])
@@ -1049,6 +1074,10 @@ def prune_support_to_dominant_chain(selected_support: list[dict], roi_profile: d
             for item in support
         ]
         alignment = float(np.average(alignment_values, weights=alignment_weights))
+        support_length = float(sum(float(item["line"]["length"]) for item in support))
+        support_strength = float(
+            sum(float(item.get("support_strength", 0.0)) for item in support)
+        )
         top_gap = max(0.0, merged[0][0] - roi_y_min)
         bottom_gap = max(0.0, roi_y_max - merged[-1][1])
         extent_ratio = clip01(1.0 - (top_gap + bottom_gap) / roi_span)
@@ -1058,6 +1087,15 @@ def prune_support_to_dominant_chain(selected_support: list[dict], roi_profile: d
             "continuity": clip01(unique_length / span),
             "alignment": clip01(alignment),
             "extent_ratio": float(extent_ratio),
+            "support_length_ratio": clip01(
+                support_length / max(1.0, total_selected_length_px)
+            ),
+            "support_strength_ratio": clip01(
+                support_strength / max(1.0, total_selected_support_strength)
+            ),
+            "fragment_ratio": clip01(
+                len(support) / max(1, total_selected_fragment_count)
+            ),
         }
 
     def fast_path_score(
@@ -1068,14 +1106,17 @@ def prune_support_to_dominant_chain(selected_support: list[dict], roi_profile: d
         metrics = path_metrics(path_indices)
         edge_mean = edge_quality_sum / max(1, len(path_indices) - 1)
         return float(
-            0.25 * metrics["unique_ratio"]
-            + 0.27 * metrics["span_ratio"]
-            + 0.12 * metrics["continuity"]
-            + 0.16 * metrics["alignment"]
-            + 0.10 * metrics["extent_ratio"]
-            + 0.10
+            0.20 * metrics["unique_ratio"]
+            + 0.22 * metrics["span_ratio"]
+            + 0.08 * metrics["continuity"]
+            + 0.12 * metrics["alignment"]
+            + 0.08 * metrics["extent_ratio"]
+            + 0.13 * metrics["support_length_ratio"]
+            + 0.17 * metrics["support_strength_ratio"]
+            + 0.05 * metrics["fragment_ratio"]
+            + 0.08
             * clip01(edge_mean if len(path_indices) > 1 else metrics["alignment"])
-            - 0.025 * bridge_count
+            - 0.03 * bridge_count
         )
 
     # State: (fast score, path indices, cumulative edge quality, bridge count).
@@ -1110,7 +1151,17 @@ def prune_support_to_dominant_chain(selected_support: list[dict], roi_profile: d
                     )
                 )
 
-        states.sort(key=lambda state: state[0], reverse=True)
+        states.sort(
+            key=lambda state: (
+                state[0],
+                path_metrics(state[1])["span_ratio"],
+                len(state[1]),
+                state[2],
+                -state[3],
+                state[1],
+            ),
+            reverse=True,
+        )
         deduplicated_states: list[tuple[float, tuple[int, ...], float, int]] = []
         seen_paths: set[tuple[int, ...]] = set()
         for state in states:
@@ -1131,12 +1182,28 @@ def prune_support_to_dominant_chain(selected_support: list[dict], roi_profile: d
                     key=lambda state: (
                         path_metrics(state[1])["span_ratio"],
                         state[0],
+                        len(state[1]),
+                        state[2],
+                        -state[3],
+                        state[1],
                     ),
                 )
             )
         bridged_states = [state for state in deduplicated_states if state[3] > 0]
         if bridged_states:
-            reserved_states.append(max(bridged_states, key=lambda state: state[0]))
+            reserved_states.append(
+                max(
+                    bridged_states,
+                    key=lambda state: (
+                        state[0],
+                        path_metrics(state[1])["span_ratio"],
+                        len(state[1]),
+                        state[2],
+                        -state[3],
+                        state[1],
+                    ),
+                )
+            )
 
         primary_limit = max(1, beam_width - len(reserved_states))
         for state in deduplicated_states[:primary_limit]:
@@ -1155,19 +1222,46 @@ def prune_support_to_dominant_chain(selected_support: list[dict], roi_profile: d
         states_by_end.append(unique_states)
         all_states.extend(unique_states)
 
-    all_states.sort(key=lambda state: state[0], reverse=True)
+    all_states.sort(
+        key=lambda state: (
+            state[0],
+            path_metrics(state[1])["span_ratio"],
+            len(state[1]),
+            state[2],
+            -state[3],
+            state[1],
+        ),
+        reverse=True,
+    )
     final_states = list(all_states[:top_path_count])
     if all_states:
         widest_states = sorted(
             all_states,
-            key=lambda state: (path_metrics(state[1])["span_ratio"], state[0]),
+            key=lambda state: (
+                path_metrics(state[1])["span_ratio"],
+                state[0],
+                len(state[1]),
+                state[2],
+                -state[3],
+                state[1],
+            ),
             reverse=True,
         )[: max(2, min(12, top_path_count // 4))]
         for state in widest_states:
             if state not in final_states:
                 final_states.append(state)
         bridged_states = [state for state in all_states if state[3] > 0]
-        bridged_states.sort(key=lambda state: state[0], reverse=True)
+        bridged_states.sort(
+            key=lambda state: (
+                state[0],
+                path_metrics(state[1])["span_ratio"],
+                len(state[1]),
+                state[2],
+                -state[3],
+                state[1],
+            ),
+            reverse=True,
+        )
         for state in bridged_states[: max(2, min(12, top_path_count // 4))]:
             if state not in final_states:
                 final_states.append(state)
@@ -1208,21 +1302,27 @@ def prune_support_to_dominant_chain(selected_support: list[dict], roi_profile: d
             else 0.0
         )
         quality = (
-            0.22 * metrics["unique_ratio"]
-            + 0.27 * metrics["span_ratio"]
-            + 0.12 * metrics["continuity"]
-            + 0.13 * metrics["alignment"]
+            0.18 * metrics["unique_ratio"]
+            + 0.20 * metrics["span_ratio"]
+            + 0.07 * metrics["continuity"]
+            + 0.10 * metrics["alignment"]
             + 0.08 * metrics["extent_ratio"]
-            + 0.18 * clip01(fit_score)
-            + 0.08 * clip01(fast_score)
-            - 0.025 * bridge_count
+            + 0.14 * metrics["support_length_ratio"]
+            + 0.19 * metrics["support_strength_ratio"]
+            + 0.06 * metrics["fragment_ratio"]
+            + 0.12 * clip01(fit_score)
+            + 0.06 * clip01(fast_score)
+            - 0.03 * bridge_count
         )
         if fit_rmse > max_path_fit_rmse_px * 1.8:
             quality -= 0.25
         key = (
             float(quality),
+            float(metrics["support_strength_ratio"]),
+            float(metrics["support_length_ratio"]),
             float(metrics["span_ratio"]),
             float(metrics["unique_ratio"]),
+            float(metrics["fragment_ratio"]),
             float(metrics["extent_ratio"]),
             float(chain_metrics["chain_continuity_ratio"]),
             -float(fit_rmse),
@@ -1237,10 +1337,10 @@ def prune_support_to_dominant_chain(selected_support: list[dict], roi_profile: d
         return [
             max(
                 items,
-                key=lambda item: float(item.get("support_strength", 0.0)),
+                key=support_item_sort_key,
             )
         ]
-    return sorted(best_support, key=lambda item: float(item["line"]["y_mid"]))
+    return sorted(best_support, key=lambda item: line_geometry_key(item["line"]))
 
 def merge_support_items(primary_support: list[dict], secondary_support: list[dict]) -> list[dict]:
     merged_by_line_index: dict[int, dict] = {}
@@ -1251,7 +1351,7 @@ def merge_support_items(primary_support: list[dict], secondary_support: list[dic
             merged_by_line_index[line_index] = item
 
     merged = list(merged_by_line_index.values())
-    merged.sort(key=lambda item: (item["support_strength"], item["line"]["length"]), reverse=True)
+    merged.sort(key=support_item_sort_key, reverse=True)
     return merged
 
 def rescue_endpoint_support_fragments(
@@ -1336,8 +1436,8 @@ def rescue_endpoint_support_fragments(
     if not top_candidates and not bottom_candidates:
         return selected_support
 
-    top_candidates.sort(key=lambda item: (item["support_strength"], item["line"]["length"]), reverse=True)
-    bottom_candidates.sort(key=lambda item: (item["support_strength"], item["line"]["length"]), reverse=True)
+    top_candidates.sort(key=support_item_sort_key, reverse=True)
+    bottom_candidates.sort(key=support_item_sort_key, reverse=True)
     rescued_support = [
         *top_candidates[:max(0, max_fragments_per_side)],
         *bottom_candidates[:max(0, max_fragments_per_side)],
@@ -1476,7 +1576,7 @@ def extend_support_upward(
         if current_anchor_y <= float(roi_profile["trimmed_y_min"]) + min_vertical_advance_px:
             break
 
-    extended_support.sort(key=lambda item: (item["support_strength"], item["line"]["length"]), reverse=True)
+    extended_support.sort(key=support_item_sort_key, reverse=True)
     return extended_support
 
 def summarize_support_adjustments(selected_support: list[dict]) -> dict[str, float | int]:

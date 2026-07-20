@@ -25,6 +25,29 @@ def mean_axis_distance_px(
     delta_b = float(candidate_a["b"]) - float(candidate_b["b"])
     return float(np.mean(np.abs(delta_a * probe_rows + delta_b)))
 
+
+def candidate_sort_tiebreaker(candidate: dict) -> tuple[float, ...]:
+    selected_indices = tuple(int(value) for value in candidate.get("selected_fragment_line_indices", []))
+    return (
+        float(candidate.get("x_ref", 0.0)),
+        -abs(float(candidate.get("tilt_deg", 0.0))),
+        -float(candidate.get("tilt_deg", 0.0)),
+        float(candidate.get("selected_fragment_count", 0)),
+        float(candidate.get("selected_total_length_px", 0.0)),
+        float(candidate.get("supported_bin_count", 0)),
+        float(candidate.get("structural_seed_score", 0.0)),
+        float(candidate.get("hypothesis_score", candidate.get("score", 0.0))),
+        *selected_indices,
+        float(candidate.get("a", 0.0)),
+        float(candidate.get("b", 0.0)),
+    )
+
+
+def normalized_sort_key(value) -> tuple[float, ...]:
+    if isinstance(value, tuple):
+        return value
+    return (float(value),)
+
 def deduplicate_candidates(
     candidates: list[dict],
     roi_profile: dict,
@@ -52,9 +75,13 @@ def deduplicate_candidates(
     kept_buckets: dict[tuple[int, int], list[dict]] = {}
 
     if sort_key is None:
-        ordered_candidates = sorted(candidates, key=lambda item: item["score"], reverse=True)
+        ordered_candidates = sorted(candidates, key=lambda item: (item["score"], *candidate_sort_tiebreaker(item)), reverse=True)
     else:
-        ordered_candidates = sorted(candidates, key=sort_key, reverse=True)
+        ordered_candidates = sorted(
+            candidates,
+            key=lambda item: (*normalized_sort_key(sort_key(item)), *candidate_sort_tiebreaker(item)),
+            reverse=True,
+        )
 
     for candidate in ordered_candidates:
         is_duplicate = False
@@ -102,9 +129,13 @@ def select_ranked_candidate_portfolio(
     if max_candidates <= 0 or not candidates:
         return []
     if sort_key is None:
-        ordered = sorted(candidates, key=lambda item: item["score"], reverse=True)
+        ordered = sorted(candidates, key=lambda item: (item["score"], *candidate_sort_tiebreaker(item)), reverse=True)
     else:
-        ordered = sorted(candidates, key=sort_key, reverse=True)
+        ordered = sorted(
+            candidates,
+            key=lambda item: (*normalized_sort_key(sort_key(item)), *candidate_sort_tiebreaker(item)),
+            reverse=True,
+        )
     if not bool(cfg("candidate_portfolio", "enabled", default=True)):
         return select_saved_candidates_progressive(
             ordered,
@@ -270,6 +301,7 @@ def select_ranked_candidate_portfolio(
                 score,
                 min_distance,
                 float(candidate.get("geometry_score", 0.0)),
+                *candidate_sort_tiebreaker(candidate),
             )
             if best_utility is None or tie_key > best_utility:
                 best_utility = tie_key
@@ -289,8 +321,12 @@ def select_ranked_candidate_portfolio(
             add_candidate(candidate, allow_near=True)
 
     if sort_key is None:
-        return sorted(selected, key=lambda item: item["score"], reverse=True)
-    return sorted(selected, key=sort_key, reverse=True)
+        return sorted(selected, key=lambda item: (item["score"], *candidate_sort_tiebreaker(item)), reverse=True)
+    return sorted(
+        selected,
+        key=lambda item: (*normalized_sort_key(sort_key(item)), *candidate_sort_tiebreaker(item)),
+        reverse=True,
+    )
 
 def select_saved_candidates_progressive(
     candidates: list[dict],
@@ -308,9 +344,13 @@ def select_saved_candidates_progressive(
     if max_candidates <= 0 or not candidates:
         return []
     if sort_key is None:
-        ordered = sorted(candidates, key=lambda item: item["score"], reverse=True)
+        ordered = sorted(candidates, key=lambda item: (item["score"], *candidate_sort_tiebreaker(item)), reverse=True)
     else:
-        ordered = sorted(candidates, key=sort_key, reverse=True)
+        ordered = sorted(
+            candidates,
+            key=lambda item: (*normalized_sort_key(sort_key(item)), *candidate_sort_tiebreaker(item)),
+            reverse=True,
+        )
 
     base_distance = float(
         cfg(
@@ -392,8 +432,12 @@ def sort_candidates(
     sort_key=None,
 ) -> list[dict]:
     if sort_key is None:
-        return sorted(candidates, key=lambda item: item["score"], reverse=True)
-    return sorted(candidates, key=sort_key, reverse=True)
+        return sorted(candidates, key=lambda item: (item["score"], *candidate_sort_tiebreaker(item)), reverse=True)
+    return sorted(
+        candidates,
+        key=lambda item: (*normalized_sort_key(sort_key(item)), *candidate_sort_tiebreaker(item)),
+        reverse=True,
+    )
 
 def unique_candidates_by_axis(
     candidates: list[dict],
@@ -560,5 +604,5 @@ def candidate_ranking_key(candidate: dict) -> tuple[float, ...]:
         float(candidate.get("chain_continuity_ratio", 0.0)),
         -float(candidate.get("fit_rmse_px", 1e9)),
         -float(candidate.get("largest_gap_px", 1e9)),
+        *candidate_sort_tiebreaker(candidate),
     )
-

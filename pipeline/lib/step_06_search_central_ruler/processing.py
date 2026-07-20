@@ -5,10 +5,11 @@ from copy import deepcopy
 from pathlib import Path
 
 import cv2
+import numpy as np
 
 from . import context
-from .context import DISPLAY_CONFIG, PROJECT_ROOT, cfg, get_step_dirs, load_json, load_roi_mask, resolve_project_path, save_json
-from .geometry import build_row_profile, filter_fragments, normalize_line
+from .context import DISPLAY_CONFIG, PROJECT_ROOT, cfg, get_pipeline_config_path, get_step_dirs, load_json, load_roi_mask, relative_project_path, resolve_project_path, save_json, sha256_file, sha256_json
+from .geometry import build_row_profile, canonicalize_lines, filter_fragments, normalize_line
 from .rendering import build_fragment_background, create_comparison, draw_candidate_snapshot, draw_overlay, load_base_edge_image, load_step05_overlay, sanitize_candidate
 from .search import search_best_candidate
 
@@ -25,7 +26,10 @@ def build_analysis(json_path: Path) -> dict:
     height = int(data.get("height", 0)) or 4032
 
     raw_lines = data.get("valid_lines", [])
-    lines = [normalize_line(line, index) for index, line in enumerate(raw_lines, start=1)]
+    normalized_lines = [
+        normalize_line(line, index) for index, line in enumerate(raw_lines, start=1)
+    ]
+    lines = canonicalize_lines(normalized_lines)
     filtered_lines, rejected_lines = filter_fragments(lines)
 
     roi_mask_path = resolve_project_path(data.get("roi_mask_file"))
@@ -80,6 +84,36 @@ def build_analysis(json_path: Path) -> dict:
     rendering_duration_sec = time.perf_counter() - rendering_started_at
     total_analysis_duration_sec = time.perf_counter() - analysis_started_at
 
+    pipeline_config_path = get_pipeline_config_path()
+    roi_mask_hash = sha256_file(roi_mask_path)
+    step06_source_paths = [
+        PROJECT_ROOT / "pipeline" / "06_search_central_ruler.py",
+        PROJECT_ROOT / "pipeline" / "lib" / "step_06_search_central_ruler_lib.py",
+        *sorted((PROJECT_ROOT / "pipeline" / "lib" / "step_06_search_central_ruler").glob("*.py")),
+    ]
+    step06_source_files = [
+        {
+            "path": relative_project_path(path),
+            "sha256": sha256_file(path),
+        }
+        for path in step06_source_paths
+        if path.exists()
+    ]
+    reproducibility = {
+        "effective_step_config_sha256": sha256_json(context.STEP_CONFIG),
+        "pipeline_config_file": relative_project_path(pipeline_config_path),
+        "pipeline_config_sha256": sha256_file(pipeline_config_path),
+        "input_json_sha256": sha256_file(json_path),
+        "base_edge_sha256": sha256_file(resolve_project_path(base_edge_path) if base_edge_path else None),
+        "roi_mask_sha256": roi_mask_hash,
+        "step06_source_sha256": sha256_json(step06_source_files),
+        "step06_source_files": step06_source_files,
+        "library_versions": {
+            "numpy": str(np.__version__),
+            "opencv": str(cv2.__version__),
+        },
+    }
+
     metadata = {
         "image_name": image_name,
         "processing_step": "06_search_central_ruler",
@@ -129,6 +163,7 @@ def build_analysis(json_path: Path) -> dict:
             "analysis_total": float(total_analysis_duration_sec),
         },
         "parameters": context.STEP_CONFIG,
+        "reproducibility": reproducibility,
     }
 
     return {
