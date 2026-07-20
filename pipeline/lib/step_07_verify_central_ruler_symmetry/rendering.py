@@ -16,6 +16,7 @@ from .context import (
     COLOR_SEGMENT_MEDIUM,
     COLOR_TEXT,
     COLOR_WINNER,
+    PROCESSED_DIR,
     WORKING_PNG_DIR,
     cfg,
     load_color,
@@ -31,7 +32,9 @@ def to_bgr(image: np.ndarray) -> np.ndarray:
 
 def load_visual_background(metadata: dict, fallback: np.ndarray) -> tuple[np.ndarray, str | None]:
     image_name = str(metadata.get("image_name", ""))
+    normalized_background_subdir = str(cfg("visual_background_subdir", default="01_illumination_normalized") or "").strip()
     candidates = [
+        (PROCESSED_DIR / normalized_background_subdir / image_name) if image_name and normalized_background_subdir else None,
         normalize_path_value(metadata.get("source_file")),
         WORKING_PNG_DIR / image_name if image_name else None,
         normalize_path_value(metadata.get("base_edge_file")),

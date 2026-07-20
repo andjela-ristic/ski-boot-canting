@@ -41,6 +41,7 @@ DEFAULT_STEP_CONFIG = {
     "inherit_step_06_output": True,
     "input_subdir": "06_search_central_ruler",
     "input_metadata_subdir": "metadata",
+    "visual_background_subdir": "01_illumination_normalized",
     "output_subdir": "07_verify_central_ruler_symmetry",
     "cleanup_output_on_start": True,
     "candidate_limit": 10,

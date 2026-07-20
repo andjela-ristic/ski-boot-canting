@@ -6,7 +6,7 @@
   "step_06_metadata_file": "data\\processed\\06_search_central_ruler\\metadata\\IMG_0509_central_ruler.json",
   "edge_file": "data\\processed\\03_edges\\cleaned\\IMG_0509.png",
   "roi_mask_file": "data\\processed\\04_boot_roi_from_edges\\mask\\IMG_0509.png",
-  "visual_file": "data\\processed\\03_edges\\cleaned\\IMG_0509.png",
+  "visual_file": "data\\processed\\01_illumination_normalized\\IMG_0509.png",
   "segment_count": 12,
   "candidate_count": 10,
   "vertical_range": {
@@ -9975,6 +9975,7 @@
     "inherit_step_06_output": true,
     "input_subdir": "06_search_central_ruler",
     "input_metadata_subdir": "metadata",
+    "visual_background_subdir": "01_illumination_normalized",
     "output_subdir": "07_verify_central_ruler_symmetry",
     "cleanup_output_on_start": true,
     "candidate_limit": 10,
@@ -10095,10 +10096,10 @@
     ]
   },
   "timings_sec": {
-    "verification": 0.6042359999846667,
-    "rendering": 2.9287665999727324,
-    "analysis_total": 4.275611499964725,
-    "process_total": 6.852681699965615
+    "verification": 0.4526192999910563,
+    "rendering": 2.6988411000347696,
+    "analysis_total": 3.735230699996464,
+    "process_total": 9.796251399966422
   },
   "output_overlay_file": "data\\processed\\07_verify_central_ruler_symmetry\\overlay\\IMG_0509.png",
   "output_comparison_file": "data\\processed\\07_verify_central_ruler_symmetry\\comparison\\IMG_0509.png",
