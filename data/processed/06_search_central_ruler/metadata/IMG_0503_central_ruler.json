@@ -2473,11 +2473,11 @@
     }
   },
   "timings_sec": {
-    "search": 7.863019099982921,
-    "rendering": 0.33399969997117296,
-    "analysis_total": 8.355257100018207,
-    "save": 1.1899812999763526,
-    "process_total": 9.545240199950058
+    "search": 11.414369500009343,
+    "rendering": 0.33544649998657405,
+    "analysis_total": 12.135003500035964,
+    "save": 1.423609699937515,
+    "process_total": 13.558615799993277
   },
   "parameters": {
     "enabled": true,
@@ -2814,11 +2814,11 @@
   "reproducibility": {
     "effective_step_config_sha256": "a76cfc33d19885f815c03a48d5face90ffd40fe9ee28749cd12ac6303f736991",
     "pipeline_config_file": "config\\pipeline_config.yaml",
-    "pipeline_config_sha256": "76884531e95a091587b710f5550bd158c9cd2d33de303029da6c213d81ddbf2c",
+    "pipeline_config_sha256": "2a3a5bbc6a517d1fea1e561279e25c33529ea5711b7ab72dcf1103f75825d9fc",
     "input_json_sha256": "9627e6c306a9864119458c246ff15b8712fdd7a2c096071366f04bf9f4a4f13f",
     "base_edge_sha256": "c98021ebe56b5ec7849837ea95fd528b2251c4825532ae7cc64b6195e26851c0",
     "roi_mask_sha256": "109a3d75bb6433dacfa8ed413a2d8a12b80336e5a1a50b3ba72a3f752e60606b",
-    "step06_source_sha256": "0e10dced24197f57163ac00a07498ff3766e7848a83f676e80984d66bc2b9d58",
+    "step06_source_sha256": "06587ab07b687e926ddde3f2cc259f8ee760bb13db3f8a0eece26587a259f325",
     "step06_source_files": [
       {
         "path": "pipeline\\06_search_central_ruler.py",
@@ -2838,7 +2838,7 @@
       },
       {
         "path": "pipeline\\lib\\step_06_search_central_ruler\\context.py",
-        "sha256": "8b4a7160367fc8e7ebf3a0c6115642780fc6f0260c4a2b1cbf8466d76ef92dec"
+        "sha256": "4494fff5bc9be6d8092ccf445d9e830a1fd97fbf1c337672ca2a2e3fcadb7012"
       },
       {
         "path": "pipeline\\lib\\step_06_search_central_ruler\\geometry.py",

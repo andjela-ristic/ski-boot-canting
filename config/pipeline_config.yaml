@@ -544,21 +544,37 @@ step_07_verify_central_ruler_symmetry:
   input_metadata_subdir: metadata
   output_subdir: 07_verify_central_ruler_symmetry
   cleanup_output_on_start: true
+
   candidate_limit: 10
   segment_count: 12
+
   vertical_range:
     use_step_06_trimmed_range: true
     trim_top_ratio: 0.02
     trim_bottom_ratio: 0.02
-  roi_core:
+
+  roi_preparation:
     keep_largest_component: true
     close_kernel_size: 7
     close_iterations: 1
-    row_width_cap_quantile: 0.80
-    row_width_cap_scale: 1.08
-    min_evaluation_half_width_px: 70
-    max_evaluation_half_width_ratio: 0.46
-    center_fit_fallback_smoothing: 31
+
+  # Candidate-independent symmetric crop. The Step 04 mask is used only to
+  # determine where both sides are available; its asymmetric outline is not scored.
+  consensus_corridor:
+    candidate_score_power: 2.0
+    reference_half_width_ratio: 0.42
+    row_half_width_quantile: 0.72
+    row_half_width_cap_scale: 1.05
+    minimum_half_width_px: 80
+    maximum_half_width_image_ratio: 0.30
+    edge_margin_px: 8
+    smooth_window: 51
+    max_normalized_candidate_offset: 0.60
+    min_axis_inside_corridor_ratio: 0.82
+    absolute_max_tilt_delta_deg: 5.0
+    tilt_mad_multiplier: 6.0
+    tilt_mad_floor_deg: 0.75
+
   edge_input:
     threshold: 24
     binary_nonzero_ratio_max: 0.20
@@ -566,47 +582,54 @@ step_07_verify_central_ruler_symmetry:
     canny_high: 135
     close_kernel_size: 3
     close_iterations: 0
+    remove_border_components: true
+    border_component_min_height_ratio: 0.80
+    border_component_max_center_distance_ratio: 0.42
+
   mirror:
     center_exclusion_px: 4
-    max_chamfer_distance_px: 12.0
-    min_boundary_pixels_per_side: 8
-    min_edge_pixels_per_side: 12
-    min_mask_pixels_per_side: 120
-    min_axis_inside_row_ratio: 0.55
-    silhouette_boundary_weight: 0.72
-    silhouette_occupancy_weight: 0.28
-    silhouette_weight: 0.72
-    internal_edge_weight: 0.28
+    max_chamfer_distance_px: 16.0
+    distance_score_scale_px: 7.0
+    min_edge_pixels_per_side: 14
+    min_edge_rows_per_side_ratio: 0.16
+    histogram_smoothing_sigma: 2.0
+
+    # near-axis, middle, outer shell. Near and middle regions dominate because
+    # buckles and straps mostly live in the outer band.
+    band_boundaries: [0.0, 0.22, 0.52, 1.0]
+    band_weights: [0.46, 0.39, 0.15]
+    band_match_fractions: [0.90, 0.76, 0.58]
+
+    chamfer_weight: 0.64
+    radial_histogram_weight: 0.24
+    edge_count_balance_weight: 0.12
+    coverage_reliability_power: 0.20
+
   segment_aggregation:
     min_valid_segments: 8
-    discard_worst_segments: 2
-    trimmed_mean_weight: 0.75
-    median_weight: 0.25
-    valid_segment_ratio_power: 0.35
-    minimum_candidate_score: 0.0
+    min_valid_segments_per_zone: 2
+    global_weighted_mean_weight: 0.55
+    global_weighted_median_weight: 0.45
+    global_score_weight: 0.55
+    zone_harmonic_weight: 0.45
+    zone_weights: [0.30, 0.35, 0.35]
+
+  final_scoring:
+    mirror_symmetry_weight: 0.72
+    bilateral_coverage_weight: 0.10
+    consensus_centrality_weight: 0.08
+    step_06_prior_weight: 0.10
+
   confidence:
-    high_min_symmetry_percent: 82.0
+    high_min_verification_percent: 72.0
     high_min_margin_percent: 2.0
-    medium_min_symmetry_percent: 68.0
+    medium_min_verification_percent: 60.0
     medium_min_margin_percent: 0.8
+
   drawing:
     axis_thickness: 4
     other_axis_thickness: 1
-    roi_boundary_thickness: 2
+    corridor_boundary_thickness: 2
     segment_line_thickness: 1
     font_scale: 0.62
     background_alpha: 0.82
-    candidate_snapshot_scale: 0.72
-  test_presets:
-  - name: default
-    override: {}
-  - name: mask_only
-    override:
-      mirror:
-        silhouette_weight: 1.0
-        internal_edge_weight: 0.0
-  - name: edge_stronger
-    override:
-      mirror:
-        silhouette_weight: 0.60
-        internal_edge_weight: 0.40
