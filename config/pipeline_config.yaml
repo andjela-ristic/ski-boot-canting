@@ -288,6 +288,8 @@ step_06_search_central_ruler:
     coarse_x_bucket_px: 18
     max_coarse_candidates_per_x_bucket: 3
     top_coarse_candidates: 24
+    coarse_score_floor_ratio: 0.97
+    fine_score_floor_ratio: 0.98
     fine_window_x_px: 40
     fine_window_angle_deg: 2.2
     min_support_fragments: 2
@@ -306,19 +308,55 @@ step_06_search_central_ruler:
     huber_delta_px: 10
     huber_iterations: 4
     max_fit_tilt_deg: 12
+    endpoint_sample_weight_boost: 1.7
+    original_endpoint_sample_weight_boost: 2.2
   best_fit_selection:
     top_hypothesis_count: 24
-    min_anchor_band_coverage: 0.05
+    min_anchor_band_coverage: 0.18
     min_anchor_overlap_px: 24
     min_anchor_fragment_ratio: 0.78
-    endpoint_anchor_bonus_weight: 0.10
-    gap_penalty_weight: 0.12
-    support_adjustment_penalty_weight: 0.18
-    outside_mask_penalty_weight: 0.08
+    formula_buckets:
+      longest_interval_px: 20.0
+      continuity_ratio_scale: 20.0
+    formula_weights:
+      has_top_bottom_anchor: 1000.0
+      has_top_anchor: 160.0
+      has_bottom_anchor: 160.0
+      paired_anchor_strength: 340.0
+      paired_endpoint_coverage: 220.0
+      longest_interval_bucket: 22.0
+      continuity_bucket: 14.0
+      longest_interval_px: 0.08
+      chain_continuity_ratio: 14.0
+      has_top_bottom_original_anchor: 520.0
+      has_top_original_anchor: 110.0
+      has_bottom_original_anchor: 110.0
+      paired_original_anchor_strength: 260.0
+      paired_original_endpoint_coverage: 180.0
+      endpoint_anchor_score: 0.10
+      outside_chain_length_ratio: 140.0
+      outside_chain_fragment_ratio: 80.0
+      total_reach_gap_px: 0.10
+      chain_total_gap_px: 0.03
+      gap_penalty: 0.12
+      merged_interval_count: 4.0
+      adjusted_fragment_ratio: 80.0
+      support_adjustment_penalty: 0.18
+      length_weighted_mean_abs_support_shift_px: 0.08
+      max_abs_support_shift_px: 0.12
+      outside_mask_penalty: 0.08
+      hypothesis_x_ref_delta_px: 8.0
+      hypothesis_tilt_delta_deg: 24.0
+      score: 60.0
+    axis_harmonization:
+      enabled: true
+      min_x_ref_delta_px: 0.75
+      min_tilt_delta_deg: 0.05
+      hypothesis_pull_ratio: 0.35
   support_chain:
     enabled: true
     max_connection_gap_px: 220
-    max_connection_dx_px: 28
+    max_connection_dx_px: 22
     max_angle_difference_deg: 3
   support_adjustment:
     enabled: true
@@ -326,17 +364,19 @@ step_06_search_central_ruler:
     max_tilt_delta_deg: 1.5
     max_mean_shift_px: 6
     max_endpoint_shift_px: 9
-    allow_tilt_without_intersection_axis_distance_px: 6
+    allow_tilt_without_intersection_axis_distance_px: 8
     require_axis_intersection_for_tilt_adjustment: true
-    min_support_strength_scale: 0.62
-    joint_adjustment_top_hypotheses: 8
+    min_support_strength_scale: 0.68
+    full_adjustment_top_hypotheses: 8
+    joint_adjustment_top_hypotheses: 4
     joint_adjustment_min_original_endpoint_ratio: 0.90
+    joint_adjustment_min_original_endpoint_coverage: 0.24
   support_extension:
     enabled: true
     trigger_gap_px: 180
     max_added_fragments: 6
     min_vertical_advance_px: 18
-    max_connection_dx_px: 34
+    max_connection_dx_px: 26
     max_connection_gap_px: 360
     max_axis_distance_px: 55
     max_center_distance_px: 70

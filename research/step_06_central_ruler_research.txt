@@ -336,3 +336,77 @@ Bitno:
 
 - problem na `IMG_0510` nije bio samo u brzom screen-u, nego i u tome sto je zavrsni ranking birao kandidata koji nije imao najveci `selection_score`
 - posle korekcije rankinga i hibridnog screen-a, `IMG_0510` ponovo vraca kandidat sa `has_top_bottom_original_anchor = True`
+
+### Novi smer: jaci endpoint kriterijum + sredina + brzi dedup
+
+Posle daljih iteracija pokazalo se da jos uvek postoje dva odvojena problema:
+
+- formula je i dalje znala da preforsira vrlo male razlike u duzini lanca umesto centriranijeg kandidata
+- runtime nije bio problem u fit-u ose nego u deduplikaciji i u tome sto se adjustment/refit grana radila presiroko
+
+Zbog toga je uvedeno sledece:
+
+- `has_endpoint_anchor(...)` sada trazi i minimalnu pokrivenost endpoint banda (`min_anchor_band_coverage`), ne samo overlap i ratio jednog fragmenta
+- `fit_axis_from_support(...)` sada daje vecu tezinu uzorcima iz gornjeg i donjeg endpoint banda
+- originalni endpoint fragmenti dobijaju jaci weight od prilagodjenih endpoint fragmenata
+- `selection_score` sada:
+  - zadrzava prioritet da kandidat ima sidra na oba kraja
+  - ali vise ne dozvoljava da razlika od `1-3 px` u duzini lanca sama pregazi bolji ukupni fit
+  - mnogo vise koristi ukupni `score` kada su krajevi i kontinuitet vec jaki
+- `candidate_selection_key` sada ranije uvodi `score`, `symmetry_score` i `roi_center_score`, a kasnije gleda sirovu duzinu lanca
+
+### Korekcija sporog dela
+
+Profilisanje na `IMG_0510` je pokazalo da glavni problem vise nije:
+
+- `fit_axis_from_support`
+- brzi coarse/fine screen
+
+nego:
+
+- `deduplicate_candidates`
+- `select_support_fragments`
+- `build_adjusted_line_variant`
+
+Prava uska grla su resena ovako:
+
+- `deduplicate_candidates` sada koristi bucket-e po uglu i `x_ref`
+- dedup koristi rani izlaz cim skupi trazeni broj jedinstvenih kandidata
+- prosecna udaljenost osa vise ne racuna `line_x_at_y(...)` u python petlji, vec preko zatvorene forme `abs((a1-a2) * y + (b1-b2))`
+- adjustment se uopste ne pokusava za fragmente koji vec vrlo dobro nalezu na osu
+- puna `support_adjustment` grana sada se radi samo za vrh hipoteza (`full_adjustment_top_hypotheses`), dok ostale hipoteze i dalje prolaze laganu proveru
+
+### Trenutno potvrdjen rezultat za `IMG_0510`
+
+Cist single-image run posle ovih izmena daje:
+
+- najbolji kandidat: `C21 / final_fit_support_chain`
+- `x_ref = 1436.585`
+- `tilt_deg = -0.108`
+- `score = 0.477`
+- `selection_score = 4021.202`
+- `has_top_bottom_original_anchor = True`
+- `adjusted_fragment_ratio = 0.0`
+- `search ~= 4.01 s`
+- `process_total ~= 16.02 s`
+
+Bitna interpretacija:
+
+- kandidat je sada biran kao centriraniji i stabilniji chain-fit, a ne vise po maloj razlici u sirovoj duzini intervala
+- i dalje zadrzava originalna sidra na oba kraja
+
+### Status celog skupa
+
+Ceo dataset (`11` slika) je uspesno rerun-ovan do kraja i za svaku sliku je sacuvan metadata fajl u:
+
+- `data/processed/06_search_central_ruler/metadata`
+
+Na ovom run-u svi najbolji kandidati imaju:
+
+- `has_top_bottom_original_anchor = True`
+
+Napomena o timing-u celog batch run-a:
+
+- batch je bio pracen paralelnim proverama iz terminala dok je radio u pozadini
+- zato batch timing nije benchmark-cist i ne treba ga uzimati kao finalnu meru performansi
+- za realnu procenu brzine pouzdaniji je cist single-image run bez paralelnog monitoringa
