@@ -204,7 +204,7 @@ class FrameValidator:
         except (TypeError, ValueError):
             return 1.0
 
-        return float(np.clip(numeric, 0.75, 1.20))
+        return float(np.clip(numeric, 0.90, 1.20))
 
     @staticmethod
     def _scaled_guide_config(

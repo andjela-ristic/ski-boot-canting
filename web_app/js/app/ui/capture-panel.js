@@ -15,9 +15,9 @@ import {
 import { formatFileSize, normalizeError } from "../utils/format.js";
 
 const READINESS_POLL_INTERVAL_MS = 250;
-const READINESS_SUCCESS_STREAK = 3;
-const READINESS_FAILURE_STREAK = 2;
-const NON_READY_GUIDE_DETAIL = "The frame will turn green when it is good";
+const READINESS_SUCCESS_STREAK = 2;
+const READINESS_FAILURE_STREAK = 3;
+const NON_READY_GUIDE_DETAIL = "";
 const BASE_GUIDE_WIDTH_RATIO = 0.6;
 const BASE_GUIDE_HEIGHT_RATIO = 0.8;
 
@@ -324,7 +324,9 @@ function syncGuideScaleUi(options) {
 
 function setGuideState(options, stateName, detail = "") {
   options.elements.readinessGuide.className = `readiness-guide is-${stateName}`;
-  options.elements.readinessGuideDetail.textContent = detail;
+  if (options.elements.readinessGuideDetail) {
+    options.elements.readinessGuideDetail.textContent = detail;
+  }
   options.state.readinessLastOutcome = stateName;
 }
 

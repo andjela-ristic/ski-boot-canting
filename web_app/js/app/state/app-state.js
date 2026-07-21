@@ -45,7 +45,7 @@ export function hydrateForm(elements) {
 
   const guideScale = window.localStorage.getItem(STORAGE_KEYS.guideScale);
   if (guideScale) {
-    elements.guideScale.value = guideScale;
+    elements.guideScale.value = String(normalizeGuideScaleValue(guideScale));
   }
 }
 
@@ -96,9 +96,13 @@ export function getClipDurationMs(elements) {
 }
 
 export function getGuideScale(elements) {
-  const parsed = Number.parseFloat(elements.guideScale.value);
+  return normalizeGuideScaleValue(elements.guideScale.value);
+}
+
+function normalizeGuideScaleValue(rawValue) {
+  const parsed = Number.parseFloat(rawValue);
   if (!Number.isFinite(parsed)) {
     return 1;
   }
-  return Math.min(1.2, Math.max(0.75, parsed));
+  return Math.min(1.2, Math.max(0.9, parsed));
 }

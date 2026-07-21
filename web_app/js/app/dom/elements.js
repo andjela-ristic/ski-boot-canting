@@ -9,7 +9,7 @@ export function getAppElements() {
     cameraPill: requireElement("camera-pill"),
     cameraPreview: requireElement("camera-preview"),
     readinessGuide: requireElement("readiness-guide"),
-    readinessGuideDetail: requireElement("readiness-guide-detail"),
+    readinessGuideDetail: getOptionalElement("readiness-guide-detail"),
     guideScale: requireElement("guide-scale"),
     guideScaleValue: requireElement("guide-scale-value"),
     previewPlaceholder: requireElement("preview-placeholder"),
@@ -40,4 +40,8 @@ function requireElement(id) {
     throw new Error(`Missing required DOM element: #${id}`);
   }
   return element;
+}
+
+function getOptionalElement(id) {
+  return document.getElementById(id);
 }

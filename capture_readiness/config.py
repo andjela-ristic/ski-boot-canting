@@ -68,7 +68,7 @@ class ReadinessConfig:
     processing_max_width: int = 480
     jpeg_max_bytes: int = 3_000_000
     opencv_threads: int = 1
-    success_score_threshold: float = 0.90
+    success_score_threshold: float = 0.85
     guide: GuideConfig = field(default_factory=GuideConfig)
     quality: QualityConfig = field(default_factory=QualityConfig)
     boot: BootConfig = field(default_factory=BootConfig)

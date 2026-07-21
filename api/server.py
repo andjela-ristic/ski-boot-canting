@@ -313,7 +313,7 @@ class CantingApiHandler(BaseHTTPRequestHandler):
                 form,
                 "guide_scale",
                 default=1.0,
-                minimum=0.75,
+                minimum=0.90,
                 maximum=1.20,
             ),
         )

@@ -109,44 +109,12 @@
   color: var(--muted);
 }
 
-.readiness-guide-panel {
-  position: absolute;
-  left: 50%;
-  bottom: 18px;
-  transform: translateX(-50%);
-  display: flex;
-  justify-content: center;
-}
-
-.readiness-guide-detail {
-  padding: 10px 14px;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  background: rgba(7, 16, 20, 0.72);
-  color: rgba(245, 249, 250, 0.92);
-  font-size: 0.92rem;
-  font-weight: 700;
-  letter-spacing: 0.01em;
-  white-space: nowrap;
-  backdrop-filter: blur(8px);
-  transition:
-    background-color 160ms ease,
-    border-color 160ms ease,
-    color 160ms ease;
-}
-
 .readiness-guide.is-ready .readiness-guide-shape {
   border-color: rgba(74, 214, 132, 0.96);
   box-shadow:
     0 0 0 999px rgba(6, 34, 18, 0.16),
     0 0 28px rgba(74, 214, 132, 0.28),
     inset 0 0 0 1px rgba(74, 214, 132, 0.34);
-}
-
-.readiness-guide.is-ready .readiness-guide-detail {
-  border-color: rgba(74, 214, 132, 0.4);
-  background: rgba(11, 50, 27, 0.82);
-  color: rgba(216, 255, 226, 0.98);
 }
 
 .readiness-guide.is-idle .readiness-guide-shape,
@@ -157,14 +125,6 @@
     0 0 0 999px rgba(42, 6, 6, 0.15),
     0 0 24px rgba(255, 91, 91, 0.22),
     inset 0 0 0 1px rgba(255, 91, 91, 0.28);
-}
-
-.readiness-guide.is-idle .readiness-guide-detail,
-.readiness-guide.is-pending .readiness-guide-detail,
-.readiness-guide.is-not-ready .readiness-guide-detail {
-  border-color: rgba(255, 91, 91, 0.38);
-  background: rgba(61, 14, 14, 0.84);
-  color: rgba(255, 231, 231, 0.98);
 }
 
 .action-row {
@@ -272,14 +232,5 @@
 
   .readiness-guide-shape {
     border-radius: 26px;
-  }
-
-  .readiness-guide-panel {
-    bottom: 14px;
-  }
-
-  .readiness-guide-detail {
-    white-space: normal;
-    text-align: center;
   }
 }

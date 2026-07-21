@@ -2,7 +2,7 @@
   "processing_max_width": 480,
   "jpeg_max_bytes": 3000000,
   "opencv_threads": 1,
-  "success_score_threshold": 0.9,
+  "success_score_threshold": 0.85,
   "guide": {
     "x_min_ratio": 0.2,
     "x_max_ratio": 0.8,
