@@ -14,6 +14,10 @@ from .rendering import build_fragment_background, create_comparison, draw_candid
 from .search import search_best_candidate
 
 
+def _persistence_enabled(key: str, default: bool = True) -> bool:
+    return bool(context.STEP_CONFIG.get("persistence", {}).get(key, default))
+
+
 def process_image(json_path: Path | str) -> dict:
     return process_json_file(Path(json_path))
 
@@ -53,23 +57,35 @@ def build_analysis(
     ranked_candidates = search_result.get("ranked_candidates", fine_candidates)
     ranked_candidate_total_count = int(search_result.get("ranked_candidate_total_count", len(ranked_candidates)))
 
+    save_overlay = _persistence_enabled("save_overlay", True)
+    save_comparison = _persistence_enabled("save_comparison", True)
+    save_candidate_snapshots = _persistence_enabled("save_candidate_snapshots", True)
+    needs_fragment_background = save_overlay or save_comparison or save_candidate_snapshots
     rendering_started_at = time.perf_counter()
-    step05_overlay = load_step05_overlay(image_name)
-    fragment_background = build_fragment_background(base_edge_image, filtered_lines)
-    overlay = draw_overlay(
-        fragment_background=fragment_background,
-        filtered_line_count=len(filtered_lines),
-        best_candidate=best_candidate,
-        fine_candidates=ranked_candidates,
-        roi_profile=roi_profile,
-        image_name=image_name,
+    fragment_background = (
+        build_fragment_background(base_edge_image, filtered_lines)
+        if needs_fragment_background
+        else None
     )
-    comparison = create_comparison(step05_overlay, overlay)
+    overlay = None
+    if (save_overlay or save_comparison) and fragment_background is not None:
+        overlay = draw_overlay(
+            fragment_background=fragment_background,
+            filtered_line_count=len(filtered_lines),
+            best_candidate=best_candidate,
+            fine_candidates=ranked_candidates,
+            roi_profile=roi_profile,
+            image_name=image_name,
+        )
+    comparison = None
+    if save_comparison and overlay is not None:
+        step05_overlay = load_step05_overlay(image_name)
+        comparison = create_comparison(step05_overlay, overlay)
     saved_candidate_count = int(cfg("candidate_deduplication", "max_saved_candidates", default=8))
     if bool(context.STEP_CONFIG.get("save_all_final_candidates", False)):
         saved_candidate_count = len(ranked_candidates)
     candidate_snapshot_images = []
-    if materialize_candidate_snapshots:
+    if materialize_candidate_snapshots and save_candidate_snapshots and fragment_background is not None:
         for index, candidate in enumerate(
             ranked_candidates[:saved_candidate_count],
             start=1,
@@ -199,42 +215,51 @@ def process_json_file(json_path: Path) -> dict:
     comparison_path = dirs["output_comparison_dir"] / image_name
     metadata_path = dirs["output_metadata_dir"] / f"{Path(image_name).stem}_central_ruler.json"
     candidate_snapshot_dir = dirs["output_candidate_snapshot_dir"] / Path(image_name).stem
+    save_overlay = _persistence_enabled("save_overlay", True)
+    save_comparison = _persistence_enabled("save_comparison", True)
+    save_candidate_snapshots = _persistence_enabled("save_candidate_snapshots", True)
 
-    overlay_path.parent.mkdir(parents=True, exist_ok=True)
-    comparison_path.parent.mkdir(parents=True, exist_ok=True)
     metadata_path.parent.mkdir(parents=True, exist_ok=True)
-    candidate_snapshot_dir.mkdir(parents=True, exist_ok=True)
+    if save_overlay:
+        overlay_path.parent.mkdir(parents=True, exist_ok=True)
+    if save_comparison:
+        comparison_path.parent.mkdir(parents=True, exist_ok=True)
+    if save_candidate_snapshots:
+        candidate_snapshot_dir.mkdir(parents=True, exist_ok=True)
 
-    if not cv2.imwrite(str(overlay_path), analysis["overlay"]):
-        raise RuntimeError(f"Could not save overlay: {overlay_path}")
-    if not cv2.imwrite(str(comparison_path), analysis["comparison"]):
-        raise RuntimeError(f"Could not save comparison: {comparison_path}")
+    if save_overlay:
+        if analysis["overlay"] is None or not cv2.imwrite(str(overlay_path), analysis["overlay"]):
+            raise RuntimeError(f"Could not save overlay: {overlay_path}")
+    if save_comparison:
+        if analysis["comparison"] is None or not cv2.imwrite(str(comparison_path), analysis["comparison"]):
+            raise RuntimeError(f"Could not save comparison: {comparison_path}")
 
     candidate_snapshot_files = []
     snapshot_rendering_duration_sec = 0.0
     fragment_background = analysis["_fragment_background"]
     roi_profile = analysis["_roi_profile"]
     saved_candidate_count = int(analysis["_saved_candidate_count"])
-    for snapshot_index, candidate in enumerate(
-        analysis["ranked_candidates"][:saved_candidate_count],
-        start=1,
-    ):
-        snapshot_render_started_at = time.perf_counter()
-        snapshot_image = draw_candidate_snapshot(
-            fragment_background=fragment_background,
-            candidate=candidate,
-            roi_profile=roi_profile,
-            image_name=image_name,
-            candidate_label=f"C{snapshot_index}",
-        )
-        snapshot_rendering_duration_sec += (
-            time.perf_counter() - snapshot_render_started_at
-        )
-        snapshot_path = candidate_snapshot_dir / f"C{snapshot_index:02d}_{image_name}"
-        if not cv2.imwrite(str(snapshot_path), snapshot_image):
-            raise RuntimeError(f"Could not save candidate snapshot: {snapshot_path}")
-        candidate_snapshot_files.append(relative_project_path(snapshot_path))
-        del snapshot_image
+    if save_candidate_snapshots and fragment_background is not None:
+        for snapshot_index, candidate in enumerate(
+            analysis["ranked_candidates"][:saved_candidate_count],
+            start=1,
+        ):
+            snapshot_render_started_at = time.perf_counter()
+            snapshot_image = draw_candidate_snapshot(
+                fragment_background=fragment_background,
+                candidate=candidate,
+                roi_profile=roi_profile,
+                image_name=image_name,
+                candidate_label=f"C{snapshot_index}",
+            )
+            snapshot_rendering_duration_sec += (
+                time.perf_counter() - snapshot_render_started_at
+            )
+            snapshot_path = candidate_snapshot_dir / f"C{snapshot_index:02d}_{image_name}"
+            if not cv2.imwrite(str(snapshot_path), snapshot_image):
+                raise RuntimeError(f"Could not save candidate snapshot: {snapshot_path}")
+            candidate_snapshot_files.append(relative_project_path(snapshot_path))
+            del snapshot_image
 
     metadata = deepcopy(analysis["metadata"])
     metadata.setdefault("timings_sec", {})
@@ -246,8 +271,8 @@ def process_json_file(json_path: Path) -> dict:
         metadata["timings_sec"].get("analysis_total", 0.0)
         + snapshot_rendering_duration_sec
     )
-    metadata["output_overlay_file"] = relative_project_path(overlay_path)
-    metadata["output_comparison_file"] = relative_project_path(comparison_path)
+    metadata["output_overlay_file"] = relative_project_path(overlay_path) if save_overlay else None
+    metadata["output_comparison_file"] = relative_project_path(comparison_path) if save_comparison else None
     metadata["candidate_snapshot_files"] = candidate_snapshot_files
     metadata["timings_sec"]["save"] = float(
         time.perf_counter()
@@ -265,9 +290,9 @@ def process_json_file(json_path: Path) -> dict:
         "selected_fragment_count": best_candidate["selected_fragment_count"] if best_candidate else 0,
         "best_score": best_candidate["score"] if best_candidate else None,
         "best_tilt_deg": best_candidate["tilt_deg"] if best_candidate else None,
-        "overlay_path": relative_project_path(overlay_path),
+        "overlay_path": relative_project_path(overlay_path) if save_overlay else None,
         "metadata_path": relative_project_path(metadata_path),
-        "comparison_path": relative_project_path(comparison_path),
+        "comparison_path": relative_project_path(comparison_path) if save_comparison else None,
         "candidate_snapshot_dir": relative_project_path(candidate_snapshot_dir),
     }
 

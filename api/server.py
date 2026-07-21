@@ -24,6 +24,11 @@ from .pipeline_runner import PipelineRunner
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 WEB_ROOT = REPO_ROOT / "web_app"
+CLIENT_DISCONNECT_ERRORS = (
+    BrokenPipeError,
+    ConnectionAbortedError,
+    ConnectionResetError,
+)
 
 
 class CantingApiHandler(BaseHTTPRequestHandler):
@@ -36,7 +41,7 @@ class CantingApiHandler(BaseHTTPRequestHandler):
         self._write_cors_headers()
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "Content-Type, Accept, Origin")
-        self.end_headers()
+        self._finalize_response()
 
     def do_GET(self) -> None:
         raw_path = self._normalize_path()
@@ -436,9 +441,7 @@ class CantingApiHandler(BaseHTTPRequestHandler):
             self.send_header("Cache-Control", "no-cache")
         else:
             self.send_header("Cache-Control", "public, max-age=3600")
-        self.end_headers()
-        self.wfile.write(body)
-        return True
+        return self._finalize_response(body)
 
     def _resolve_web_asset_path(self, request_path: str) -> Path | None:
         if request_path == "/favicon.ico":
@@ -487,8 +490,7 @@ class CantingApiHandler(BaseHTTPRequestHandler):
         self._write_cors_headers()
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
-        self.end_headers()
-        self.wfile.write(body)
+        self._finalize_response(body)
 
     def _write_binary_overlay(
         self,
@@ -510,8 +512,17 @@ class CantingApiHandler(BaseHTTPRequestHandler):
             self.send_header("X-Overlay-Output-Path", result.overlay_output_path)
         if result.metadata_output_path is not None:
             self.send_header("X-Metadata-Output-Path", result.metadata_output_path)
-        self.end_headers()
-        self.wfile.write(body)
+        self._finalize_response(body)
+
+    def _finalize_response(self, body: bytes = b"") -> bool:
+        try:
+            self.end_headers()
+            if body:
+                self.wfile.write(body)
+        except CLIENT_DISCONNECT_ERRORS:
+            self.close_connection = True
+            return False
+        return True
 
     def _write_cors_headers(self) -> None:
         allow_origin = os.environ.get("API_CORS_ALLOW_ORIGIN", "*").strip() or "*"

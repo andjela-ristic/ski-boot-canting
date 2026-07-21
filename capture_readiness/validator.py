@@ -290,9 +290,17 @@ class FrameValidator:
 
         # Evaluate the central 80% to reduce influence from UI borders.
         height, width = gray.shape
-        x1, x2 = int(width * 0.10), int(width * 0.90)
-        y1, y2 = int(height * 0.10), int(height * 0.90)
+        x1, y1, x2, y2 = self._ratio_rect(
+            width,
+            height,
+            0.10,
+            0.90,
+            0.10,
+            0.90,
+        )
         sample = gray[y1:y2, x1:x2]
+        if sample.size == 0:
+            sample = gray
 
         mean_brightness = float(sample.mean())
         dark_ratio = float(np.mean(sample <= quality.dark_pixel_threshold))

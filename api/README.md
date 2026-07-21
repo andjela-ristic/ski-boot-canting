@@ -156,7 +156,8 @@ Behavior:
 - extracts frames uniformly across the video
 - analyzes all sampled frames in parallel
 - keeps one execution slot reserved for regular `/analyze` requests
-- returns per-frame analysis plus averaged numeric metadata tree
+- returns the overlay and metadata path from the best sampled frame
+- keeps per-frame analysis plus averaged numeric metadata tree in the response
 
 Za `multipart` upload trenutno vraca jedan validan stub overlay da web PWA flow moze da se testira end-to-end iako finalna multi-frame fuzija jos nije implementirana.
 
@@ -167,6 +168,8 @@ Response shape:
   "video_path": "C:\\Users\\panonit\\Documents\\ml-ski-boot-canting\\data\\videos\\sample.mp4",
   "frame_count": 6,
   "processing_time_ms": 8123.45,
+  "selected_frame_index": 3,
+  "selected_timestamp_ms": 1042.5,
   "frame_sampling": {
     "sample_count": 6,
     "max_workers": 4

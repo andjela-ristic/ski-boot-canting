@@ -101,13 +101,19 @@ export async function uploadAnalyzeImage(options) {
     overlayOutputPath: extractString(response.headers.get("X-Overlay-Output-Path")),
     metadataOutputPath: extractString(response.headers.get("X-Metadata-Output-Path")),
     frameCount: 1,
+    selectedFrameIndex: null,
+    selectedTimestampMs: null,
+    frames: [],
   };
 }
 
 function normalizeResultPayload(payload) {
+  const selectedFrameIndex = toFiniteNumber(payload.selected_frame_index);
+  const normalizedFrames = normalizeFrames(payload.frames, selectedFrameIndex);
   const nestedFrameAnalysis =
-    Array.isArray(payload.frames) && payload.frames.length > 0
-      ? payload.frames[0].analysis || null
+    normalizedFrames.length > 0
+      ? normalizedFrames.find((frame) => frame.selected)?.analysis ||
+        normalizedFrames[0].analysis
       : null;
 
   const overlayDataUrl =
@@ -153,7 +159,65 @@ function normalizeResultPayload(payload) {
         : Array.isArray(payload.frames)
           ? payload.frames.length
           : null,
+    selectedFrameIndex,
+    selectedTimestampMs: toFiniteNumber(payload.selected_timestamp_ms),
+    frames: normalizedFrames.map((frame) => ({
+      frameIndex: frame.frameIndex,
+      timestampMs: frame.timestampMs,
+      imageName: frame.imageName,
+      overlayDataUrl: frame.overlayDataUrl,
+      overlayOutputPath: frame.overlayOutputPath,
+      metadataOutputPath: frame.metadataOutputPath,
+      selected: frame.selected,
+    })),
   };
+}
+
+function normalizeFrames(rawFrames, selectedFrameIndex) {
+  if (!Array.isArray(rawFrames)) {
+    return [];
+  }
+
+  return rawFrames
+    .map((frame, index) => normalizeFrame(frame, index, selectedFrameIndex))
+    .filter(Boolean);
+}
+
+function normalizeFrame(rawFrame, index, selectedFrameIndex) {
+  if (!rawFrame || typeof rawFrame !== "object") {
+    return null;
+  }
+
+  const analysis =
+    rawFrame.analysis && typeof rawFrame.analysis === "object" ? rawFrame.analysis : {};
+  const overlayDataUrl = extractString(analysis.overlay_data_url);
+  if (!overlayDataUrl) {
+    return null;
+  }
+
+  const frameIndex = toFiniteNumber(rawFrame.frame_index);
+  const imageName =
+    extractString(analysis.image_name) ||
+    `frame_${String(index + 1).padStart(2, "0")}.png`;
+
+  return {
+    frameIndex,
+    timestampMs: toFiniteNumber(rawFrame.timestamp_ms),
+    imageName,
+    overlayDataUrl,
+    overlayOutputPath: extractString(analysis.overlay_output_path),
+    metadataOutputPath: extractString(analysis.metadata_output_path),
+    selected:
+      frameIndex !== null &&
+      selectedFrameIndex !== null &&
+      frameIndex === selectedFrameIndex,
+    analysis,
+  };
+}
+
+function toFiniteNumber(value) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : null;
 }
 
 async function readApiError(response, fallbackMessage) {

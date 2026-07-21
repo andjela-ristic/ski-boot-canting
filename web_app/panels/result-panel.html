@@ -21,9 +21,38 @@
   <div class="result-content is-hidden" id="result-content">
     <div class="result-meta" id="result-meta"></div>
 
+    <div class="result-actions">
+      <a
+        class="secondary-button result-download"
+        id="download-overlay"
+        href="#"
+        download="canting-overlay.png"
+      >
+        Download overlay
+      </a>
+    </div>
+
     <div class="overlay-frame">
       <img id="overlay-image" alt="Analysis overlay result" />
     </div>
+
+    <section class="frame-gallery-section is-hidden" id="frame-gallery-section">
+      <div class="frame-gallery-header">
+        <div>
+          <h4>All Returned Frame Overlays</h4>
+          <p>Extra frame cards can be closed and restored without rerunning the analysis.</p>
+        </div>
+        <button
+          class="ghost-button ghost-button-small frame-gallery-reset is-hidden"
+          id="restore-frames-button"
+          type="button"
+        >
+          Show all frames
+        </button>
+      </div>
+      <p class="frame-gallery-status is-hidden" id="frame-gallery-status" aria-live="polite"></p>
+      <div class="frame-gallery" id="frame-gallery"></div>
+    </section>
 
     <details class="technical-details is-hidden" id="technical-details">
       <summary>Technical Details</summary>

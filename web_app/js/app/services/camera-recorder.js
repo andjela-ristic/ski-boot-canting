@@ -2,6 +2,10 @@ import { wait } from "../utils/format.js";
 
 const MAX_IDEAL_WIDTH = 7680;
 const MAX_IDEAL_HEIGHT = 4320;
+const RECORDER_TIMESLICE_MS = 250;
+const RETRY_RECORDING_WAIT_MS = 120;
+const SAFE_RECORDING_MIN_BITRATE = 6_000_000;
+const SAFE_RECORDING_MAX_BITRATE = 20_000_000;
 const RESOLUTION_FALLBACKS = [
   { width: 7680, height: 4320 },
   { width: 4032, height: 3024 },
@@ -37,6 +41,7 @@ export async function initializeCamera(options) {
   options.elements.cameraPreview.srcObject = stream;
   options.elements.previewPlaceholder.classList.add("is-hidden");
   await options.elements.cameraPreview.play().catch(() => undefined);
+  options.refreshChrome?.();
 
   const streamDetails = describeStream(stream);
   const iosHint = isLikelyIosDevice()
@@ -70,25 +75,38 @@ export function stopCurrentStream(options) {
   options.state.currentStream = null;
   options.elements.cameraPreview.srcObject = null;
   options.elements.previewPlaceholder.classList.remove("is-hidden");
+  options.refreshChrome?.();
 }
 
 export async function recordClip(options) {
   const stream = await ensureCameraStream(options);
-  const recorderOptions = chooseRecorderOptions(stream);
+  options.setStatus(`Recording a ${Math.round(options.durationMs / 100) / 10}s clip...`, "info");
+
+  try {
+    return await recordClipOnce(stream, options.durationMs, { conservative: false });
+  } catch (error) {
+    if (!isEmptyRecordingError(error)) {
+      throw error;
+    }
+
+    options.setStatus(
+      "The browser returned an empty first take. Retrying with safer recording settings...",
+      "warning",
+    );
+    await softenStreamForRecording(stream);
+    return recordClipOnce(stream, options.durationMs, { conservative: true });
+  }
+}
+
+async function recordClipOnce(stream, durationMs, recorderConfig = {}) {
+  const recorderOptions = chooseRecorderOptions(stream, recorderConfig);
   const recorder =
     Object.keys(recorderOptions).length > 0
       ? new MediaRecorder(stream, recorderOptions)
       : new MediaRecorder(stream);
   const chunks = [];
 
-  const stopped = new Promise((resolve, reject) => {
-    recorder.addEventListener("dataavailable", (event) => {
-      if (event.data && event.data.size > 0) {
-        chunks.push(event.data);
-      }
-    });
-
-    recorder.addEventListener("stop", resolve, { once: true });
+  const recordingFailed = new Promise((_, reject) => {
     recorder.addEventListener(
       "error",
       (event) => {
@@ -98,22 +116,40 @@ export async function recordClip(options) {
     );
   });
 
-  options.setStatus(`Recording a ${Math.round(options.durationMs / 100) / 10}s clip...`, "info");
-  recorder.start();
-  await wait(options.durationMs);
+  const started = new Promise((resolve) => {
+    recorder.addEventListener("start", resolve, { once: true });
+  });
 
-  if (typeof recorder.requestData === "function") {
+  const stopped = new Promise((resolve) => {
+    recorder.addEventListener("stop", resolve, { once: true });
+  });
+
+  recorder.addEventListener("dataavailable", (event) => {
+    if (event.data && event.data.size > 0) {
+      chunks.push(event.data);
+    }
+  });
+
+  recorder.start(RECORDER_TIMESLICE_MS);
+  await Promise.race([started, recordingFailed]);
+  await wait(durationMs);
+
+  if (recorder.state !== "inactive" && typeof recorder.requestData === "function") {
     recorder.requestData();
+    await wait(RETRY_RECORDING_WAIT_MS);
   }
 
-  recorder.stop();
-  await stopped;
+  if (recorder.state !== "inactive") {
+    recorder.stop();
+  }
+  await Promise.race([stopped, recordingFailed]);
 
   if (chunks.length === 0) {
     throw new Error("The browser returned an empty recording.");
   }
 
-  const mimeType = recorder.mimeType || chunks[0].type || "video/mp4";
+  const firstChunk = chunks.find((chunk) => chunk && chunk.size > 0) || chunks[0];
+  const mimeType = recorder.mimeType || firstChunk.type || "video/mp4";
   const extension = mimeType.includes("webm") ? "webm" : "mp4";
   const filename = `canting-scan-${Date.now()}.${extension}`;
   const blob = new Blob(chunks, { type: mimeType });
@@ -123,8 +159,8 @@ export async function recordClip(options) {
   });
 }
 
-function chooseRecorderOptions(stream) {
-  const options = {};
+function chooseRecorderOptions(stream, recorderConfig = {}) {
+  const recorderOptions = {};
   const candidates = [
     'video/mp4;codecs="avc1.42E01E,mp4a.40.2"',
     "video/mp4",
@@ -132,9 +168,9 @@ function chooseRecorderOptions(stream) {
     "video/webm",
   ];
 
-  const targetVideoBitrate = calculateTargetVideoBitrate(stream);
+  const targetVideoBitrate = calculateTargetVideoBitrate(stream, recorderConfig.conservative);
   if (Number.isFinite(targetVideoBitrate) && targetVideoBitrate > 0) {
-    options.videoBitsPerSecond = targetVideoBitrate;
+    recorderOptions.videoBitsPerSecond = targetVideoBitrate;
   }
 
   if (typeof MediaRecorder.isTypeSupported === "function") {
@@ -143,11 +179,34 @@ function chooseRecorderOptions(stream) {
     });
 
     if (supported) {
-      options.mimeType = supported;
+      recorderOptions.mimeType = supported;
     }
   }
 
-  return options;
+  return recorderOptions;
+}
+
+async function softenStreamForRecording(stream) {
+  const videoTrack =
+    stream && typeof stream.getVideoTracks === "function" ? stream.getVideoTracks()[0] : null;
+  if (!videoTrack || typeof videoTrack.applyConstraints !== "function") {
+    return;
+  }
+
+  const candidates = [
+    { width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 24 } },
+    { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 24 } },
+    { frameRate: { ideal: 24 } },
+  ];
+
+  for (const candidate of candidates) {
+    try {
+      await videoTrack.applyConstraints(candidate);
+      return;
+    } catch (error) {
+      // Keep trying lower-impact fallbacks until one sticks.
+    }
+  }
 }
 
 function buildPreferredVideoConstraints(facingMode) {
@@ -280,19 +339,23 @@ function withOptionalResizeMode(constraint, resizeMode) {
   };
 }
 
-function calculateTargetVideoBitrate(stream) {
+function calculateTargetVideoBitrate(stream, conservative = false) {
   const videoTrack =
     stream && typeof stream.getVideoTracks === "function" ? stream.getVideoTracks()[0] : null;
   if (!videoTrack || typeof videoTrack.getSettings !== "function") {
-    return 12_000_000;
+    return conservative ? SAFE_RECORDING_MIN_BITRATE : 12_000_000;
   }
 
   const settings = videoTrack.getSettings();
   const width = Number.isFinite(settings.width) ? settings.width : 1920;
   const height = Number.isFinite(settings.height) ? settings.height : 1080;
-  const frameRate = Number.isFinite(settings.frameRate) && settings.frameRate > 0 ? settings.frameRate : 30;
-  const rawTarget = Math.round(width * height * frameRate * 0.18);
-  return clamp(rawTarget, 12_000_000, 85_000_000);
+  const frameRate =
+    Number.isFinite(settings.frameRate) && settings.frameRate > 0
+      ? settings.frameRate
+      : 30;
+  const ratio = conservative ? 0.06 : 0.08;
+  const rawTarget = Math.round(width * height * frameRate * ratio);
+  return clamp(rawTarget, SAFE_RECORDING_MIN_BITRATE, SAFE_RECORDING_MAX_BITRATE);
 }
 
 function clamp(value, min, max) {
@@ -326,4 +389,8 @@ function isLikelyIosDevice() {
     /iPad|iPhone|iPod/i.test(userAgent) ||
     (platform === "MacIntel" && Number(navigator.maxTouchPoints || 0) > 1)
   );
+}
+
+function isEmptyRecordingError(error) {
+  return error instanceof Error && error.message === "The browser returned an empty recording.";
 }

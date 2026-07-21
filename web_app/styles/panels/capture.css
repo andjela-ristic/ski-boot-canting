@@ -63,7 +63,8 @@
   transition:
     border-color 160ms ease,
     box-shadow 160ms ease,
-    transform 160ms ease;
+    transform 160ms ease,
+    opacity 160ms ease;
 }
 
 .guide-controls {
@@ -117,7 +118,6 @@
     inset 0 0 0 1px rgba(74, 214, 132, 0.34);
 }
 
-.readiness-guide.is-idle .readiness-guide-shape,
 .readiness-guide.is-pending .readiness-guide-shape,
 .readiness-guide.is-not-ready .readiness-guide-shape {
   border-color: rgba(255, 91, 91, 0.96);

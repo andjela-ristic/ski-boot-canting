@@ -2473,11 +2473,11 @@
     }
   },
   "timings_sec": {
-    "search": 2.871033499999612,
-    "rendering": 0.266835300004459,
-    "analysis_total": 3.314014400002634,
-    "save": 1.075553899994702,
-    "process_total": 4.389569599999959
+    "search": 4.281288800000766,
+    "rendering": 0.4627772999992885,
+    "analysis_total": 4.935685999997077,
+    "save": 2.163768300000811,
+    "process_total": 7.099457899999834
   },
   "parameters": {
     "enabled": true,
@@ -2814,11 +2814,11 @@
   "reproducibility": {
     "effective_step_config_sha256": "a76cfc33d19885f815c03a48d5face90ffd40fe9ee28749cd12ac6303f736991",
     "pipeline_config_file": "config\\pipeline_config.yaml",
-    "pipeline_config_sha256": "4de8df44837b27f07beebe064240d318faa254fbfc4bc1aca87bf8815b3cb8c2",
+    "pipeline_config_sha256": "907c31f6891d211e2cc90fa98f409a881709766a51010f07c9f2922df729e043",
     "input_json_sha256": "9627e6c306a9864119458c246ff15b8712fdd7a2c096071366f04bf9f4a4f13f",
     "base_edge_sha256": "c98021ebe56b5ec7849837ea95fd528b2251c4825532ae7cc64b6195e26851c0",
     "roi_mask_sha256": "df2aa3cdff25d6b30475d543a78f48b75920d37eef20e79f38107a71a7a65d2b",
-    "step06_source_sha256": "303f78f9fab1508f438a7d6fe4997fb72cc30312f84ffe1a7728e0bce9f37670",
+    "step06_source_sha256": "e5db3d09fe2bfe3321237a30832c9c14f57dc08d5fe4510e12c845114544b6e0",
     "step06_source_files": [
       {
         "path": "pipeline\\06_search_central_ruler.py",
@@ -2850,11 +2850,11 @@
       },
       {
         "path": "pipeline\\lib\\step_06_search_central_ruler\\processing.py",
-        "sha256": "e31a88f0b17ab35a5b761f4da3522267561d1650a868513a79364d2b28ba908e"
+        "sha256": "7ff44faa3979b2202ff88150f6dd3676c30b385a29c31acf1c4df9ab47e11645"
       },
       {
         "path": "pipeline\\lib\\step_06_search_central_ruler\\rendering.py",
-        "sha256": "c728a4f4f178b38ce616a9bfc5ad68507f6daf512c8924ad0d0ec42e3027ec37"
+        "sha256": "c61bf59fe7b1f56000cb15a345b9205e86fdd8d433dc220046b31e717907491b"
       },
       {
         "path": "pipeline\\lib\\step_06_search_central_ruler\\search.py",

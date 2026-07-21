@@ -15,6 +15,10 @@ from .rendering import create_comparison, draw_diagnostic, draw_overlay, load_ba
 from .table_line import build_exclusion_mask, detect_table_line_with_stability
 
 
+def _persistence_enabled(key: str, default: bool = True) -> bool:
+    return bool(context.STEP_CONFIG.get("persistence", {}).get(key, default))
+
+
 def collect_metadata_files(image_filter: str | None = None, limit: int | None = None) -> list[Path]:
     input_dir = context.get_step_dirs()["input_metadata_dir"]
     if not input_dir.exists():
@@ -117,7 +121,9 @@ def build_analysis(metadata_path: Path) -> dict:
         axis_quality,
         measurement_confidence,
     )
-    diagnostic = draw_diagnostic(edge, exclusion_mask, table_result)
+    save_diagnostic = _persistence_enabled("save_diagnostic", True)
+    save_comparison = _persistence_enabled("save_comparison", True)
+    diagnostic = draw_diagnostic(edge, exclusion_mask, table_result) if (save_diagnostic or save_comparison) else None
 
     table_line = table_result.get("winner")
     output_metadata = {
@@ -191,7 +197,7 @@ def build_analysis(metadata_path: Path) -> dict:
         "parameters": deepcopy(context.STEP_CONFIG),
         "timings_sec": {"analysis_total": float(time.perf_counter() - started)},
     }
-    comparison = create_comparison(overlay, diagnostic, output_metadata)
+    comparison = create_comparison(overlay, diagnostic, output_metadata) if save_comparison and diagnostic is not None else None
     return {
         "image_name": image_name,
         "metadata": output_metadata,
@@ -211,20 +217,28 @@ def process_metadata_file(metadata_path: Path) -> dict:
     comparison_path = dirs["output_comparison_dir"] / image_name
     diagnostic_path = dirs["output_diagnostics_dir"] / image_name
     metadata_output_path = dirs["output_metadata_dir"] / f"{stem}_canting_angle.json"
-    for path in (overlay_path, comparison_path, diagnostic_path, metadata_output_path):
-        path.parent.mkdir(parents=True, exist_ok=True)
+    save_comparison = _persistence_enabled("save_comparison", True)
+    save_diagnostic = _persistence_enabled("save_diagnostic", True)
+    overlay_path.parent.mkdir(parents=True, exist_ok=True)
+    metadata_output_path.parent.mkdir(parents=True, exist_ok=True)
+    if save_comparison:
+        comparison_path.parent.mkdir(parents=True, exist_ok=True)
+    if save_diagnostic:
+        diagnostic_path.parent.mkdir(parents=True, exist_ok=True)
     for path, image in (
         (overlay_path, analysis["overlay"]),
-        (comparison_path, analysis["comparison"]),
-        (diagnostic_path, analysis["diagnostic"]),
+        (comparison_path, analysis["comparison"]) if save_comparison else (None, None),
+        (diagnostic_path, analysis["diagnostic"]) if save_diagnostic else (None, None),
     ):
-        if not cv2.imwrite(str(path), image):
+        if path is None:
+            continue
+        if image is None or not cv2.imwrite(str(path), image):
             raise RuntimeError(f"Could not save image: {path}")
     metadata = deepcopy(analysis["metadata"])
     metadata.update({
         "output_overlay_file": context.relative_project_path(overlay_path),
-        "output_comparison_file": context.relative_project_path(comparison_path),
-        "output_diagnostic_file": context.relative_project_path(diagnostic_path),
+        "output_comparison_file": context.relative_project_path(comparison_path) if save_comparison else None,
+        "output_diagnostic_file": context.relative_project_path(diagnostic_path) if save_diagnostic else None,
     })
     metadata["timings_sec"]["process_total"] = float(time.perf_counter() - started)
     context.save_json(metadata_output_path, metadata)
@@ -246,7 +260,7 @@ def process_metadata_file(metadata_path: Path) -> dict:
         "uncertainty_95_deg": metadata.get("angle_uncertainty", {}).get("table_angle_uncertainty_95_deg"),
         "decision": measurement.get("decision", "reference_line_not_reliable"),
         "overlay_path": context.relative_project_path(overlay_path),
-        "comparison_path": context.relative_project_path(comparison_path),
+        "comparison_path": context.relative_project_path(comparison_path) if save_comparison else None,
         "metadata_path": context.relative_project_path(metadata_output_path),
     }
 

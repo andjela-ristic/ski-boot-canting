@@ -61,6 +61,10 @@ class PipelineExecutionCoordinator:
         self._pending_high_priority = 0
         self._condition = threading.Condition()
 
+    @property
+    def low_priority_capacity(self) -> int:
+        return max(1, self.max_parallel - self.reserved_high_priority_slots)
+
     @contextmanager
     def acquire(self, priority: str) -> Any:
         is_high_priority = priority == "high"
@@ -78,10 +82,9 @@ class PipelineExecutionCoordinator:
                     self._condition.notify_all()
                     raise
             else:
-                low_priority_limit = max(1, self.max_parallel - self.reserved_high_priority_slots)
                 while (
                     self._active_total >= self.max_parallel
-                    or self._active_low_priority >= low_priority_limit
+                    or self._active_low_priority >= self.low_priority_capacity
                     or self._pending_high_priority > 0
                 ):
                     self._condition.wait()
@@ -412,7 +415,12 @@ class PipelineRunner:
             frames_config=frames_config,
             requested_frame_count=requested_frame_count,
         )
-        max_workers = min(sample_count, frames_config["max_workers"])
+        coordinator = _load_execution_coordinator()
+        max_workers = min(
+            sample_count,
+            frames_config["max_workers"],
+            coordinator.low_priority_capacity,
+        )
 
         extracted_frame_paths = self._extract_sampled_frames(
             resolved_video_path,
@@ -434,7 +442,8 @@ class PipelineRunner:
         averaged_metadata = self._average_metadata_tree(
             [item.analysis.metadata for item in frame_results]
         )
-        representative_frame = self._choose_representative_video_frame(frame_results)
+        ordered_frame_results = self._order_video_frames(frame_results)
+        best_frame = ordered_frame_results[0]
 
         return {
             "video_name": video_name,
@@ -442,20 +451,21 @@ class PipelineRunner:
             "input_video_path": input_video_path,
             "processing_time_ms": round(processing_time_ms, 2),
             "overlay_data_url": self._png_bytes_to_data_url(
-                representative_frame.analysis.overlay_png_bytes
+                best_frame.analysis.overlay_png_bytes
             ),
-            "overlay_output_path": representative_frame.analysis.overlay_output_path,
-            "metadata_output_path": representative_frame.analysis.metadata_output_path,
+            "overlay_output_path": best_frame.analysis.overlay_output_path,
+            "metadata_output_path": best_frame.analysis.metadata_output_path,
             "frame_count": len(frame_results),
             "frame_sampling": {
                 "sample_count": sample_count,
                 "max_workers": max_workers,
                 "requested_frame_count": requested_frame_count,
             },
-            "selected_frame_index": representative_frame.frame_index,
-            "selected_timestamp_ms": round(representative_frame.timestamp_ms, 2),
+            "selected_frame_index": best_frame.frame_index,
+            "selected_timestamp_ms": round(best_frame.timestamp_ms, 2),
             "frames": [
-                item.to_dict(include_step_logs=include_step_logs) for item in frame_results
+                item.to_dict(include_step_logs=include_step_logs)
+                for item in ordered_frame_results
             ],
             "average_metadata": averaged_metadata,
             "artifacts_dir": str(extraction_dir) if keep_artifacts else None,
@@ -478,14 +488,100 @@ class PipelineRunner:
             )
         return sample_count
 
-    def _choose_representative_video_frame(
+    def _choose_best_video_frame(
         self,
         frame_results: list[FrameAnalysisResult],
     ) -> FrameAnalysisResult:
         if not frame_results:
             raise ApiError(500, "Video analysis did not produce any frame results.")
 
-        return frame_results[len(frame_results) // 2]
+        return self._order_video_frames(frame_results)[0]
+
+    def _order_video_frames(
+        self,
+        frame_results: list[FrameAnalysisResult],
+    ) -> list[FrameAnalysisResult]:
+        if not frame_results:
+            return []
+
+        middle_index = (len(frame_results) - 1) / 2.0
+        return sorted(
+            frame_results,
+            key=lambda item: (
+                self._frame_absolute_canting_distance(item),
+                -self._frame_measurement_confidence(item),
+                -self._frame_table_line_quality(item),
+                -self._frame_axis_quality(item),
+                -self._frame_table_line_stability(item),
+                self._frame_uncertainty_95_deg(item),
+                abs(item.frame_index - middle_index),
+                item.frame_index,
+            ),
+        )
+
+    def _frame_absolute_canting_distance(self, frame_result: FrameAnalysisResult) -> float:
+        metadata = frame_result.analysis.metadata
+        angle_measurement = metadata.get("angle_measurement", {})
+        value = angle_measurement.get("absolute_canting_angle_deg")
+        if value is None:
+            signed = angle_measurement.get("canting_angle_deg")
+            try:
+                value = abs(float(signed))
+            except (TypeError, ValueError):
+                return math.inf
+
+        try:
+            numeric = float(value)
+        except (TypeError, ValueError):
+            return math.inf
+        if not math.isfinite(numeric):
+            return math.inf
+        return max(0.0, numeric)
+
+    def _frame_measurement_confidence(self, frame_result: FrameAnalysisResult) -> float:
+        metadata = frame_result.analysis.metadata
+        measurement = metadata.get("measurement_validation", {})
+        return self._score_value(measurement.get("measurement_confidence_score"))
+
+    def _frame_table_line_quality(self, frame_result: FrameAnalysisResult) -> float:
+        metadata = frame_result.analysis.metadata
+        table_line = metadata.get("table_line", {})
+        return self._score_value(
+            table_line.get("table_line_quality_score", table_line.get("score"))
+        )
+
+    def _frame_axis_quality(self, frame_result: FrameAnalysisResult) -> float:
+        metadata = frame_result.analysis.metadata
+        axis_validation = metadata.get("axis_validation", {})
+        return self._score_value(axis_validation.get("axis_quality_score"))
+
+    def _frame_table_line_stability(self, frame_result: FrameAnalysisResult) -> float:
+        metadata = frame_result.analysis.metadata
+        table_line_stability = metadata.get("table_line_stability", {})
+        return self._score_value(table_line_stability.get("score"))
+
+    def _frame_uncertainty_95_deg(self, frame_result: FrameAnalysisResult) -> float:
+        metadata = frame_result.analysis.metadata
+        uncertainty = metadata.get("angle_uncertainty", {})
+        value = uncertainty.get("table_angle_uncertainty_95_deg")
+        if value is None:
+            return math.inf
+        try:
+            numeric = float(value)
+        except (TypeError, ValueError):
+            return math.inf
+        if not math.isfinite(numeric):
+            return math.inf
+        return max(0.0, numeric)
+
+    def _score_value(self, value: Any) -> float:
+        try:
+            numeric = float(value)
+        except (TypeError, ValueError):
+            return 0.0
+        if not math.isfinite(numeric):
+            return 0.0
+        return numeric
 
     def _resolve_input_path(self, image_path: str | Path) -> Path:
         resolved = self._resolve_existing_path(image_path)
@@ -962,6 +1058,47 @@ class PipelineRunner:
     def _png_bytes_to_data_url(self, png_bytes: bytes) -> str:
         return "data:image/png;base64," + base64.b64encode(png_bytes).decode("ascii")
 
+    def _apply_request_pipeline_overrides(self, config: dict[str, Any]) -> dict[str, Any]:
+        """Disable nonessential per-request artifacts without changing results."""
+        step06 = dict(config.get("step_06_search_central_ruler", {}))
+        step06["persistence"] = {
+            **dict(step06.get("persistence", {})),
+            "save_overlay": False,
+            "save_comparison": False,
+            "save_candidate_snapshots": False,
+        }
+        config["step_06_search_central_ruler"] = step06
+
+        step07 = dict(config.get("step_07_verify_central_ruler_symmetry", {}))
+        step07["persistence"] = {
+            **dict(step07.get("persistence", {})),
+            "save_overlay": False,
+            "save_comparison": False,
+            "save_candidate_snapshots": False,
+            "save_rectified": False,
+            "save_evaluation_mask": True,
+            "save_evaluation_edge": False,
+        }
+        config["step_07_verify_central_ruler_symmetry"] = step07
+
+        step08 = dict(config.get("step_08_multi_validate_central_ruler", {}))
+        step08["persistence"] = {
+            **dict(step08.get("persistence", {})),
+            "save_overlay": False,
+            "save_comparison": False,
+            "save_diagnostic": False,
+        }
+        config["step_08_multi_validate_central_ruler"] = step08
+
+        step09 = dict(config.get("step_09_measure_canting_angle", {}))
+        step09["persistence"] = {
+            **dict(step09.get("persistence", {})),
+            "save_comparison": False,
+            "save_diagnostic": False,
+        }
+        config["step_09_measure_canting_angle"] = step09
+        return config
+
     def _write_job_config(self, job_dir: Path) -> Path:
         config = json.loads(json.dumps(_load_base_config()))
 
@@ -969,6 +1106,7 @@ class PipelineRunner:
         config["paths"]["working_png_dir"] = str((job_dir / "working_png").resolve())
         config["paths"]["processed_dir"] = str((job_dir / "processed").resolve())
         config["paths"]["metadata_dir"] = str((job_dir / "metadata").resolve())
+        config = self._apply_request_pipeline_overrides(config)
 
         display = dict(config.get("display", {}))
         display["show_windows"] = False

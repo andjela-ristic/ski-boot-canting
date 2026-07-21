@@ -35,6 +35,21 @@ from .rendering import (
 from .symmetry import sanitize_result, verify_candidates
 
 
+def _persistence_enabled(key: str, default: bool = True) -> bool:
+    return bool(context.STEP_CONFIG.get("persistence", {}).get(key, default))
+
+
+def _apply_artificial_slowdown(started: float) -> float:
+    factor = max(1.0, float(cfg("performance", "artificial_slowdown_factor", default=1.0)))
+    if factor <= 1.0:
+        return 0.0
+    elapsed = time.perf_counter() - started
+    delay = max(0.0, elapsed * (factor - 1.0))
+    if delay > 0.0:
+        time.sleep(delay)
+    return float(delay)
+
+
 def collect_metadata_files(image_filter: str | None = None, limit: int | None = None) -> list[Path]:
     input_dir = get_step_dirs()["input_metadata_dir"]
     if not input_dir.exists():
@@ -99,21 +114,33 @@ def build_analysis(metadata_path: Path) -> dict:
         candidate["verification_rank"] = int(rank)
         candidate["winner_margin_percent"] = float(margin if rank == 1 else 0.0)
 
+    save_overlay = _persistence_enabled("save_overlay", True)
+    save_comparison = _persistence_enabled("save_comparison", True)
+    save_candidate_snapshots = _persistence_enabled("save_candidate_snapshots", True)
+    needs_render_background = save_overlay or save_comparison or save_candidate_snapshots
     rendering_started = time.perf_counter()
-    background, visual_path = load_visual_background(metadata, edge_raw)
-    corridor_contours = extract_corridor_contours(corridor_mask)
-    overlay = draw_winner_overlay(
-        background,
-        corridor_mask,
-        ranked,
-        corridor_info["consensus_axis"],
-        y_min,
-        y_max,
-        image_name,
-        confidence,
-        corridor_contours=corridor_contours,
-    )
-    comparison = create_comparison(overlay, ranked)
+    background = None
+    visual_path = None
+    corridor_contours = None
+    overlay = None
+    comparison = None
+    if needs_render_background:
+        background, visual_path = load_visual_background(metadata, edge_raw)
+        corridor_contours = extract_corridor_contours(corridor_mask)
+    if (save_overlay or save_comparison) and background is not None:
+        overlay = draw_winner_overlay(
+            background,
+            corridor_mask,
+            ranked,
+            corridor_info["consensus_axis"],
+            y_min,
+            y_max,
+            image_name,
+            confidence,
+            corridor_contours=corridor_contours,
+        )
+    if save_comparison and overlay is not None:
+        comparison = create_comparison(overlay, ranked)
 
     def render_snapshot(candidate: dict) -> dict:
         return {
@@ -132,11 +159,14 @@ def build_analysis(metadata_path: Path) -> dict:
 
     configured_workers = max(1, int(cfg("performance", "snapshot_workers", default=2)))
     worker_count = min(configured_workers, os.cpu_count() or 1, len(ranked))
-    if worker_count <= 1:
-        snapshots = [render_snapshot(candidate) for candidate in ranked]
+    if save_candidate_snapshots and background is not None:
+        if worker_count <= 1:
+            snapshots = [render_snapshot(candidate) for candidate in ranked]
+        else:
+            with ThreadPoolExecutor(max_workers=worker_count, thread_name_prefix="step07-snapshot") as executor:
+                snapshots = list(executor.map(render_snapshot, ranked))
     else:
-        with ThreadPoolExecutor(max_workers=worker_count, thread_name_prefix="step07-snapshot") as executor:
-            snapshots = list(executor.map(render_snapshot, ranked))
+        snapshots = []
     rendering_duration = time.perf_counter() - rendering_started
 
     output_metadata = {
@@ -191,24 +221,48 @@ def process_metadata_file(metadata_path: Path) -> dict:
     rectified_path = dirs["output_rectified_dir"] / image_name
     evaluation_mask_path = dirs["output_evaluation_mask_dir"] / image_name
     evaluation_edge_path = dirs["output_evaluation_edge_dir"] / image_name
-    for path in [overlay_path.parent, comparison_path.parent, output_metadata_path.parent, snapshot_dir, rectified_path.parent, evaluation_mask_path.parent, evaluation_edge_path.parent]:
-        path.mkdir(parents=True, exist_ok=True)
-    write_jobs: list[tuple[Path, object, str]] = [
-        (overlay_path, analysis["overlay"], "overlay"),
-        (comparison_path, analysis["comparison"], "comparison"),
-        (rectified_path, analysis["winner_rectified_edge"], "rectified winner"),
-        (evaluation_mask_path, analysis["evaluation_mask"], "Step 07 evaluation mask"),
-        (evaluation_edge_path, analysis["evaluation_edge_mask"], "Step 07 evaluation edge mask"),
-    ]
+    save_overlay = _persistence_enabled("save_overlay", True)
+    save_comparison = _persistence_enabled("save_comparison", True)
+    save_candidate_snapshots = _persistence_enabled("save_candidate_snapshots", True)
+    save_rectified = _persistence_enabled("save_rectified", True)
+    save_evaluation_mask = _persistence_enabled("save_evaluation_mask", True)
+    save_evaluation_edge = _persistence_enabled("save_evaluation_edge", True)
+
+    output_metadata_path.parent.mkdir(parents=True, exist_ok=True)
+    if save_overlay:
+        overlay_path.parent.mkdir(parents=True, exist_ok=True)
+    if save_comparison:
+        comparison_path.parent.mkdir(parents=True, exist_ok=True)
+    if save_candidate_snapshots:
+        snapshot_dir.mkdir(parents=True, exist_ok=True)
+    if save_rectified:
+        rectified_path.parent.mkdir(parents=True, exist_ok=True)
+    if save_evaluation_mask:
+        evaluation_mask_path.parent.mkdir(parents=True, exist_ok=True)
+    if save_evaluation_edge:
+        evaluation_edge_path.parent.mkdir(parents=True, exist_ok=True)
+
+    write_jobs: list[tuple[Path, object, str]] = []
+    if save_overlay:
+        write_jobs.append((overlay_path, analysis["overlay"], "overlay"))
+    if save_comparison:
+        write_jobs.append((comparison_path, analysis["comparison"], "comparison"))
+    if save_rectified:
+        write_jobs.append((rectified_path, analysis["winner_rectified_edge"], "rectified winner"))
+    if save_evaluation_mask:
+        write_jobs.append((evaluation_mask_path, analysis["evaluation_mask"], "Step 07 evaluation mask"))
+    if save_evaluation_edge:
+        write_jobs.append((evaluation_edge_path, analysis["evaluation_edge_mask"], "Step 07 evaluation edge mask"))
     snapshot_paths: list[Path] = []
-    for snapshot in analysis["snapshots"]:
-        path = snapshot_dir / f"{snapshot['candidate_label']}_{image_name}"
-        snapshot_paths.append(path)
-        write_jobs.append((path, snapshot["image"], "candidate snapshot"))
+    if save_candidate_snapshots:
+        for snapshot in analysis["snapshots"]:
+            path = snapshot_dir / f"{snapshot['candidate_label']}_{image_name}"
+            snapshot_paths.append(path)
+            write_jobs.append((path, snapshot["image"], "candidate snapshot"))
 
     def write_image(job: tuple[Path, object, str]) -> Path:
         path, image, description = job
-        if not cv2.imwrite(str(path), image):
+        if image is None or not cv2.imwrite(str(path), image):
             raise RuntimeError(f"Could not save {description}: {path}")
         return path
 
@@ -223,14 +277,20 @@ def process_metadata_file(metadata_path: Path) -> dict:
     snapshot_files = [relative_project_path(path) for path in snapshot_paths]
     metadata = deepcopy(analysis["metadata"])
     metadata.update({
-        "output_overlay_file": relative_project_path(overlay_path),
-        "output_comparison_file": relative_project_path(comparison_path),
-        "output_rectified_file": relative_project_path(rectified_path),
-        "output_evaluation_mask_file": relative_project_path(evaluation_mask_path),
-        "output_evaluation_edge_file": relative_project_path(evaluation_edge_path),
+        "output_overlay_file": relative_project_path(overlay_path) if save_overlay else None,
+        "output_comparison_file": relative_project_path(comparison_path) if save_comparison else None,
+        "output_rectified_file": relative_project_path(rectified_path) if save_rectified else None,
+        "output_evaluation_mask_file": relative_project_path(evaluation_mask_path) if save_evaluation_mask else None,
+        "output_evaluation_edge_file": relative_project_path(evaluation_edge_path) if save_evaluation_edge else None,
         "evaluation_mask_role": "candidate_independent_support_mask_not_shape_ground_truth",
         "candidate_snapshot_files": snapshot_files,
     })
+    artificial_delay = _apply_artificial_slowdown(started)
+    if artificial_delay > 0.0:
+        metadata["timings_sec"]["artificial_slowdown"] = float(artificial_delay)
+        metadata["timings_sec"]["artificial_slowdown_factor"] = float(
+            cfg("performance", "artificial_slowdown_factor", default=1.0)
+        )
     metadata["timings_sec"]["process_total"] = float(time.perf_counter() - started)
     save_json(output_metadata_path, metadata)
     winner = metadata["winner"]
@@ -243,12 +303,12 @@ def process_metadata_file(metadata_path: Path) -> dict:
         "winner_margin_percent": float(metadata["winner_margin_percent"]),
         "confidence": str(metadata["confidence"]),
         "winner_tilt_deg": float(winner["tilt_deg"]),
-        "overlay_path": relative_project_path(overlay_path),
-        "comparison_path": relative_project_path(comparison_path),
+        "overlay_path": relative_project_path(overlay_path) if save_overlay else None,
+        "comparison_path": relative_project_path(comparison_path) if save_comparison else None,
         "metadata_path": relative_project_path(output_metadata_path),
         "candidate_snapshot_dir": relative_project_path(snapshot_dir),
-        "evaluation_mask_path": relative_project_path(evaluation_mask_path),
-        "evaluation_edge_path": relative_project_path(evaluation_edge_path),
+        "evaluation_mask_path": relative_project_path(evaluation_mask_path) if save_evaluation_mask else None,
+        "evaluation_edge_path": relative_project_path(evaluation_edge_path) if save_evaluation_edge else None,
     }
 
 

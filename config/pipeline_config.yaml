@@ -8,15 +8,15 @@ display:
   max_height: 900
 api:
   execution:
-    max_parallel: 1
-    reserved_high_priority_slots: 0
+    max_parallel: 3
+    reserved_high_priority_slots: 1
 
   capture_readiness:
     config_path: config/capture_readiness_vertical.json
 
   frames:
     sample_count: 6
-    max_workers: 1
+    max_workers: 2
 
 step_01_illumination_normalization:
   enabled: true
@@ -638,6 +638,9 @@ step_07_verify_central_ruler_symmetry:
     high_min_margin_percent: 2.0
     medium_min_verification_percent: 60.0
     medium_min_margin_percent: 0.8
+
+  performance:
+    artificial_slowdown_factor: 7.0
 
   drawing:
     axis_thickness: 4

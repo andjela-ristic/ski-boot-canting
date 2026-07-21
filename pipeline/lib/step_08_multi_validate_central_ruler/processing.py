@@ -27,6 +27,10 @@ from .validators import (
 )
 
 
+def _persistence_enabled(key: str, default: bool = True) -> bool:
+    return bool(context.STEP_CONFIG.get("persistence", {}).get(key, default))
+
+
 def collect_metadata_files(image_filter: str | None = None, limit: int | None = None) -> list[Path]:
     input_dir = get_step_dirs()["input_metadata_dir"]
     if not input_dir.exists():
@@ -142,20 +146,31 @@ def build_analysis(metadata_path: Path) -> dict:
     )
     confidence = compute_confidence(final_candidate, ranked, y_min, y_max)
 
-    background, visual_path = load_visual_background(step06, step07, evaluation_mask)
-    overlay = draw_overlay(
-        background,
-        evaluation_mask,
-        ranked,
-        final_candidate,
-        y_min,
-        y_max,
-        image_name,
-        confidence,
-        selection_info,
-    )
-    comparison = create_comparison(overlay, ranked, final_candidate, confidence, selection_info)
-    diagnostic = draw_diagnostic(evaluation_mask, ranked, final_candidate, y_min, y_max)
+    save_overlay = _persistence_enabled("save_overlay", True)
+    save_comparison = _persistence_enabled("save_comparison", True)
+    save_diagnostic = _persistence_enabled("save_diagnostic", True)
+    background = None
+    visual_path = None
+    overlay = None
+    comparison = None
+    diagnostic = None
+    if save_overlay or save_comparison:
+        background, visual_path = load_visual_background(step06, step07, evaluation_mask)
+        overlay = draw_overlay(
+            background,
+            evaluation_mask,
+            ranked,
+            final_candidate,
+            y_min,
+            y_max,
+            image_name,
+            confidence,
+            selection_info,
+        )
+    if save_comparison and overlay is not None:
+        comparison = create_comparison(overlay, ranked, final_candidate, confidence, selection_info)
+    if save_diagnostic:
+        diagnostic = draw_diagnostic(evaluation_mask, ranked, final_candidate, y_min, y_max)
 
     output_metadata = {
         "image_name": image_name,
@@ -202,20 +217,30 @@ def process_metadata_file(metadata_path: Path) -> dict:
     comparison_path = dirs["output_comparison_dir"] / image_name
     diagnostic_path = dirs["output_diagnostics_dir"] / image_name
     metadata_output_path = dirs["output_metadata_dir"] / f"{stem}_multi_validation.json"
-    for path in (overlay_path, comparison_path, diagnostic_path, metadata_output_path):
-        path.parent.mkdir(parents=True, exist_ok=True)
+    save_overlay = _persistence_enabled("save_overlay", True)
+    save_comparison = _persistence_enabled("save_comparison", True)
+    save_diagnostic = _persistence_enabled("save_diagnostic", True)
+    metadata_output_path.parent.mkdir(parents=True, exist_ok=True)
+    if save_overlay:
+        overlay_path.parent.mkdir(parents=True, exist_ok=True)
+    if save_comparison:
+        comparison_path.parent.mkdir(parents=True, exist_ok=True)
+    if save_diagnostic:
+        diagnostic_path.parent.mkdir(parents=True, exist_ok=True)
     for path, image in (
-        (overlay_path, analysis["overlay"]),
-        (comparison_path, analysis["comparison"]),
-        (diagnostic_path, analysis["diagnostic"]),
+        (overlay_path, analysis["overlay"]) if save_overlay else (None, None),
+        (comparison_path, analysis["comparison"]) if save_comparison else (None, None),
+        (diagnostic_path, analysis["diagnostic"]) if save_diagnostic else (None, None),
     ):
-        if not cv2.imwrite(str(path), image):
+        if path is None:
+            continue
+        if image is None or not cv2.imwrite(str(path), image):
             raise RuntimeError(f"Could not save image: {path}")
     metadata = deepcopy(analysis["metadata"])
     metadata.update({
-        "output_overlay_file": relative_project_path(overlay_path),
-        "output_comparison_file": relative_project_path(comparison_path),
-        "output_diagnostic_file": relative_project_path(diagnostic_path),
+        "output_overlay_file": relative_project_path(overlay_path) if save_overlay else None,
+        "output_comparison_file": relative_project_path(comparison_path) if save_comparison else None,
+        "output_diagnostic_file": relative_project_path(diagnostic_path) if save_diagnostic else None,
     })
     metadata["timings_sec"]["process_total"] = float(time.perf_counter() - started)
     save_json(metadata_output_path, metadata)
@@ -229,8 +254,8 @@ def process_metadata_file(metadata_path: Path) -> dict:
         "multi_validation_percent": float(metadata["multi_validation_percent"]),
         "confidence_percent": float(metadata["confidence_percent"]),
         "decision": str(metadata["decision"]),
-        "overlay_path": relative_project_path(overlay_path),
-        "comparison_path": relative_project_path(comparison_path),
+        "overlay_path": relative_project_path(overlay_path) if save_overlay else None,
+        "comparison_path": relative_project_path(comparison_path) if save_comparison else None,
         "metadata_path": relative_project_path(metadata_output_path),
     }
 

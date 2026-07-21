@@ -15,7 +15,9 @@ function renderCapabilityPills(options) {
   }
 
   if (options.liveAvailable) {
-    options.elements.cameraPill.textContent = "In-app camera: active";
+    options.elements.cameraPill.textContent = options.state.currentStream
+      ? "In-app camera: active"
+      : "In-app camera: available";
     options.elements.cameraPill.className = "pill success";
   } else {
     options.elements.cameraPill.textContent = "In-app camera: upload mode";
@@ -35,6 +37,12 @@ function renderCaptureNote(options) {
 }
 
 function renderPreviewPlaceholder(options) {
+  if (options.state.currentStream) {
+    options.elements.previewPlaceholder.textContent =
+      "Live capture is running.";
+    return;
+  }
+
   if (options.liveAvailable) {
     options.elements.previewPlaceholder.textContent =
       "Camera preview will appear here when the browser allows live access.";

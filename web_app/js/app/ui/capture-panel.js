@@ -11,6 +11,7 @@ import {
   canUseLiveCamera,
   initializeCamera,
   recordClip,
+  stopCurrentStream,
 } from "../services/camera-recorder.js";
 import { formatFileSize, normalizeError } from "../utils/format.js";
 
@@ -20,6 +21,7 @@ const READINESS_FAILURE_STREAK = 3;
 const NON_READY_GUIDE_DETAIL = "";
 const BASE_GUIDE_WIDTH_RATIO = 0.6;
 const BASE_GUIDE_HEIGHT_RATIO = 0.8;
+const QUICK_CAPTURE_DURATION_MS = 2000;
 
 export function bindCapturePanel(options) {
   options.elements.captureNote.textContent = buildCaptureNote();
@@ -51,7 +53,10 @@ export function bindCapturePanel(options) {
 
   options.elements.toggleCamera.addEventListener("click", async () => {
     if (!canUseLiveCamera()) {
-      options.setStatus("Camera switching is only available when live preview is running in the browser.", "warning");
+      options.setStatus(
+        "Camera switching is only available when live preview is running in the browser.",
+        "warning",
+      );
       return;
     }
 
@@ -61,6 +66,7 @@ export function bindCapturePanel(options) {
       elements: options.elements,
       state: options.state,
       setStatus: options.setStatus,
+      refreshChrome: options.refreshChrome,
     });
   });
 
@@ -70,7 +76,7 @@ export function bindCapturePanel(options) {
     }
 
     if (!canUseLiveCamera()) {
-      options.setStatus("Use the Record or choose video option for this session.", "warning");
+      options.setStatus("Use Upload existing video for this session.", "warning");
       return;
     }
 
@@ -83,15 +89,35 @@ export function bindCapturePanel(options) {
         elements: options.elements,
         state: options.state,
         setStatus: options.setStatus,
-        durationMs: getClipDurationMs(options.elements),
+        durationMs: QUICK_CAPTURE_DURATION_MS,
+        refreshChrome: options.refreshChrome,
       });
 
-      setSelectedVideo(options, file, "Clip is ready for analysis.");
-      options.setStatus("The clip was saved. You can run the analysis right away.", "success");
+      setSelectedVideo(options, file, "Quick capture recorded. Running analysis...");
+      stopCurrentStream({
+        elements: options.elements,
+        state: options.state,
+        refreshChrome: options.refreshChrome,
+      });
+
+      options.state.activeOperation = "uploading";
+      options.refreshChrome();
+      options.setStatus("Uploading the captured 2-second clip for analysis...", "info");
+      persistForm(options.elements);
+
+      const result = await uploadSelectedVideo(options, file, QUICK_CAPTURE_DURATION_MS);
+      rememberResultOverlay(options, result);
+      options.renderResult(result);
+      options.setStatus("Analysis finished. The captured 2-second clip was processed.", "success");
     } catch (error) {
       console.error(error);
       options.setStatus(normalizeError(error, "Recording failed."), "error");
     } finally {
+      stopCurrentStream({
+        elements: options.elements,
+        state: options.state,
+        refreshChrome: options.refreshChrome,
+      });
       options.state.busy = false;
       options.state.activeOperation = null;
       options.refreshChrome();
@@ -114,7 +140,7 @@ export function bindCapturePanel(options) {
     }
 
     if (!options.state.selectedVideoFile) {
-      options.setStatus("Record or choose a video file first.", "warning");
+      options.setStatus("Upload or capture a video file first.", "warning");
       return;
     }
 
@@ -125,15 +151,11 @@ export function bindCapturePanel(options) {
       options.setStatus("Uploading the original video for analysis...", "info");
       persistForm(options.elements);
 
-      const requestOptions = {
-        file: options.state.selectedVideoFile,
-        baseUrl: normalizedBaseUrlValue(options.elements),
-        keepArtifacts: options.elements.keepArtifacts.checked,
-        clipDurationMs: getClipDurationMs(options.elements),
-        frameCount: getFrameCount(options.elements),
-      };
-
-      const result = await uploadVideo(requestOptions);
+      const result = await uploadSelectedVideo(
+        options,
+        options.state.selectedVideoFile,
+        getClipDurationMs(options.elements),
+      );
 
       rememberResultOverlay(options, result);
       options.renderResult(result);
@@ -161,6 +183,16 @@ function setSelectedVideo(options, file, label) {
   options.state.clipPreviewUrl = URL.createObjectURL(file);
   options.elements.clipPreview.src = options.state.clipPreviewUrl;
   options.elements.clipShell.classList.remove("is-hidden");
+}
+
+async function uploadSelectedVideo(options, file, clipDurationMs) {
+  return uploadVideo({
+    file,
+    baseUrl: normalizedBaseUrlValue(options.elements),
+    keepArtifacts: options.elements.keepArtifacts.checked,
+    clipDurationMs,
+    frameCount: getFrameCount(options.elements),
+  });
 }
 
 function startReadinessLoop(options) {

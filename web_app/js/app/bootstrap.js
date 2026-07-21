@@ -55,17 +55,18 @@ export async function bootstrapApp() {
         elements,
         state,
         setStatus: statusPresenter.setStatus,
+        refreshChrome,
       }).catch((error) => {
         console.error(error);
         statusPresenter.setStatus(
-          "The browser camera is not available right now. Use the Record or choose video option.",
+          "The browser camera is not available right now. Use Record or choose video.",
           "warning",
         );
         refreshChrome();
       });
     } else {
       statusPresenter.setStatus(
-        "The app is ready. For this session, use the Record or choose video option.",
+        "The app is ready. For this session, use Record or choose video.",
         "warning",
       );
     }
