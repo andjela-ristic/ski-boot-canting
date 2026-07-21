@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+from functools import lru_cache
 from pathlib import Path
 
 import cv2
@@ -97,7 +98,13 @@ def ensure_odd_kernel_size(value: int, name: str) -> int:
     return value
 
 
+@lru_cache(maxsize=32)
 def make_ellipse_kernel(kernel_size: int) -> np.ndarray:
+    """Return a cached morphology kernel.
+
+    OpenCV treats structuring-element inputs as read-only, so reusing the same
+    kernel is safe and avoids rebuilding large kernels for every image.
+    """
     kernel_size = ensure_odd_kernel_size(kernel_size, "kernel_size")
 
     return cv2.getStructuringElement(
@@ -168,18 +175,28 @@ def normalize_to_uint8(image: np.ndarray) -> np.ndarray:
 
 
 def remove_small_components(binary_image: np.ndarray, min_area: int) -> np.ndarray:
-    component_count, labels, stats, _ = cv2.connectedComponentsWithStats(binary_image, 8)
-    cleaned = np.zeros_like(binary_image)
+    """Remove small components with one indexed lookup instead of N full scans.
 
-    for component_index in range(1, component_count):
-        area = int(stats[component_index, cv2.CC_STAT_AREA])
+    The previous implementation evaluated ``labels == component_index`` once
+    per component. On a 12 MP image with many edge fragments, that repeatedly
+    scanned the entire label image and dominated both runtime and allocation
+    pressure. The lookup table below produces the identical binary result in
+    one pass over ``labels``.
+    """
+    component_count, labels, stats, _ = cv2.connectedComponentsWithStats(
+        binary_image,
+        8,
+    )
 
-        if area < min_area:
-            continue
+    if component_count <= 1:
+        return np.zeros_like(binary_image)
 
-        cleaned[labels == component_index] = 255
+    keep_component = (
+        stats[:, cv2.CC_STAT_AREA].astype(np.int64, copy=False) >= int(min_area)
+    )
+    keep_component[0] = False
 
-    return cleaned
+    return np.where(keep_component[labels], 255, 0).astype(np.uint8)
 
 
 def build_center_prior(height: int, width: int) -> np.ndarray:
@@ -197,21 +214,21 @@ def build_center_prior(height: int, width: int) -> np.ndarray:
 
     x_coords = np.arange(width, dtype=np.float32)
     y_coords = np.arange(height, dtype=np.float32)
-    xx, yy = np.meshgrid(x_coords, y_coords)
 
     center_x = (width - 1) / 2.0
     center_y = (height - 1) / 2.0
 
-    exponent = (
-        ((xx - center_x) ** 2) / (2.0 * sigma_x * sigma_x)
-        + ((yy - center_y) ** 2) / (2.0 * sigma_y * sigma_y)
-    )
+    # Broadcasting creates only the final HxW exponent. The old meshgrid
+    # version additionally allocated two full HxW coordinate matrices.
+    x_exponent = ((x_coords - center_x) ** 2) / (2.0 * sigma_x * sigma_x)
+    y_exponent = ((y_coords - center_y) ** 2) / (2.0 * sigma_y * sigma_y)
+    exponent = y_exponent[:, None] + x_exponent[None, :]
     prior = np.exp(-exponent)
 
     if power != 1.0:
         prior = np.power(prior, power)
 
-    return prior.astype(np.float32)
+    return prior.astype(np.float32, copy=False)
 
 
 def compute_density_threshold(weighted_density: np.ndarray) -> int:
@@ -265,6 +282,14 @@ def component_vertical_extent_score(component_mask: np.ndarray) -> float:
 
 
 def select_components_union(binary_mask: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Score and select connected components without storing per-component masks.
+
+    Bounding-box height from ``connectedComponentsWithStats`` is exactly the
+    vertical extent previously obtained by scanning every full component mask.
+    Component coloring and union creation are now label-table lookups, so the
+    selected ROI is unchanged while avoiding O(component_count * image_area)
+    work and memory.
+    """
     selection_config = STEP_CONFIG["component_selection"]
     min_area_ratio = float(selection_config["min_area_ratio"])
     center_weight = float(selection_config["center_weight"])
@@ -275,10 +300,17 @@ def select_components_union(binary_mask: np.ndarray) -> tuple[np.ndarray, np.nda
     scaled_min_area = int(round(image_area * min_area_ratio * 0.05))
     min_area = max(int(STEP_CONFIG["noise"]["min_component_area"]), scaled_min_area)
 
-    component_count, labels, stats, centroids = cv2.connectedComponentsWithStats(binary_mask, 8)
+    component_count, labels, stats, centroids = cv2.connectedComponentsWithStats(
+        binary_mask,
+        8,
+    )
 
-    component_records: list[dict[str, float | int | np.ndarray]] = []
     component_debug = np.zeros((height, width, 3), dtype=np.uint8)
+    if component_count <= 1:
+        return np.zeros_like(binary_mask), component_debug
+
+    component_records: list[dict[str, float | int]] = []
+    color_lookup = np.zeros((component_count, 3), dtype=np.uint8)
 
     for component_index in range(1, component_count):
         area = int(stats[component_index, cv2.CC_STAT_AREA])
@@ -286,11 +318,20 @@ def select_components_union(binary_mask: np.ndarray) -> tuple[np.ndarray, np.nda
         if area < min_area:
             continue
 
-        component_mask = np.where(labels == component_index, 255, 0).astype(np.uint8)
         centroid_x = float(centroids[component_index][0])
         centroid_y = float(centroids[component_index][1])
-        center_score = component_center_score(centroid_x, centroid_y, width, height)
-        vertical_extent_score = component_vertical_extent_score(component_mask)
+        center_score = component_center_score(
+            centroid_x,
+            centroid_y,
+            width,
+            height,
+        )
+
+        component_height = int(stats[component_index, cv2.CC_STAT_HEIGHT])
+        vertical_extent_score = max(
+            0.05,
+            float(component_height) / float(height),
+        )
 
         score = (
             float(area)
@@ -298,13 +339,31 @@ def select_components_union(binary_mask: np.ndarray) -> tuple[np.ndarray, np.nda
             * (vertical_extent_score ** vertical_extent_weight)
         )
 
-        color = (
+        color_lookup[component_index] = (
             int((37 * component_index) % 255),
             int((97 * component_index) % 255),
             int((173 * component_index) % 255),
         )
-        component_debug[component_mask > 0] = color
 
+        component_records.append(
+            {
+                "index": component_index,
+                "score": score,
+                "area": area,
+                "center_score": center_score,
+                "vertical_extent_score": vertical_extent_score,
+            }
+        )
+
+    if not component_records:
+        return np.zeros_like(binary_mask), component_debug
+
+    component_debug = color_lookup[labels]
+
+    for record in component_records:
+        component_index = int(record["index"])
+        centroid_x = float(centroids[component_index][0])
+        centroid_y = float(centroids[component_index][1])
         cv2.circle(
             component_debug,
             (int(round(centroid_x)), int(round(centroid_y))),
@@ -313,19 +372,8 @@ def select_components_union(binary_mask: np.ndarray) -> tuple[np.ndarray, np.nda
             thickness=-1,
         )
 
-        component_records.append({
-            "mask": component_mask,
-            "score": score,
-            "area": area,
-            "center_score": center_score,
-            "vertical_extent_score": vertical_extent_score,
-        })
-
-    if not component_records:
-        return np.zeros_like(binary_mask), component_debug
-
     best_score = max(float(record["score"]) for record in component_records)
-    selected_union = np.zeros_like(binary_mask)
+    selected_lookup = np.zeros(component_count, dtype=np.bool_)
 
     for record in component_records:
         score = float(record["score"])
@@ -338,15 +386,14 @@ def select_components_union(binary_mask: np.ndarray) -> tuple[np.ndarray, np.nda
             or (center_score >= 0.3 and vertical_extent_score >= 0.08)
         )
 
-        if not should_keep:
-            continue
+        if should_keep:
+            selected_lookup[int(record["index"])] = True
 
-        component_mask = record["mask"]
-        selected_union = cv2.bitwise_or(selected_union, component_mask)
-        component_debug[component_mask > 0] = (0, 255, 0)
+    selected_pixels = selected_lookup[labels]
+    selected_union = np.where(selected_pixels, 255, 0).astype(np.uint8)
+    component_debug[selected_pixels] = (0, 255, 0)
 
     return selected_union, component_debug
-
 
 def smooth_with_hull(binary_mask: np.ndarray) -> np.ndarray:
     hull_config = STEP_CONFIG["hull"]
@@ -451,9 +498,11 @@ def make_comparison_view(
 
 
 def make_density_blob_mask(density_image: np.ndarray, threshold_value: int) -> np.ndarray:
-    activity_mask = np.where(density_image >= threshold_value, 255, 0).astype(np.uint8)
-
-    return activity_mask
+    return cv2.compare(
+        density_image,
+        int(threshold_value),
+        cv2.CMP_GE,
+    )
 
 
 def process_edge_image(edge_image: np.ndarray) -> dict[str, np.ndarray | int]:
@@ -473,7 +522,7 @@ def process_edge_image(edge_image: np.ndarray) -> dict[str, np.ndarray | int]:
     second_close_kernel = make_ellipse_kernel(int(morphology_config["second_close_kernel_size"]))
     smooth_kernel = make_ellipse_kernel(int(morphology_config["smooth_kernel_size"]))
 
-    binary_edges = np.where(edge_image >= edge_threshold, 255, 0).astype(np.uint8)
+    binary_edges = cv2.compare(edge_image, edge_threshold, cv2.CMP_GE)
     cleaned_edges = remove_small_components(binary_edges, min_component_area)
 
     density_seed = cv2.dilate(cleaned_edges, density_seed_kernel, iterations=1)
