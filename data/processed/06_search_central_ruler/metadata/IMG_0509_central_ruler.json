@@ -2642,11 +2642,11 @@
     }
   },
   "timings_sec": {
-    "search": 8.191593200026546,
-    "rendering": 0.27865900000324473,
-    "analysis_total": 8.66023600002518,
-    "save": 1.0530779999680817,
-    "process_total": 9.713316300010774
+    "search": 10.083750999998301,
+    "rendering": 0.3582170000008773,
+    "analysis_total": 10.611768899998424,
+    "save": 2.254659199999878,
+    "process_total": 12.866430399997625
   },
   "parameters": {
     "enabled": true,
@@ -2983,10 +2983,10 @@
   "reproducibility": {
     "effective_step_config_sha256": "a76cfc33d19885f815c03a48d5face90ffd40fe9ee28749cd12ac6303f736991",
     "pipeline_config_file": "config\\pipeline_config.yaml",
-    "pipeline_config_sha256": "2a3a5bbc6a517d1fea1e561279e25c33529ea5711b7ab72dcf1103f75825d9fc",
+    "pipeline_config_sha256": "eeb382e65d4a2d51afff668491321cc3b124ef2c137363b9c7a0b8f7fa7f7eed",
     "input_json_sha256": "e935f5f7503f99b08748e850e29c2bc2dfe2184577ef919a2eec4ba3ff607773",
     "base_edge_sha256": "976fa34463d4f1c056cc3e9d1b4af9cff0d1351485795fe44f3ff31cf62af21d",
-    "roi_mask_sha256": "87a7081fe2bff361ea5018234624267ae72baf34bd82c9ea09a7a4b0c91b84a6",
+    "roi_mask_sha256": "695d4130142c403733b6804bd773944156b18fec8f0cb6dc3c55f23947bb915e",
     "step06_source_sha256": "06587ab07b687e926ddde3f2cc259f8ee760bb13db3f8a0eece26587a259f325",
     "step06_source_files": [
       {

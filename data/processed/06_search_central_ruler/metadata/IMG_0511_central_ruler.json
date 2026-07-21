@@ -2624,11 +2624,11 @@
     }
   },
   "timings_sec": {
-    "search": 7.0928883999586105,
-    "rendering": 0.25404299999354407,
-    "analysis_total": 7.491969799972139,
-    "save": 1.0006755000213161,
-    "process_total": 8.492646900005639
+    "search": 9.80754270000034,
+    "rendering": 0.28677560000141966,
+    "analysis_total": 10.254514899999776,
+    "save": 1.1571506999971461,
+    "process_total": 11.411667199998192
   },
   "parameters": {
     "enabled": true,
@@ -2965,10 +2965,10 @@
   "reproducibility": {
     "effective_step_config_sha256": "a76cfc33d19885f815c03a48d5face90ffd40fe9ee28749cd12ac6303f736991",
     "pipeline_config_file": "config\\pipeline_config.yaml",
-    "pipeline_config_sha256": "2a3a5bbc6a517d1fea1e561279e25c33529ea5711b7ab72dcf1103f75825d9fc",
+    "pipeline_config_sha256": "eeb382e65d4a2d51afff668491321cc3b124ef2c137363b9c7a0b8f7fa7f7eed",
     "input_json_sha256": "98c02b894cec6fc4d5c11798d042874a6747ff66a58d745c188cff5568b45214",
     "base_edge_sha256": "2e4b2f0fc8a1befcb1ca304877923e363dbf4562c097949808faaea90dba9dba",
-    "roi_mask_sha256": "29424a6c418d109580dac593df3f96d79b5168d7c77e88293bbb41be439c5a46",
+    "roi_mask_sha256": "06ae6e2d900cba8125bf16c78c343a7c608e1ddce2f16c606c30c38d0b505253",
     "step06_source_sha256": "06587ab07b687e926ddde3f2cc259f8ee760bb13db3f8a0eece26587a259f325",
     "step06_source_files": [
       {
