@@ -82,6 +82,22 @@ class UploadedFramesRequest:
 
 
 @dataclass(slots=True)
+class UploadedAnalyzeRequest:
+    image_filename: str
+    image_bytes: bytes
+    response_mode: str = "json"
+    keep_artifacts: bool = False
+    include_step_logs: bool = False
+
+
+@dataclass(slots=True)
+class UploadedCaptureReadinessRequest:
+    frame_filename: str
+    frame_bytes: bytes
+    include_debug: bool = False
+
+
+@dataclass(slots=True)
 class StepExecutionLog:
     step: str
     script_name: str

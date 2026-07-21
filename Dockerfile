@@ -20,6 +20,7 @@ RUN pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir -r requirements.txt
 
 COPY api ./api
+COPY capture_readiness ./capture_readiness
 COPY pipeline ./pipeline
 COPY config ./config
 COPY web_app ./web_app

@@ -1,16 +1,16 @@
 <article class="card stack capture-card" id="capture-card">
   <div class="section-heading">
     <div>
-      <p class="eyebrow">Korak 1</p>
-      <h2>Priprema snimka</h2>
+      <p class="eyebrow">Step 1</p>
+      <h2>Clip Setup</h2>
       <p class="section-copy">
-        Usmeri kameru ka cipeli i snimi kratak, miran kadar. Ako live kamera
-        nije dostupna, koristi direktan upload iz galerije.
+        Point the camera at the boot and record a short, steady clip. If the
+        live camera is not available, use direct gallery upload.
       </p>
     </div>
 
     <button class="ghost-button" id="toggle-camera" type="button">
-      Promeni kameru
+      Switch camera
     </button>
   </div>
 
@@ -22,18 +22,29 @@
       muted
       autoplay
     ></video>
+    <div class="readiness-guide is-idle" id="readiness-guide" aria-hidden="true">
+      <div class="readiness-guide-shape"></div>
+      <div class="readiness-guide-panel">
+        <div class="readiness-guide-badge" id="readiness-guide-badge">
+          Place the boot in frame
+        </div>
+        <div class="readiness-guide-detail" id="readiness-guide-detail">
+          Waiting for live preview
+        </div>
+      </div>
+    </div>
     <div class="preview-overlay" id="preview-placeholder">
-      Kamera ce se pojaviti ovde kada browser dozvoli live pristup.
+      Camera preview will appear here when the browser allows live access.
     </div>
   </div>
 
   <div class="action-row">
     <button class="primary-button" id="record-button" type="button">
-      Brzo snimi 2 sekunde
+      Quick 2-second capture
     </button>
 
     <label class="secondary-button file-button" for="video-file">
-      Snimi ili izaberi video
+      Record or choose video
     </label>
 
     <input
@@ -47,10 +58,10 @@
 
   <div class="selected-file">
     <p class="selected-file-label" id="selected-file-label">
-      Jos nema izabranog snimka.
+      No clip selected yet.
     </p>
     <p class="selected-file-meta" id="selected-file-meta">
-      Mozes snimiti novi kadar ili izabrati postojeci video iz galerije.
+      You can record a new clip or choose an existing video from your gallery.
     </p>
   </div>
 
@@ -59,34 +70,34 @@
   </div>
 
   <button class="analyze-button" id="upload-button" type="button">
-    Pokreni analizu
+    Run Analysis
   </button>
 
   <p class="support-note" id="capture-note">
-    Ako live kamera nije dostupna, aplikacija ostaje potpuno upotrebljiva kroz
+    If the live camera is not available, the app remains fully usable through
     video upload.
   </p>
 
   <details class="advanced-settings">
-    <summary>Napredne postavke</summary>
+    <summary>Advanced Settings</summary>
 
     <div class="advanced-panel">
       <div class="advanced-header">
         <p>
-          Ovo diras samo ako testiras drugi server ili hoces detaljniji izlaz.
-          Za uobicajeno koriscenje ostavi podrazumevane vrednosti.
+          Change these only if you are testing another server or want more
+          detailed output. For normal use, keep the default values.
         </p>
         <button
           class="ghost-button ghost-button-small"
           id="reset-base-url"
           type="button"
         >
-          Vrati podrazumevano
+          Reset to default
         </button>
       </div>
 
       <label class="field">
-        <span>Adresa servera</span>
+        <span>Server URL</span>
         <input
           id="base-url"
           name="base-url"
@@ -94,18 +105,18 @@
           autocapitalize="off"
           autocomplete="off"
           spellcheck="false"
-          placeholder="https://tvoj-tunnel.example.com"
+          placeholder="https://your-tunnel.example.com"
         />
       </label>
 
       <label class="checkbox-row">
         <input id="keep-artifacts" type="checkbox" />
-        <span>Zadrzi interne artefakte analize</span>
+        <span>Keep internal analysis artifacts</span>
       </label>
 
       <div class="subgrid">
         <label class="field">
-          <span>Trajanje snimka (ms)</span>
+          <span>Clip duration (ms)</span>
           <input
             id="clip-duration"
             type="number"
@@ -116,7 +127,7 @@
         </label>
 
         <label class="field">
-          <span>Broj frejmova</span>
+          <span>Frame count</span>
           <input
             id="frame-count"
             type="number"

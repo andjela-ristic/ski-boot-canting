@@ -9,9 +9,15 @@ from mimetypes import guess_type
 import os
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
-from .contracts import AnalyzeRequest, FramesRequest, UploadedFramesRequest
+from .contracts import (
+    AnalyzeRequest,
+    FramesRequest,
+    UploadedAnalyzeRequest,
+    UploadedCaptureReadinessRequest,
+    UploadedFramesRequest,
+)
 from .exceptions import ApiError
 from .persistence import AnalysisRepository, NoopAnalysisRepository
 from .pipeline_runner import PipelineRunner
@@ -45,6 +51,7 @@ class CantingApiHandler(BaseHTTPRequestHandler):
                         "app": "GET /",
                         "service": "GET /api",
                         "analyze": "POST /analyze",
+                        "capture_readiness": "POST /capture-readiness",
                         "frames": "POST /frames",
                         "health": "GET /health",
                     },
@@ -67,12 +74,35 @@ class CantingApiHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         path = self._normalize_api_path()
-        if path not in {"/analyze", "/frames"}:
+        if path not in {"/analyze", "/capture-readiness", "/frames"}:
             self._write_json(HTTPStatus.NOT_FOUND, {"error": "Route not found."})
             return
 
         try:
             if path == "/analyze":
+                content_type = (self.headers.get("Content-Type", "") or "").lower()
+                if content_type.startswith("multipart/form-data"):
+                    upload_request = self._read_uploaded_analyze_request()
+                    result = self.runner.analyze_uploaded_image(
+                        image_bytes=upload_request.image_bytes,
+                        image_filename=upload_request.image_filename,
+                        keep_artifacts=upload_request.keep_artifacts,
+                    )
+                    persistence_result = self.repository.save_analysis(result)
+
+                    if upload_request.response_mode == "binary":
+                        self._write_binary_overlay(result, persistence_result)
+                        return
+
+                    self._write_json(
+                        HTTPStatus.OK,
+                        result.to_json_payload(
+                            persistence=persistence_result,
+                            include_step_logs=upload_request.include_step_logs,
+                        ),
+                    )
+                    return
+
                 payload = self._read_json_body()
                 request = AnalyzeRequest.from_dict(payload)
                 result = self.runner.analyze_image(
@@ -92,6 +122,21 @@ class CantingApiHandler(BaseHTTPRequestHandler):
                         include_step_logs=request.include_step_logs,
                     ),
                 )
+                return
+
+            if path == "/capture-readiness":
+                content_type = (self.headers.get("Content-Type", "") or "").lower()
+                if not content_type.startswith("multipart/form-data"):
+                    raise ValueError(
+                        "Capture readiness requests must use multipart/form-data with field 'frame'."
+                    )
+
+                readiness_request = self._read_uploaded_capture_readiness_request()
+                result = self.runner.analyze_capture_readiness_frame(
+                    frame_bytes=readiness_request.frame_bytes,
+                    include_debug=readiness_request.include_debug,
+                )
+                self._write_json(HTTPStatus.OK, result)
                 return
 
             content_type = (self.headers.get("Content-Type", "") or "").lower()
@@ -195,6 +240,76 @@ class CantingApiHandler(BaseHTTPRequestHandler):
             clip_duration_ms=self._parse_form_int(form, "clip_duration_ms", default=None, minimum=1),
         )
 
+    def _read_uploaded_analyze_request(self) -> UploadedAnalyzeRequest:
+        form = cgi.FieldStorage(
+            fp=self.rfile,
+            headers=self.headers,
+            environ={
+                "REQUEST_METHOD": "POST",
+                "CONTENT_TYPE": self.headers.get("Content-Type", ""),
+                "CONTENT_LENGTH": self.headers.get("Content-Length", "0"),
+            },
+            keep_blank_values=True,
+        )
+
+        image_field = form["image"] if "image" in form else None
+        if image_field is None:
+            raise ValueError("Multipart field 'image' is required.")
+
+        if isinstance(image_field, list):
+            image_field = image_field[0]
+
+        image_file = getattr(image_field, "file", None)
+        if image_file is None:
+            raise ValueError("Multipart field 'image' must contain a file.")
+
+        image_bytes = image_file.read()
+        filename = Path(getattr(image_field, "filename", "") or "capture.jpg").name
+
+        response_mode = (self._extract_form_value(form, "response_mode") or "json").strip().lower()
+        if response_mode not in {"json", "binary"}:
+            raise ValueError("Multipart field 'response_mode' must be either 'json' or 'binary'.")
+
+        return UploadedAnalyzeRequest(
+            image_filename=filename or "capture.jpg",
+            image_bytes=image_bytes,
+            response_mode=response_mode,
+            keep_artifacts=self._parse_form_bool(form, "keep_artifacts", default=False),
+            include_step_logs=self._parse_form_bool(form, "include_step_logs", default=False),
+        )
+
+    def _read_uploaded_capture_readiness_request(self) -> UploadedCaptureReadinessRequest:
+        form = cgi.FieldStorage(
+            fp=self.rfile,
+            headers=self.headers,
+            environ={
+                "REQUEST_METHOD": "POST",
+                "CONTENT_TYPE": self.headers.get("Content-Type", ""),
+                "CONTENT_LENGTH": self.headers.get("Content-Length", "0"),
+            },
+            keep_blank_values=True,
+        )
+
+        frame_field = form["frame"] if "frame" in form else None
+        if frame_field is None:
+            raise ValueError("Multipart field 'frame' is required.")
+
+        if isinstance(frame_field, list):
+            frame_field = frame_field[0]
+
+        frame_file = getattr(frame_field, "file", None)
+        if frame_file is None:
+            raise ValueError("Multipart field 'frame' must contain a file.")
+
+        frame_bytes = frame_file.read()
+        filename = Path(getattr(frame_field, "filename", "") or "preview.jpg").name
+
+        return UploadedCaptureReadinessRequest(
+            frame_filename=filename or "preview.jpg",
+            frame_bytes=frame_bytes,
+            include_debug=self._parse_query_bool("debug", default=False),
+        )
+
     def _parse_form_bool(self, form: cgi.FieldStorage, field_name: str, default: bool) -> bool:
         value = self._extract_form_value(form, field_name)
         if value is None or value == "":
@@ -243,6 +358,19 @@ class CantingApiHandler(BaseHTTPRequestHandler):
             return None
         return str(value)
 
+    def _parse_query_bool(self, field_name: str, default: bool) -> bool:
+        query = parse_qs(urlparse(self.path).query, keep_blank_values=True)
+        raw_values = query.get(field_name)
+        if not raw_values:
+            return default
+
+        normalized = raw_values[0].strip().lower()
+        if normalized in {"true", "1", "yes", "on"}:
+            return True
+        if normalized in {"false", "0", "no", "off"}:
+            return False
+        raise ValueError(f"Query parameter '{field_name}' must be a boolean.")
+
     def _write_service_index(self) -> None:
         self._write_json(
             HTTPStatus.OK,
@@ -251,6 +379,7 @@ class CantingApiHandler(BaseHTTPRequestHandler):
                 "frontend": "GET /",
                 "endpoints": {
                     "analyze": "POST /analyze",
+                    "capture_readiness": "POST /capture-readiness",
                     "frames": "POST /frames",
                     "health": "GET /health",
                 },
@@ -342,9 +471,14 @@ class CantingApiHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(body)))
         self.send_header("X-Processing-Time-Ms", f"{result.processing_time_ms:.2f}")
         self.send_header("X-Image-Name", result.image_name)
+        self.send_header("X-Input-Image-Path", result.input_image_path)
         self.send_header("X-Persistence-Saved", str(bool(persistence_result.get("saved", False))).lower())
         if result.artifacts_dir is not None:
             self.send_header("X-Artifacts-Dir", result.artifacts_dir)
+        if result.overlay_output_path is not None:
+            self.send_header("X-Overlay-Output-Path", result.overlay_output_path)
+        if result.metadata_output_path is not None:
+            self.send_header("X-Metadata-Output-Path", result.metadata_output_path)
         self.end_headers()
         self.wfile.write(body)
 

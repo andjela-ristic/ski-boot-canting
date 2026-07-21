@@ -8,12 +8,15 @@ display:
   max_height: 900
 api:
   execution:
-    max_parallel: 4
-    reserved_high_priority_slots: 1
+    max_parallel: 1
+    reserved_high_priority_slots: 0
+
+  capture_readiness:
+    config_path: config/capture_readiness_vertical.json
 
   frames:
     sample_count: 6
-    max_workers: 3
+    max_workers: 1
 
 step_01_illumination_normalization:
   enabled: true

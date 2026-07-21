@@ -1,0 +1,55 @@
+{
+  "processing_max_width": 480,
+  "jpeg_max_bytes": 3000000,
+  "opencv_threads": 1,
+  "success_score_threshold": 0.9,
+  "guide": {
+    "x_min_ratio": 0.2,
+    "x_max_ratio": 0.8,
+    "y_min_ratio": 0.05,
+    "y_max_ratio": 0.94
+  },
+  "quality": {
+    "min_sharpness": 12.0,
+    "min_mean_brightness": 20.0,
+    "max_mean_brightness": 238.0,
+    "max_dark_ratio": 0.82,
+    "max_bright_ratio": 0.82,
+    "dark_pixel_threshold": 8,
+    "bright_pixel_threshold": 247
+  },
+  "boot": {
+    "min_height_ratio": 0.45,
+    "max_height_ratio": 0.99,
+    "min_width_ratio": 0.18,
+    "max_width_ratio": 0.84,
+    "min_area_ratio": 0.075,
+    "max_area_ratio": 0.82,
+    "max_center_offset_ratio": 0.11,
+    "min_bottom_ratio": 0.6,
+    "min_side_margin_ratio": 0.012,
+    "min_top_margin_ratio": 0.012,
+    "min_candidate_score": 0.47,
+    "canny_low": 40,
+    "canny_high": 120,
+    "gaussian_kernel": 5,
+    "close_kernel": 7,
+    "open_kernel": 3
+  },
+  "reference": {
+    "required": true,
+    "orientation": "horizontal",
+    "exclude_guide_from_search": true,
+    "x_min_ratio": 0.0,
+    "x_max_ratio": 1.0,
+    "y_min_ratio": 0.68,
+    "y_max_ratio": 0.99,
+    "max_angle_error_deg": 8.0,
+    "min_total_length_ratio": 0.28,
+    "min_segment_length_ratio": 0.12,
+    "max_line_gap_ratio": 0.06,
+    "canny_low": 45,
+    "canny_high": 135,
+    "hough_threshold": 24
+  }
+}

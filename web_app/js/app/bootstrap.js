@@ -48,7 +48,7 @@ export async function bootstrapApp() {
     });
 
     refreshChrome();
-    statusPresenter.setStatus("Pripremamo aplikaciju i proveravamo kameru...", "info");
+    statusPresenter.setStatus("Preparing the app and checking the camera...", "info");
 
     if (canUseLiveCamera()) {
       initializeCamera({
@@ -58,14 +58,14 @@ export async function bootstrapApp() {
       }).catch((error) => {
         console.error(error);
         statusPresenter.setStatus(
-          "Kamera u browseru trenutno nije dostupna. Koristi opciju Snimi ili izaberi video.",
+          "The browser camera is not available right now. Use the Record or choose video option.",
           "warning",
         );
         refreshChrome();
       });
     } else {
       statusPresenter.setStatus(
-        "Aplikacija je spremna. Za ovo otvaranje koristi opciju Snimi ili izaberi video.",
+        "The app is ready. For this session, use the Record or choose video option.",
         "warning",
       );
     }
@@ -74,6 +74,10 @@ export async function bootstrapApp() {
 
     window.addEventListener("pagehide", () => {
       stopCurrentStream({ elements, state });
+      if (state.resultOverlayObjectUrl) {
+        URL.revokeObjectURL(state.resultOverlayObjectUrl);
+        state.resultOverlayObjectUrl = null;
+      }
     });
   } catch (error) {
     console.error(error);
@@ -81,8 +85,8 @@ export async function bootstrapApp() {
       shell.innerHTML = `
         <div class="card app-fatal">
           <div>
-            <h2>Ucitivanje aplikacije nije uspelo.</h2>
-            <p>Proveri da li su svi staticki fajlovi dostupni i osvezi stranicu.</p>
+            <h2>App loading failed.</h2>
+            <p>Check that all static files are available and refresh the page.</p>
           </div>
         </div>
       `;

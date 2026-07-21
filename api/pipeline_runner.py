@@ -17,11 +17,15 @@ import subprocess
 import sys
 import threading
 import time
+import tempfile
 import uuid
 from typing import Any, Callable
 
 import cv2
 import yaml
+
+from capture_readiness import FrameValidator, load_config as load_capture_readiness_config
+from capture_readiness.validator import FrameValidationError
 
 from .contracts import AnalyzeResult, FrameAnalysisResult, StepExecutionLog
 from .exceptions import ApiError
@@ -29,7 +33,12 @@ from .exceptions import ApiError
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 PIPELINE_DIR = PROJECT_ROOT / "pipeline"
-RUNTIME_ROOT = PROJECT_ROOT / "api" / ".runtime"
+RUNTIME_ROOT = Path(
+    os.environ.get(
+        "API_RUNTIME_ROOT",
+        str(Path(tempfile.gettempdir()) / "ml-ski-boot-canting-api"),
+    )
+).expanduser().resolve()
 SUPPORTED_IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg"}
 SUPPORTED_VIDEO_EXTENSIONS = {".mp4", ".mov", ".avi", ".mkv", ".m4v"}
 WINDOWS_ABSOLUTE_PATH_RE = re.compile(r"^[A-Za-z]:[\\/]")
@@ -224,6 +233,24 @@ def _tail_text(text: str, max_chars: int = 6000) -> str:
 
 
 @lru_cache(maxsize=1)
+def _load_capture_readiness_validator() -> FrameValidator:
+    api_config = _load_base_config().get("api", {})
+    readiness_config = api_config.get("capture_readiness", {})
+
+    configured_path = readiness_config.get("config_path")
+    env_path = os.environ.get("CAPTURE_READINESS_CONFIG", "").strip()
+    config_path = env_path or configured_path
+
+    if config_path:
+        resolved_config_path = PROJECT_ROOT / config_path
+        if Path(config_path).is_absolute():
+            resolved_config_path = Path(config_path)
+        return FrameValidator(load_capture_readiness_config(resolved_config_path))
+
+    return FrameValidator(load_capture_readiness_config())
+
+
+@lru_cache(maxsize=1)
 def _load_execution_coordinator() -> PipelineExecutionCoordinator:
     api_config = _load_base_config().get("api", {})
     execution_config = api_config.get("execution", {})
@@ -251,6 +278,21 @@ def _load_execution_coordinator() -> PipelineExecutionCoordinator:
 
 
 class PipelineRunner:
+    def analyze_capture_readiness_frame(
+        self,
+        frame_bytes: bytes,
+        include_debug: bool = False,
+    ) -> dict[str, Any]:
+        try:
+            result = _load_capture_readiness_validator().validate_bytes(
+                frame_bytes,
+                include_debug=include_debug,
+            )
+        except FrameValidationError as exc:
+            raise ApiError(422, str(exc)) from exc
+
+        return result.to_dict()
+
     def analyze_image(
         self,
         image_path: str | Path,
@@ -258,64 +300,42 @@ class PipelineRunner:
         priority: str = "high",
     ) -> AnalyzeResult:
         resolved_image_path = self._resolve_input_path(image_path)
-        image_name = resolved_image_path.name
         job_dir = self._make_job_dir()
 
         try:
             with _load_execution_coordinator().acquire(priority):
                 copied_image = self._prepare_job_input(job_dir, resolved_image_path)
-                config_path = self._write_job_config(job_dir)
-
-                started = time.perf_counter()
-                step_logs = self._run_pipeline(job_dir, copied_image.name, config_path)
-                processing_time_ms = (time.perf_counter() - started) * 1000.0
-
-                overlay_path = job_dir / "processed" / "09_measure_canting_angle" / "overlay" / copied_image.name
-                metadata_path = (
-                    job_dir
-                    / "processed"
-                    / "09_measure_canting_angle"
-                    / "metadata"
-                    / f"{copied_image.stem}_canting_angle.json"
-                )
-
-                if not overlay_path.exists():
-                    raise ApiError(
-                        500,
-                        "Pipeline finished without producing Step 09 overlay.",
-                        details={
-                            "expected_overlay_path": str(overlay_path),
-                            "step_logs": [item.to_dict() for item in step_logs],
-                        },
-                    )
-
-                if not metadata_path.exists():
-                    raise ApiError(
-                        500,
-                        "Pipeline finished without producing Step 09 metadata.",
-                        details={
-                            "expected_metadata_path": str(metadata_path),
-                            "step_logs": [item.to_dict() for item in step_logs],
-                        },
-                    )
-
-                overlay_png_bytes = overlay_path.read_bytes()
-                metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
-
-                artifacts_dir = str(job_dir) if keep_artifacts else None
-                overlay_output_path = str(overlay_path) if keep_artifacts else None
-                metadata_output_path = str(metadata_path) if keep_artifacts else None
-
-                return AnalyzeResult(
-                    image_name=image_name,
+                return self._execute_analyze_job(
+                    job_dir=job_dir,
+                    working_image=copied_image,
                     input_image_path=str(resolved_image_path),
-                    processing_time_ms=processing_time_ms,
-                    overlay_png_bytes=overlay_png_bytes,
-                    metadata=metadata,
-                    artifacts_dir=artifacts_dir,
-                    overlay_output_path=overlay_output_path,
-                    metadata_output_path=metadata_output_path,
-                    step_logs=step_logs,
+                    keep_artifacts=keep_artifacts,
+                )
+        finally:
+            if not keep_artifacts and job_dir.exists():
+                shutil.rmtree(job_dir, ignore_errors=True)
+
+    def analyze_uploaded_image(
+        self,
+        image_bytes: bytes,
+        image_filename: str,
+        keep_artifacts: bool = False,
+        priority: str = "high",
+    ) -> AnalyzeResult:
+        if not image_bytes:
+            raise ApiError(400, "Uploaded image is empty.")
+
+        safe_image_name = self._sanitize_image_filename(image_filename)
+        job_dir = self._make_job_dir()
+
+        try:
+            with _load_execution_coordinator().acquire(priority):
+                uploaded_image = self._prepare_uploaded_image(job_dir, safe_image_name, image_bytes)
+                return self._execute_analyze_job(
+                    job_dir=job_dir,
+                    working_image=uploaded_image,
+                    input_image_path=f"uploaded://{safe_image_name}",
+                    keep_artifacts=keep_artifacts,
                 )
         finally:
             if not keep_artifacts and job_dir.exists():
@@ -739,17 +759,25 @@ class PipelineRunner:
         )
 
     def _prepare_job_input(self, job_dir: Path, image_path: Path) -> Path:
-        working_dir = job_dir / "working_png"
-        metadata_dir = job_dir / "metadata"
-        processed_dir = job_dir / "processed"
-
-        working_dir.mkdir(parents=True, exist_ok=True)
-        metadata_dir.mkdir(parents=True, exist_ok=True)
-        processed_dir.mkdir(parents=True, exist_ok=True)
-
+        working_dir = self._ensure_job_dirs(job_dir)
         copied_path = working_dir / image_path.name
         shutil.copy2(image_path, copied_path)
         return copied_path
+
+    def _prepare_uploaded_image(self, job_dir: Path, image_name: str, image_bytes: bytes) -> Path:
+        working_dir = self._ensure_job_dirs(job_dir)
+        image_path = working_dir / image_name
+        image_path.write_bytes(image_bytes)
+
+        image = cv2.imread(str(image_path), cv2.IMREAD_COLOR)
+        if image is None:
+            raise ApiError(
+                400,
+                "Uploaded image could not be decoded by OpenCV.",
+                details={"image_filename": image_name},
+            )
+
+        return image_path
 
     def _prepare_uploaded_video(self, job_dir: Path, video_name: str, video_bytes: bytes) -> Path:
         uploads_dir = job_dir / "uploads"
@@ -758,6 +786,33 @@ class PipelineRunner:
         video_path = uploads_dir / video_name
         video_path.write_bytes(video_bytes)
         return video_path
+
+    def _ensure_job_dirs(self, job_dir: Path) -> Path:
+        working_dir = job_dir / "working_png"
+        metadata_dir = job_dir / "metadata"
+        processed_dir = job_dir / "processed"
+
+        working_dir.mkdir(parents=True, exist_ok=True)
+        metadata_dir.mkdir(parents=True, exist_ok=True)
+        processed_dir.mkdir(parents=True, exist_ok=True)
+        return working_dir
+
+    def _sanitize_image_filename(self, raw_filename: str) -> str:
+        filename = Path(str(raw_filename).strip() or "capture.jpg").name
+        if not filename:
+            filename = "capture.jpg"
+
+        suffix = Path(filename).suffix.lower()
+        if suffix not in SUPPORTED_IMAGE_EXTENSIONS:
+            if suffix:
+                raise ApiError(
+                    400,
+                    "Uploaded image must use one of: .png, .jpg, .jpeg",
+                    details={"image_filename": filename},
+                )
+            filename = f"{filename}.jpg"
+
+        return filename
 
     def _sanitize_video_filename(self, raw_filename: str) -> str:
         filename = Path(str(raw_filename).strip() or "capture.mp4").name
@@ -915,20 +970,95 @@ class PipelineRunner:
 
         return config_path
 
+    def _execute_analyze_job(
+        self,
+        *,
+        job_dir: Path,
+        working_image: Path,
+        input_image_path: str,
+        keep_artifacts: bool,
+    ) -> AnalyzeResult:
+        config_path = self._write_job_config(job_dir)
+
+        started = time.perf_counter()
+        step_logs = self._run_pipeline(job_dir, working_image.name, config_path)
+        processing_time_ms = (time.perf_counter() - started) * 1000.0
+
+        overlay_path = job_dir / "processed" / "09_measure_canting_angle" / "overlay" / working_image.name
+        metadata_path = (
+            job_dir
+            / "processed"
+            / "09_measure_canting_angle"
+            / "metadata"
+            / f"{working_image.stem}_canting_angle.json"
+        )
+
+        if not overlay_path.exists():
+            raise ApiError(
+                500,
+                "Pipeline finished without producing Step 09 overlay.",
+                details={
+                    "expected_overlay_path": str(overlay_path),
+                    "step_logs": [item.to_dict() for item in step_logs],
+                },
+            )
+
+        if not metadata_path.exists():
+            raise ApiError(
+                500,
+                "Pipeline finished without producing Step 09 metadata.",
+                details={
+                    "expected_metadata_path": str(metadata_path),
+                    "step_logs": [item.to_dict() for item in step_logs],
+                },
+            )
+
+        overlay_png_bytes = overlay_path.read_bytes()
+        metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+
+        artifacts_dir = str(job_dir) if keep_artifacts else None
+        overlay_output_path = str(overlay_path) if keep_artifacts else None
+        metadata_output_path = str(metadata_path) if keep_artifacts else None
+
+        return AnalyzeResult(
+            image_name=working_image.name,
+            input_image_path=input_image_path,
+            processing_time_ms=processing_time_ms,
+            overlay_png_bytes=overlay_png_bytes,
+            metadata=metadata,
+            artifacts_dir=artifacts_dir,
+            overlay_output_path=overlay_output_path,
+            metadata_output_path=metadata_output_path,
+            step_logs=step_logs,
+        )
+
     def _run_pipeline(
         self,
         job_dir: Path,
         image_name: str,
         config_path: Path,
     ) -> list[StepExecutionLog]:
+        """Run each step in a clean Python process.
+
+        This intentionally mirrors the normal pipeline execution model. Running
+        all scripts through runpy in one process leaks process-global state
+        between steps (notably cv2.setNumThreads from Step 04), retains imported
+        pipeline modules and large native allocations, and can make Steps 05-09
+        dramatically slower than their standalone execution.
+        """
         logs: list[StepExecutionLog] = []
         env = os.environ.copy()
         env["PIPELINE_CONFIG"] = str(config_path)
         env["PYTHONIOENCODING"] = "utf-8"
+        env["PYTHONUNBUFFERED"] = "1"
 
         python_executable = sys.executable
         if not python_executable:
             raise ApiError(500, "Could not determine the Python executable for pipeline subprocesses.")
+
+        creationflags = 0
+        if os.name == "nt":
+            creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 
         for step in PIPELINE_STEPS:
             command = [
@@ -942,11 +1072,13 @@ class PipelineRunner:
                 command,
                 cwd=str(PROJECT_ROOT),
                 env=env,
-                capture_output=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
                 text=True,
                 encoding="utf-8",
                 errors="replace",
                 check=False,
+                creationflags=creationflags,
             )
             elapsed_ms = (time.perf_counter() - started) * 1000.0
 
@@ -968,12 +1100,64 @@ class PipelineRunner:
                         "return_code": completed.returncode,
                         "stdout": step_log.stdout,
                         "stderr": step_log.stderr,
+                        "step_logs": [item.to_dict() for item in logs],
                     },
                 )
 
             self._assert_expected_outputs(job_dir, step, image_name, step_log)
 
         return logs
+
+    def _parse_worker_payload(self, stdout: str, stderr: str) -> dict[str, Any]:
+        raw_payload = stdout.strip()
+        if not raw_payload:
+            raise ApiError(
+                500,
+                "Pipeline worker returned no structured output.",
+                details={"worker_stderr": _tail_text(stderr)},
+            )
+
+        try:
+            payload = json.loads(raw_payload)
+        except json.JSONDecodeError as exc:
+            raise ApiError(
+                500,
+                "Pipeline worker returned invalid JSON output.",
+                details={
+                    "worker_stdout": _tail_text(stdout),
+                    "worker_stderr": _tail_text(stderr),
+                },
+            ) from exc
+
+        if not isinstance(payload, dict):
+            raise ApiError(
+                500,
+                "Pipeline worker returned an unexpected payload type.",
+                details={"worker_stdout": _tail_text(stdout)},
+            )
+
+        return payload
+
+    def _step_logs_from_payload(self, raw_logs: Any) -> list[StepExecutionLog]:
+        if not isinstance(raw_logs, list):
+            return []
+
+        step_logs: list[StepExecutionLog] = []
+        for item in raw_logs:
+            if not isinstance(item, dict):
+                continue
+
+            step_logs.append(
+                StepExecutionLog(
+                    step=str(item.get("step", "")),
+                    script_name=str(item.get("script_name", "")),
+                    elapsed_ms=float(item.get("elapsed_ms", 0.0) or 0.0),
+                    stdout=_tail_text(str(item.get("stdout", ""))),
+                    stderr=_tail_text(str(item.get("stderr", ""))),
+                )
+            )
+
+        return step_logs
 
     def _assert_expected_outputs(
         self,

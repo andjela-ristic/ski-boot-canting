@@ -1,7 +1,7 @@
 {
   "name": "Ski Boot Canting",
   "short_name": "Canting",
-  "description": "Web PWA za ski boot canting analizu videa i overlay rezultat.",
+  "description": "Web PWA for ski boot canting video analysis and overlay results.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

@@ -4,28 +4,28 @@ export function renderResult(options) {
   options.elements.resultPlaceholder.classList.add("is-hidden");
   options.elements.resultContent.classList.remove("is-hidden");
   options.elements.overlayImage.src = options.result.overlayDataUrl;
-  options.elements.overlayImage.alt = `Overlay rezultat za ${options.result.sourceName}`;
+  options.elements.overlayImage.alt = `Overlay result for ${options.result.sourceName}`;
   options.elements.resultTitle.textContent = options.result.sourceName;
   options.elements.resultSummary.textContent =
-    `Analiza je zavrsena za ${options.result.processingTimeMs.toFixed(2)} ms. ` +
-    "Overlay ispod prikazuje vraceni vizuelni rezultat.";
+    `Analysis finished in ${options.result.processingTimeMs.toFixed(2)} ms. ` +
+    "The overlay below shows the returned visual result.";
 
   options.elements.resultMeta.innerHTML = "";
-  addMetaChip(options.elements.resultMeta, "Snimak", options.result.sourceName);
+  addMetaChip(options.elements.resultMeta, "Clip", options.result.sourceName);
   addMetaChip(
     options.elements.resultMeta,
-    "Obrada",
+    "Processing",
     `${options.result.processingTimeMs.toFixed(2)} ms`,
   );
   if (options.result.frameCount) {
-    addMetaChip(options.elements.resultMeta, "Frejmovi", String(options.result.frameCount));
+    addMetaChip(options.elements.resultMeta, "Frames", String(options.result.frameCount));
   }
 
   const details = [
-    ["Izvorni put", options.result.sourcePath],
-    ["Artefakti", options.result.artifactsDir],
-    ["Overlay fajl", options.result.overlayOutputPath],
-    ["Metadata fajl", options.result.metadataOutputPath],
+    ["Source path", options.result.sourcePath],
+    ["Artifacts", options.result.artifactsDir],
+    ["Overlay file", options.result.overlayOutputPath],
+    ["Metadata file", options.result.metadataOutputPath],
     ["Server", normalizedBaseUrlValue(options.elements)],
   ];
 
