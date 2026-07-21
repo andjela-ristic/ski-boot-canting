@@ -1,12 +1,21 @@
 from __future__ import annotations
 
 import math
+import os
+from concurrent.futures import ThreadPoolExecutor
 
 import cv2
 import numpy as np
 
 from .context import cfg, clip01
-from .geometry import axis_tilt_deg, axis_x_at_y, rectify_about_axis, segment_ranges, split_mirrored_sides
+from .geometry import (
+    axis_tilt_deg,
+    axis_x_at_y,
+    build_rectification_grid,
+    rectify_about_axis,
+    segment_ranges,
+    split_mirrored_sides,
+)
 
 
 def _normalize_weights(values: list[float]) -> np.ndarray:
@@ -41,12 +50,12 @@ def _weighted_median(values: list[float], weights: list[float]) -> float:
 
 def _partial_bidirectional_chamfer(first: np.ndarray, second: np.ndarray, match_fraction: float) -> dict:
     first_bool, second_bool = first > 0, second > 0
-    n_first, n_second = int(np.count_nonzero(first_bool)), int(np.count_nonzero(second_bool))
+    n_first, n_second = cv2.countNonZero(first), cv2.countNonZero(second)
     minimum = int(cfg("mirror", "min_edge_pixels_per_side", default=14))
     if n_first < minimum or n_second < minimum:
         return {"reliable": False, "score": None, "mean_distance_px": None, "first_count": n_first, "second_count": n_second}
-    first_dt = cv2.distanceTransform(np.where(first_bool, 0, 1).astype(np.uint8), cv2.DIST_L2, 3)
-    second_dt = cv2.distanceTransform(np.where(second_bool, 0, 1).astype(np.uint8), cv2.DIST_L2, 3)
+    first_dt = cv2.distanceTransform(cv2.compare(first, 0, cv2.CMP_EQ), cv2.DIST_L2, 3)
+    second_dt = cv2.distanceTransform(cv2.compare(second, 0, cv2.CMP_EQ), cv2.DIST_L2, 3)
     maximum = max(1.0, float(cfg("mirror", "max_chamfer_distance_px", default=16.0)))
     scale = max(1e-6, float(cfg("mirror", "distance_score_scale_px", default=7.0)))
     d12 = np.clip(second_dt[first_bool], 0.0, maximum)
@@ -74,8 +83,8 @@ def _partial_bidirectional_chamfer(first: np.ndarray, second: np.ndarray, match_
 
 
 def _radial_histogram_similarity(first: np.ndarray, second: np.ndarray) -> float:
-    h1 = np.sum(first > 0, axis=0).astype(np.float64)
-    h2 = np.sum(second > 0, axis=0).astype(np.float64)
+    h1 = np.count_nonzero(first, axis=0).astype(np.float64)
+    h2 = np.count_nonzero(second, axis=0).astype(np.float64)
     sigma = max(0.0, float(cfg("mirror", "histogram_smoothing_sigma", default=2.0)))
     if sigma > 0 and h1.size > 2:
         h1 = cv2.GaussianBlur(h1.reshape(1, -1), (0, 0), sigmaX=sigma).reshape(-1)
@@ -88,12 +97,13 @@ def _radial_histogram_similarity(first: np.ndarray, second: np.ndarray) -> float
 
 
 def _row_coverage(edge: np.ndarray) -> float:
-    return float(np.mean(np.any(edge > 0, axis=1))) if edge.shape[0] else 0.0
+    return float(np.mean(np.any(edge, axis=1))) if edge.shape[0] else 0.0
 
 
 def _band_score(left: np.ndarray, right: np.ndarray, match_fraction: float) -> dict:
     chamfer = _partial_bidirectional_chamfer(left, right, match_fraction)
-    left_count, right_count = int(np.count_nonzero(left)), int(np.count_nonzero(right))
+    left_count = int(chamfer["first_count"])
+    right_count = int(chamfer["second_count"])
     count_balance = min(left_count, right_count) / max(1, max(left_count, right_count))
     left_rows, right_rows = _row_coverage(left), _row_coverage(right)
     row_balance = min(left_rows, right_rows) / max(1e-9, max(left_rows, right_rows))
@@ -324,16 +334,33 @@ def verify_candidate(
     y_max: int,
     half_width: int,
     segment_count: int,
+    _rectification_source: np.ndarray | None = None,
+    _rectification_grid: tuple[np.ndarray, np.ndarray, np.ndarray] | None = None,
+    _segment_ranges: list[tuple[int, int]] | None = None,
+    _step06_prior_score: float | None = None,
+    _final_score_weights: np.ndarray | None = None,
 ) -> dict:
     center_exclusion = int(cfg("mirror", "center_exclusion_px", default=4))
-    rectified_corridor = rectify_about_axis(corridor_mask, candidate, y_min, y_max, half_width, cv2.INTER_NEAREST)
-    rectified_edge = rectify_about_axis(edge_mask, candidate, y_min, y_max, half_width, cv2.INTER_NEAREST)
+    if _rectification_source is None:
+        _rectification_source = cv2.merge((corridor_mask, edge_mask))
+    rectified_pair = rectify_about_axis(
+        _rectification_source,
+        candidate,
+        y_min,
+        y_max,
+        half_width,
+        cv2.INTER_NEAREST,
+        rectification_grid=_rectification_grid,
+    )
+    rectified_corridor = rectified_pair[:, :, 0]
+    rectified_edge = rectified_pair[:, :, 1]
     left_edge, right_edge = split_mirrored_sides(rectified_edge, center_exclusion)
     center_column = rectified_corridor.shape[1] // 2
     center_inside = rectified_corridor[:, center_column] > 0
 
     segments: list[dict] = []
-    for index, (start, end) in enumerate(segment_ranges(rectified_edge.shape[0], segment_count)):
+    ranges = _segment_ranges if _segment_ranges is not None else segment_ranges(rectified_edge.shape[0], segment_count)
+    for index, (start, end) in enumerate(ranges):
         result = _segment_score(left_edge[start:end], right_edge[start:end], center_inside[start:end], index, start, end)
         result["image_y_start"] = int(y_min + start)
         result["image_y_end"] = int(y_min + end - 1)
@@ -341,13 +368,21 @@ def verify_candidate(
     aggregate = _aggregate_segments(segments)
     geometry = _candidate_geometry_reliability(candidate, consensus_info, row_half_widths, y_min, y_max)
     axis_inside_ratio = float(np.mean(center_inside)) if center_inside.size else 0.0
-    step06_prior = _step06_prior(candidate, all_candidates)
-    score_weights = _normalize_weights([
-        float(cfg("final_scoring", "mirror_symmetry_weight", default=0.72)),
-        float(cfg("final_scoring", "bilateral_coverage_weight", default=0.10)),
-        float(cfg("final_scoring", "consensus_centrality_weight", default=0.08)),
-        float(cfg("final_scoring", "step_06_prior_weight", default=0.10)),
-    ])
+    step06_prior = (
+        float(_step06_prior_score)
+        if _step06_prior_score is not None
+        else _step06_prior(candidate, all_candidates)
+    )
+    score_weights = (
+        _final_score_weights
+        if _final_score_weights is not None
+        else _normalize_weights([
+            float(cfg("final_scoring", "mirror_symmetry_weight", default=0.72)),
+            float(cfg("final_scoring", "bilateral_coverage_weight", default=0.10)),
+            float(cfg("final_scoring", "consensus_centrality_weight", default=0.08)),
+            float(cfg("final_scoring", "step_06_prior_weight", default=0.10)),
+        ])
+    )
     verification_score = float(
         score_weights[0] * aggregate["mirror_symmetry_score"]
         + score_weights[1] * aggregate["bilateral_coverage_score"]
@@ -410,10 +445,48 @@ def verify_candidates(
     half_width: int,
     segment_count: int,
 ) -> list[dict]:
-    verified = [
-        verify_candidate(c, i, candidates, corridor_mask, edge_mask, consensus_info, row_half_widths, y_min, y_max, half_width, segment_count)
-        for i, c in enumerate(candidates)
-    ]
+    rectification_source = cv2.merge((corridor_mask, edge_mask))
+    rectification_grid = build_rectification_grid(y_min, y_max, half_width)
+    prepared_segment_ranges = segment_ranges(y_max - y_min + 1, segment_count)
+    step06_priors = [_step06_prior(candidate, candidates) for candidate in candidates]
+    final_score_weights = _normalize_weights([
+        float(cfg("final_scoring", "mirror_symmetry_weight", default=0.72)),
+        float(cfg("final_scoring", "bilateral_coverage_weight", default=0.10)),
+        float(cfg("final_scoring", "consensus_centrality_weight", default=0.08)),
+        float(cfg("final_scoring", "step_06_prior_weight", default=0.10)),
+    ])
+
+    def run_candidate(item: tuple[int, dict]) -> dict:
+        index, candidate = item
+        return verify_candidate(
+            candidate,
+            index,
+            candidates,
+            corridor_mask,
+            edge_mask,
+            consensus_info,
+            row_half_widths,
+            y_min,
+            y_max,
+            half_width,
+            segment_count,
+            _rectification_source=rectification_source,
+            _rectification_grid=rectification_grid,
+            _segment_ranges=prepared_segment_ranges,
+            _step06_prior_score=step06_priors[index],
+            _final_score_weights=final_score_weights,
+        )
+
+    configured_workers = max(1, int(cfg("performance", "candidate_workers", default=2)))
+    available_cpus = os.cpu_count() or 1
+    worker_count = min(configured_workers, available_cpus, len(candidates))
+    if worker_count <= 1:
+        verified = [run_candidate(item) for item in enumerate(candidates)]
+    else:
+        with ThreadPoolExecutor(max_workers=worker_count, thread_name_prefix="step07-candidate") as executor:
+            # executor.map preserves source order, so labels and deterministic tie
+            # handling remain exactly the same as in the serial implementation.
+            verified = list(executor.map(run_candidate, enumerate(candidates)))
     # Validity must be compared before score. The previous implementation put
     # score first and could allow an invalid accidental mirror match to win.
     return sorted(

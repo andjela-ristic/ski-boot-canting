@@ -29,6 +29,12 @@ def to_bgr(image: np.ndarray) -> np.ndarray:
     return cv2.cvtColor(image, cv2.COLOR_GRAY2BGR) if image.ndim == 2 else image.copy()
 
 
+def extract_corridor_contours(corridor_mask: np.ndarray) -> list[np.ndarray]:
+    boundary = mask_boundary(corridor_mask)
+    contours, _ = cv2.findContours(boundary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    return contours
+
+
 def load_visual_background(metadata: dict, fallback: np.ndarray) -> tuple[np.ndarray, str | None]:
     image_name = str(metadata.get("image_name", ""))
     candidates = [
@@ -75,10 +81,19 @@ def _draw_axis(image: np.ndarray, candidate: dict, y_min: int, y_max: int, color
     )
 
 
-def draw_winner_overlay(background: np.ndarray, corridor_mask: np.ndarray, ranked: list[dict], consensus_axis: dict, y_min: int, y_max: int, image_name: str, confidence: str) -> np.ndarray:
+def draw_winner_overlay(
+    background: np.ndarray,
+    corridor_mask: np.ndarray,
+    ranked: list[dict],
+    consensus_axis: dict,
+    y_min: int,
+    y_max: int,
+    image_name: str,
+    confidence: str,
+    corridor_contours: list[np.ndarray] | None = None,
+) -> np.ndarray:
     canvas = (to_bgr(background).astype(np.float32) * float(cfg("drawing", "background_alpha", default=0.82))).astype(np.uint8)
-    boundary = mask_boundary(corridor_mask)
-    contours, _ = cv2.findContours(boundary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    contours = corridor_contours if corridor_contours is not None else extract_corridor_contours(corridor_mask)
     cv2.drawContours(canvas, contours, -1, COLOR_CORRIDOR, int(cfg("drawing", "corridor_boundary_thickness", default=2)), cv2.LINE_AA)
     _draw_axis(canvas, consensus_axis, y_min, y_max, (160, 160, 0), 1)
     for candidate in ranked[1:]:
@@ -115,10 +130,18 @@ def build_rectified_diagnostic(candidate: dict) -> np.ndarray:
     return diagnostic
 
 
-def draw_candidate_snapshot(background: np.ndarray, corridor_mask: np.ndarray, candidate: dict, consensus_axis: dict, y_min: int, y_max: int, image_name: str) -> np.ndarray:
+def draw_candidate_snapshot(
+    background: np.ndarray,
+    corridor_mask: np.ndarray,
+    candidate: dict,
+    consensus_axis: dict,
+    y_min: int,
+    y_max: int,
+    image_name: str,
+    corridor_contours: list[np.ndarray] | None = None,
+) -> np.ndarray:
     left_panel = to_bgr(background)
-    boundary = mask_boundary(corridor_mask)
-    contours, _ = cv2.findContours(boundary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    contours = corridor_contours if corridor_contours is not None else extract_corridor_contours(corridor_mask)
     cv2.drawContours(left_panel, contours, -1, COLOR_CORRIDOR, 1, cv2.LINE_AA)
     _draw_axis(left_panel, consensus_axis, y_min, y_max, (160, 160, 0), 1)
     _draw_axis(left_panel, candidate, y_min, y_max, COLOR_WINNER, int(cfg("drawing", "axis_thickness", default=4)))

@@ -117,6 +117,11 @@ DEFAULT_STEP_CONFIG = {
         "medium_min_verification_percent": 60.0,
         "medium_min_margin_percent": 0.8,
     },
+    "performance": {
+        "candidate_workers": 2,
+        "snapshot_workers": 4,
+        "image_write_workers": 4,
+    },
     "drawing": {
         "axis_thickness": 4,
         "other_axis_thickness": 1,

@@ -258,6 +258,17 @@ def prepare_edge_mask(edge_image: np.ndarray, corridor_mask: np.ndarray, consens
     return ensure_binary(edge)
 
 
+def build_rectification_grid(
+    y_min: int,
+    y_max: int,
+    half_width: int,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    rows = np.arange(y_min, y_max + 1, dtype=np.float32)
+    offsets = np.arange(-half_width, half_width + 1, dtype=np.float32)
+    map_y = np.repeat(rows[:, None], offsets.size, axis=1)
+    return rows, offsets, map_y
+
+
 def rectify_about_axis(
     image: np.ndarray,
     axis: dict,
@@ -265,16 +276,18 @@ def rectify_about_axis(
     y_max: int,
     half_width: int,
     interpolation: int = cv2.INTER_NEAREST,
+    rectification_grid: tuple[np.ndarray, np.ndarray, np.ndarray] | None = None,
 ) -> np.ndarray:
-    rows = np.arange(y_min, y_max + 1, dtype=np.float32)
-    offsets = np.arange(-half_width, half_width + 1, dtype=np.float32)
-    map_y = np.repeat(rows[:, None], offsets.size, axis=1)
+    if rectification_grid is None:
+        rows, offsets, map_y = build_rectification_grid(y_min, y_max, half_width)
+    else:
+        rows, offsets, map_y = rectification_grid
     axis_x = float(axis.get("a", 0.0)) * rows + float(axis.get("b", axis.get("x_ref", 0.0)))
     map_x = axis_x[:, None] + offsets[None, :]
     return cv2.remap(
         image,
         map_x.astype(np.float32),
-        map_y.astype(np.float32),
+        map_y,
         interpolation=interpolation,
         borderMode=cv2.BORDER_CONSTANT,
         borderValue=0,

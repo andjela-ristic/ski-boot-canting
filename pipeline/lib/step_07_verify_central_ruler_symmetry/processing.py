@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
+import os
 from pathlib import Path
 import time
 
@@ -23,7 +25,13 @@ from .geometry import (
     prepare_roi_mask,
     resolve_vertical_range,
 )
-from .rendering import create_comparison, draw_candidate_snapshot, draw_winner_overlay, load_visual_background
+from .rendering import (
+    create_comparison,
+    draw_candidate_snapshot,
+    draw_winner_overlay,
+    extract_corridor_contours,
+    load_visual_background,
+)
 from .symmetry import sanitize_result, verify_candidates
 
 
@@ -93,15 +101,42 @@ def build_analysis(metadata_path: Path) -> dict:
 
     rendering_started = time.perf_counter()
     background, visual_path = load_visual_background(metadata, edge_raw)
-    overlay = draw_winner_overlay(background, corridor_mask, ranked, corridor_info["consensus_axis"], y_min, y_max, image_name, confidence)
+    corridor_contours = extract_corridor_contours(corridor_mask)
+    overlay = draw_winner_overlay(
+        background,
+        corridor_mask,
+        ranked,
+        corridor_info["consensus_axis"],
+        y_min,
+        y_max,
+        image_name,
+        confidence,
+        corridor_contours=corridor_contours,
+    )
     comparison = create_comparison(overlay, ranked)
-    snapshots = [
-        {
-            "candidate_label": c["candidate_label"],
-            "image": draw_candidate_snapshot(background, corridor_mask, c, corridor_info["consensus_axis"], y_min, y_max, image_name),
+
+    def render_snapshot(candidate: dict) -> dict:
+        return {
+            "candidate_label": candidate["candidate_label"],
+            "image": draw_candidate_snapshot(
+                background,
+                corridor_mask,
+                candidate,
+                corridor_info["consensus_axis"],
+                y_min,
+                y_max,
+                image_name,
+                corridor_contours=corridor_contours,
+            ),
         }
-        for c in ranked
-    ]
+
+    configured_workers = max(1, int(cfg("performance", "snapshot_workers", default=2)))
+    worker_count = min(configured_workers, os.cpu_count() or 1, len(ranked))
+    if worker_count <= 1:
+        snapshots = [render_snapshot(candidate) for candidate in ranked]
+    else:
+        with ThreadPoolExecutor(max_workers=worker_count, thread_name_prefix="step07-snapshot") as executor:
+            snapshots = list(executor.map(render_snapshot, ranked))
     rendering_duration = time.perf_counter() - rendering_started
 
     output_metadata = {
@@ -158,22 +193,34 @@ def process_metadata_file(metadata_path: Path) -> dict:
     evaluation_edge_path = dirs["output_evaluation_edge_dir"] / image_name
     for path in [overlay_path.parent, comparison_path.parent, output_metadata_path.parent, snapshot_dir, rectified_path.parent, evaluation_mask_path.parent, evaluation_edge_path.parent]:
         path.mkdir(parents=True, exist_ok=True)
-    if not cv2.imwrite(str(overlay_path), analysis["overlay"]):
-        raise RuntimeError(f"Could not save overlay: {overlay_path}")
-    if not cv2.imwrite(str(comparison_path), analysis["comparison"]):
-        raise RuntimeError(f"Could not save comparison: {comparison_path}")
-    if not cv2.imwrite(str(rectified_path), analysis["winner_rectified_edge"]):
-        raise RuntimeError(f"Could not save rectified winner: {rectified_path}")
-    if not cv2.imwrite(str(evaluation_mask_path), analysis["evaluation_mask"]):
-        raise RuntimeError(f"Could not save Step 07 evaluation mask: {evaluation_mask_path}")
-    if not cv2.imwrite(str(evaluation_edge_path), analysis["evaluation_edge_mask"]):
-        raise RuntimeError(f"Could not save Step 07 evaluation edge mask: {evaluation_edge_path}")
-    snapshot_files = []
+    write_jobs: list[tuple[Path, object, str]] = [
+        (overlay_path, analysis["overlay"], "overlay"),
+        (comparison_path, analysis["comparison"], "comparison"),
+        (rectified_path, analysis["winner_rectified_edge"], "rectified winner"),
+        (evaluation_mask_path, analysis["evaluation_mask"], "Step 07 evaluation mask"),
+        (evaluation_edge_path, analysis["evaluation_edge_mask"], "Step 07 evaluation edge mask"),
+    ]
+    snapshot_paths: list[Path] = []
     for snapshot in analysis["snapshots"]:
         path = snapshot_dir / f"{snapshot['candidate_label']}_{image_name}"
-        if not cv2.imwrite(str(path), snapshot["image"]):
-            raise RuntimeError(f"Could not save candidate snapshot: {path}")
-        snapshot_files.append(relative_project_path(path))
+        snapshot_paths.append(path)
+        write_jobs.append((path, snapshot["image"], "candidate snapshot"))
+
+    def write_image(job: tuple[Path, object, str]) -> Path:
+        path, image, description = job
+        if not cv2.imwrite(str(path), image):
+            raise RuntimeError(f"Could not save {description}: {path}")
+        return path
+
+    configured_workers = max(1, int(cfg("performance", "image_write_workers", default=4)))
+    worker_count = min(configured_workers, os.cpu_count() or 1, len(write_jobs))
+    if worker_count <= 1:
+        for job in write_jobs:
+            write_image(job)
+    else:
+        with ThreadPoolExecutor(max_workers=worker_count, thread_name_prefix="step07-write") as executor:
+            list(executor.map(write_image, write_jobs))
+    snapshot_files = [relative_project_path(path) for path in snapshot_paths]
     metadata = deepcopy(analysis["metadata"])
     metadata.update({
         "output_overlay_file": relative_project_path(overlay_path),

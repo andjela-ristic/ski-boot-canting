@@ -10068,6 +10068,11 @@
       "medium_min_verification_percent": 60.0,
       "medium_min_margin_percent": 0.8
     },
+    "performance": {
+      "candidate_workers": 2,
+      "snapshot_workers": 4,
+      "image_write_workers": 4
+    },
     "drawing": {
       "axis_thickness": 4,
       "other_axis_thickness": 1,
@@ -10096,10 +10101,10 @@
     "visual_background_subdir": "01_illumination_normalized"
   },
   "timings_sec": {
-    "verification": 0.5287002000004577,
-    "rendering": 2.422206400002324,
-    "analysis_total": 3.695300200000929,
-    "process_total": 5.524602400000731
+    "verification": 0.4904586000011477,
+    "rendering": 0.8831467000018165,
+    "analysis_total": 2.5110741999997117,
+    "process_total": 3.909880900002463
   },
   "output_overlay_file": "data\\processed\\07_verify_central_ruler_symmetry\\overlay\\IMG_0507.png",
   "output_comparison_file": "data\\processed\\07_verify_central_ruler_symmetry\\comparison\\IMG_0507.png",
