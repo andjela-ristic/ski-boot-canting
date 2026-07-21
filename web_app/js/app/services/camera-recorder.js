@@ -2,7 +2,6 @@ import { wait } from "../utils/format.js";
 
 const MAX_IDEAL_WIDTH = 7680;
 const MAX_IDEAL_HEIGHT = 4320;
-const RECORDER_TIMESLICE_MS = 250;
 const RETRY_RECORDING_WAIT_MS = 120;
 const SAFE_RECORDING_MIN_BITRATE = 6_000_000;
 const SAFE_RECORDING_MAX_BITRATE = 20_000_000;
@@ -45,7 +44,7 @@ export async function initializeCamera(options) {
 
   const streamDetails = describeStream(stream);
   const iosHint = isLikelyIosDevice()
-    ? " On iPhone, Record or choose video is usually sharper than live preview."
+    ? " On iPhone, Quick 2-second capture is usually sharper than live preview."
     : "";
 
   options.setStatus(
@@ -130,19 +129,18 @@ async function recordClipOnce(stream, durationMs, recorderConfig = {}) {
     }
   });
 
-  recorder.start(RECORDER_TIMESLICE_MS);
+  recorder.start();
   await Promise.race([started, recordingFailed]);
   await wait(durationMs);
-
-  if (recorder.state !== "inactive" && typeof recorder.requestData === "function") {
-    recorder.requestData();
-    await wait(RETRY_RECORDING_WAIT_MS);
-  }
 
   if (recorder.state !== "inactive") {
     recorder.stop();
   }
   await Promise.race([stopped, recordingFailed]);
+
+  if (chunks.length === 0) {
+    await wait(RETRY_RECORDING_WAIT_MS);
+  }
 
   if (chunks.length === 0) {
     throw new Error("The browser returned an empty recording.");

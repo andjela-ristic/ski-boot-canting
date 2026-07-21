@@ -13,7 +13,7 @@ import {
   recordClip,
   stopCurrentStream,
 } from "../services/camera-recorder.js";
-import { formatFileSize, normalizeError } from "../utils/format.js";
+import { normalizeError } from "../utils/format.js";
 
 const READINESS_POLL_INTERVAL_MS = 250;
 const READINESS_SUCCESS_STREAK = 2;
@@ -76,7 +76,7 @@ export function bindCapturePanel(options) {
     }
 
     if (!canUseLiveCamera()) {
-      options.setStatus("Use Upload existing video for this session.", "warning");
+      options.setStatus("Quick capture requires live camera access in the browser.", "warning");
       return;
     }
 
@@ -93,7 +93,6 @@ export function bindCapturePanel(options) {
         refreshChrome: options.refreshChrome,
       });
 
-      setSelectedVideo(options, file, "Quick capture recorded. Running analysis...");
       stopCurrentStream({
         elements: options.elements,
         state: options.state,
@@ -123,66 +122,6 @@ export function bindCapturePanel(options) {
       options.refreshChrome();
     }
   });
-
-  options.elements.videoFile.addEventListener("change", () => {
-    const file = options.elements.videoFile.files && options.elements.videoFile.files[0];
-    if (!file) {
-      return;
-    }
-
-    setSelectedVideo(options, file, "Video is selected and ready for analysis.");
-    options.setStatus("The video is ready. Run the analysis whenever you want.", "success");
-  });
-
-  options.elements.uploadButton.addEventListener("click", async () => {
-    if (options.state.busy) {
-      return;
-    }
-
-    if (!options.state.selectedVideoFile) {
-      options.setStatus("Upload or capture a video file first.", "warning");
-      return;
-    }
-
-    try {
-      options.state.busy = true;
-      options.state.activeOperation = "uploading";
-      options.refreshChrome();
-      options.setStatus("Uploading the original video for analysis...", "info");
-      persistForm(options.elements);
-
-      const result = await uploadSelectedVideo(
-        options,
-        options.state.selectedVideoFile,
-        getClipDurationMs(options.elements),
-      );
-
-      rememberResultOverlay(options, result);
-      options.renderResult(result);
-      options.setStatus("Analysis finished. The result is shown below.", "success");
-    } catch (error) {
-      console.error(error);
-      options.setStatus(normalizeError(error, "Upload or processing failed."), "error");
-    } finally {
-      options.state.busy = false;
-      options.state.activeOperation = null;
-      options.refreshChrome();
-    }
-  });
-}
-
-function setSelectedVideo(options, file, label) {
-  options.state.selectedVideoFile = file;
-  options.elements.selectedFileLabel.textContent = label;
-  options.elements.selectedFileMeta.textContent = `${file.name} - ${formatFileSize(file.size)}`;
-
-  if (options.state.clipPreviewUrl) {
-    URL.revokeObjectURL(options.state.clipPreviewUrl);
-  }
-
-  options.state.clipPreviewUrl = URL.createObjectURL(file);
-  options.elements.clipPreview.src = options.state.clipPreviewUrl;
-  options.elements.clipShell.classList.remove("is-hidden");
 }
 
 async function uploadSelectedVideo(options, file, clipDurationMs) {
@@ -280,10 +219,7 @@ async function capturePreviewFrame(videoElement) {
 
   const viewportWidth = Math.max(1, Math.round(videoElement.clientWidth || sourceWidth));
   const viewportHeight = Math.max(1, Math.round(videoElement.clientHeight || sourceHeight));
-  const coverScale = Math.max(
-    viewportWidth / sourceWidth,
-    viewportHeight / sourceHeight,
-  );
+  const coverScale = Math.max(viewportWidth / sourceWidth, viewportHeight / sourceHeight);
   const visibleSourceWidth = sourceWidth / coverScale;
   const visibleSourceHeight = sourceHeight / coverScale;
   const visibleSourceX = Math.max(0, (sourceWidth - visibleSourceWidth) * 0.5);
@@ -376,10 +312,10 @@ function formatReadinessMeta(options) {
 
 function buildCaptureNote() {
   if (isLikelyIosDevice()) {
-    return "For the sharpest iPhone result, prefer Record or choose video. The app now uploads the original video for analysis instead of extracting a browser-compressed frame.";
+    return "For the sharpest iPhone result, use Quick 2-second capture. The app uploads the original recorded clip for analysis.";
   }
 
-  return "For maximum quality, video analysis uploads the original clip instead of a browser-extracted preview frame.";
+  return "Quick 2-second capture uploads the original recorded clip for maximum quality.";
 }
 
 function isLikelyIosDevice() {

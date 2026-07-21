@@ -16,30 +16,35 @@ class GuideConfig:
 
 @dataclass(frozen=True, slots=True)
 class QualityConfig:
-    min_sharpness: float = 12.0
-    min_mean_brightness: float = 20.0
-    max_mean_brightness: float = 238.0
-    max_dark_ratio: float = 0.82
-    max_bright_ratio: float = 0.82
+    # Preview frames are frequently compressed and slightly soft, so these
+    # limits reject only clearly unusable frames.
+    min_sharpness: float = 8.0
+    min_mean_brightness: float = 12.0
+    max_mean_brightness: float = 245.0
+    max_dark_ratio: float = 0.90
+    max_bright_ratio: float = 0.90
     dark_pixel_threshold: int = 8
     bright_pixel_threshold: int = 247
 
 
 @dataclass(frozen=True, slots=True)
 class BootConfig:
-    min_height_ratio: float = 0.45
-    max_height_ratio: float = 0.99
-    min_width_ratio: float = 0.18
-    max_width_ratio: float = 0.84
-    min_area_ratio: float = 0.075
-    max_area_ratio: float = 0.82
-    max_center_offset_ratio: float = 0.11
-    min_bottom_ratio: float = 0.60
-    min_side_margin_ratio: float = 0.012
-    min_top_margin_ratio: float = 0.012
-    min_candidate_score: float = 0.47
-    canny_low: int = 40
-    canny_high: int = 120
+    # Geometry limits are intentionally tolerant. The final measurement
+    # pipeline remains responsible for precise canting validation.
+    min_height_ratio: float = 0.38
+    max_height_ratio: float = 0.995
+    min_width_ratio: float = 0.14
+    max_width_ratio: float = 0.92
+    min_area_ratio: float = 0.050
+    max_area_ratio: float = 0.90
+    max_center_offset_ratio: float = 0.16
+    min_bottom_ratio: float = 0.54
+    min_side_margin_ratio: float = 0.0
+    min_top_margin_ratio: float = 0.0
+    min_candidate_score: float = 0.40
+    scale_tolerance_ratio: float = 0.055
+    canny_low: int = 32
+    canny_high: int = 110
     gaussian_kernel: int = 5
     close_kernel: int = 7
     open_kernel: int = 3
@@ -52,15 +57,29 @@ class ReferenceConfig:
     exclude_guide_from_search: bool = True
     x_min_ratio: float = 0.00
     x_max_ratio: float = 1.00
-    y_min_ratio: float = 0.68
+    # The table/platform edge in real preview frames can sit above 68%.
+    y_min_ratio: float = 0.52
     y_max_ratio: float = 0.99
-    max_angle_error_deg: float = 8.0
-    min_total_length_ratio: float = 0.28
-    min_segment_length_ratio: float = 0.12
-    max_line_gap_ratio: float = 0.06
-    canny_low: int = 45
-    canny_high: int = 135
-    hough_threshold: int = 24
+    max_angle_error_deg: float = 12.0
+    min_total_length_ratio: float = 0.14
+    min_best_length_ratio: float = 0.075
+    min_segment_length_ratio: float = 0.055
+    max_line_gap_ratio: float = 0.10
+    canny_low: int = 28
+    canny_high: int = 105
+    hough_threshold: int = 14
+
+    # Projection fallback catches a long table edge even when Hough splits it
+    # into weak or short segments.
+    projection_fallback_enabled: bool = True
+    projection_min_strength: float = 2.6
+    projection_min_coverage_ratio: float = 0.12
+
+    # A clearly detected, complete, centered boot may pass the fast preview
+    # check if the line detector alone is uncertain. The slower pipeline still
+    # performs the precise reference-line validation.
+    allow_strong_boot_fallback: bool = True
+    strong_boot_fallback_score: float = 0.78
 
 
 @dataclass(frozen=True, slots=True)
@@ -68,7 +87,7 @@ class ReadinessConfig:
     processing_max_width: int = 480
     jpeg_max_bytes: int = 3_000_000
     opencv_threads: int = 1
-    success_score_threshold: float = 0.85
+    success_score_threshold: float = 0.72
     guide: GuideConfig = field(default_factory=GuideConfig)
     quality: QualityConfig = field(default_factory=QualityConfig)
     boot: BootConfig = field(default_factory=BootConfig)

@@ -52,40 +52,10 @@
     <button class="primary-button" id="record-button" type="button">
       Quick 2-second capture
     </button>
-
-    <label class="secondary-button file-button" for="video-file">
-      Record or choose video
-    </label>
-
-    <input
-      id="video-file"
-      type="file"
-      accept="video/*"
-      capture="environment"
-      hidden
-    />
   </div>
-
-  <div class="selected-file">
-    <p class="selected-file-label" id="selected-file-label">
-      No clip selected yet.
-    </p>
-    <p class="selected-file-meta" id="selected-file-meta">
-      You can record a new clip or choose an existing video from your gallery.
-    </p>
-  </div>
-
-  <div class="preview-shell clip-shell is-hidden" id="clip-shell">
-    <video id="clip-preview" class="clip-video" controls playsinline></video>
-  </div>
-
-  <button class="analyze-button" id="upload-button" type="button">
-    Run Analysis
-  </button>
 
   <p class="support-note" id="capture-note">
-    If the live camera is not available, the app remains fully usable through
-    video upload.
+    This flow records a 2-second clip and uploads it immediately for analysis.
   </p>
 
   <details class="advanced-settings">

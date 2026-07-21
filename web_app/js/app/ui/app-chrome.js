@@ -28,12 +28,12 @@ function renderCapabilityPills(options) {
 function renderCaptureNote(options) {
   if (window.isSecureContext) {
     options.elements.captureNote.textContent =
-      "If the browser allows camera access, you can record a clip directly here. Video upload remains available at all times.";
+      "Tap Quick 2-second capture to record a short clip and upload it immediately for analysis.";
     return;
   }
 
   options.elements.captureNote.textContent =
-    "Video upload is recommended for this session. If you want live camera access in the browser, open the app through an HTTPS link.";
+    "Quick 2-second capture requires browser camera access. Open the app through HTTPS for this session.";
 }
 
 function renderPreviewPlaceholder(options) {
@@ -50,7 +50,7 @@ function renderPreviewPlaceholder(options) {
   }
 
   options.elements.previewPlaceholder.textContent =
-    "Open the HTTPS version of the app for live camera access, or use Record or choose video right away.";
+    "Open the HTTPS version of the app for live camera access, then use Quick 2-second capture.";
 }
 
 function syncBusyState(options) {
@@ -58,21 +58,16 @@ function syncBusyState(options) {
 
   options.elements.recordButton.disabled = options.state.busy || liveUnavailable;
   options.elements.toggleCamera.disabled = options.state.busy || liveUnavailable;
-  options.elements.uploadButton.disabled = options.state.busy;
   options.elements.resetBaseUrl.disabled = options.state.busy;
   options.elements.toggleCamera.classList.toggle("is-hidden", liveUnavailable);
 
   if (options.state.activeOperation === "recording") {
     options.elements.recordButton.textContent = "Recording...";
+  } else if (options.state.activeOperation === "uploading") {
+    options.elements.recordButton.textContent = "Uploading...";
   } else if (liveUnavailable) {
     options.elements.recordButton.textContent = "Quick capture unavailable";
   } else {
     options.elements.recordButton.textContent = "Quick 2-second capture";
-  }
-
-  if (options.state.activeOperation === "uploading") {
-    options.elements.uploadButton.textContent = "Analysis running...";
-  } else {
-    options.elements.uploadButton.textContent = "Run Analysis";
   }
 }

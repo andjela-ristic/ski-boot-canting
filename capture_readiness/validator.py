@@ -106,7 +106,7 @@ class FrameValidator:
         guide_gray = gray[gy1:gy2, gx1:gx2]
 
         candidate = self._find_boot_candidate(guide_gray, active_config)
-        reference_found, reference_metrics, reference_segments = (
+        reference_detected, reference_metrics, reference_segments = (
             self._detect_reference_line(gray, active_config)
         )
 
@@ -115,24 +115,53 @@ class FrameValidator:
             guide_gray.shape,
             active_config,
         )
+
+        reference = active_config.reference
+        strong_boot_fallback = bool(
+            reference.allow_strong_boot_fallback
+            and candidate is not None
+            and candidate.score >= reference.strong_boot_fallback_score
+            and boot_checks["boot_present"]
+            and boot_checks["boot_centered"]
+            and boot_checks["boot_scale_ok"]
+            and boot_checks["boot_complete"]
+        )
+        reference_satisfied = bool(
+            reference_detected
+            or not reference.required
+            or strong_boot_fallback
+        )
+
         checks = {
             **quality_checks,
             **boot_checks,
-            "reference_line_found": (
-                reference_found or not active_config.reference.required
-            ),
+            # Kept as the effective compatibility check used by existing
+            # frontends. Raw detector state is exposed in metrics below.
+            "reference_line_found": reference_satisfied,
         }
 
-        score_parts = [
-            1.0 if quality_checks["sharpness_ok"] else 0.0,
-            1.0 if quality_checks["exposure_ok"] else 0.0,
-            candidate.score if candidate is not None else 0.0,
-            1.0 if checks["reference_line_found"] else 0.0,
-        ]
-        score = float(np.clip(np.mean(score_parts), 0.0, 1.0))
-        success = (
+        candidate_score = candidate.score if candidate is not None else 0.0
+        score = float(np.clip(
+            0.10 * float(quality_checks["sharpness_ok"])
+            + 0.10 * float(quality_checks["exposure_ok"])
+            + 0.35 * candidate_score
+            + 0.15 * float(boot_checks["boot_centered"])
+            + 0.12 * float(boot_checks["boot_scale_ok"])
+            + 0.08 * float(boot_checks["boot_complete"])
+            + 0.10 * float(reference_satisfied),
+            0.0,
+            1.0,
+        ))
+
+        success = bool(
             score >= active_config.success_score_threshold
-            and checks["boot_scale_ok"]
+            and quality_checks["sharpness_ok"]
+            and quality_checks["exposure_ok"]
+            and boot_checks["boot_present"]
+            and boot_checks["boot_centered"]
+            and boot_checks["boot_scale_ok"]
+            and boot_checks["boot_complete"]
+            and reference_satisfied
         )
         reason = None if success else self._failure_reason(
             checks,
@@ -156,6 +185,10 @@ class FrameValidator:
             **quality_metrics,
             **boot_metrics,
             **reference_metrics,
+            "reference_detected": reference_detected,
+            "reference_accepted_via_boot_fallback": bool(
+                strong_boot_fallback and not reference_detected
+            ),
             "guide_scale": round(normalized_guide_scale, 3),
             "guide_x_min_ratio": round(active_config.guide.x_min_ratio, 5),
             "guide_x_max_ratio": round(active_config.guide.x_max_ratio, 5),
@@ -204,7 +237,7 @@ class FrameValidator:
         except (TypeError, ValueError):
             return 1.0
 
-        return float(np.clip(numeric, 0.90, 1.20))
+        return float(np.clip(numeric, 0.80, 1.25))
 
     @staticmethod
     def _scaled_guide_config(
@@ -590,14 +623,16 @@ class FrameValidator:
             abs(candidate.center_offset_ratio)
             <= boot.max_center_offset_ratio
         )
+        tolerance = max(0.0, boot.scale_tolerance_ratio)
         boot_scale_ok = (
-            boot.min_height_ratio
+            max(0.0, boot.min_height_ratio - tolerance)
             <= candidate.height_ratio
-            <= boot.max_height_ratio
-            and boot.min_width_ratio
+            <= min(1.0, boot.max_height_ratio + tolerance)
+            and max(0.0, boot.min_width_ratio - tolerance)
             <= candidate.width_ratio
-            <= boot.max_width_ratio
-            and candidate.area_ratio <= boot.max_area_ratio
+            <= min(1.0, boot.max_width_ratio + tolerance)
+            and candidate.area_ratio
+            <= min(1.0, boot.max_area_ratio + tolerance)
         )
         boot_complete = (
             top_margin_ratio >= boot.min_top_margin_ratio
@@ -633,7 +668,7 @@ class FrameValidator:
         self,
         gray: np.ndarray,
         config: ReadinessConfig,
-    ) -> tuple[bool, dict[str, float | int | str], list[tuple[int, int, int, int]]]:
+    ) -> tuple[bool, dict[str, float | int | str | bool | None], list[tuple[int, int, int, int]]]:
         reference = config.reference
         height, width = gray.shape
 
@@ -653,7 +688,12 @@ class FrameValidator:
                     "reference_orientation": reference.orientation,
                     "reference_segment_count": 0,
                     "reference_total_length_ratio": 0.0,
+                    "reference_best_length_ratio": 0.0,
                     "reference_best_angle_deg": None,
+                    "reference_hough_found": False,
+                    "reference_projection_found": False,
+                    "reference_projection_strength": 0.0,
+                    "reference_projection_coverage_ratio": 0.0,
                 },
                 [],
             )
@@ -667,15 +707,15 @@ class FrameValidator:
             L2gradient=False,
         )
 
-        # The boot itself contains many long straight edges. Reference evidence
-        # is therefore collected outside the frontend guide where the physical
-        # table/platform line should remain visible on one or both sides.
         guide_x1 = int(round(width * config.guide.x_min_ratio)) - x1
         guide_x2 = int(round(width * config.guide.x_max_ratio)) - x1
         guide_x1 = int(np.clip(guide_x1, 0, edges.shape[1]))
         guide_x2 = int(np.clip(guide_x2, 0, edges.shape[1]))
+
+        search_mask = np.ones_like(edges, dtype=np.uint8)
         if reference.exclude_guide_from_search and guide_x2 > guide_x1:
-            edges[:, guide_x1:guide_x2] = 0
+            search_mask[:, guide_x1:guide_x2] = 0
+            edges = cv2.bitwise_and(edges, search_mask)
 
         roi_height, roi_width = roi.shape
         basis = roi_width if reference.orientation == "horizontal" else roi_height
@@ -726,9 +766,7 @@ class FrameValidator:
                 if error > reference.max_angle_error_deg:
                     continue
 
-                accepted.append(
-                    (lx1 + x1, ly1 + y1, lx2 + x1, ly2 + y1)
-                )
+                accepted.append((lx1 + x1, ly1 + y1, lx2 + x1, ly2 + y1))
                 total_length += length
 
                 if length > best_length:
@@ -736,24 +774,118 @@ class FrameValidator:
                     best_angle = angle
 
         total_length_ratio = total_length / max(1.0, basis)
-        found = total_length_ratio >= reference.min_total_length_ratio
+        best_length_ratio = best_length / max(1.0, basis)
+        hough_found = bool(
+            total_length_ratio >= reference.min_total_length_ratio
+            or best_length_ratio >= reference.min_best_length_ratio
+        )
 
+        projection_found = False
+        projection_strength = 0.0
+        projection_coverage = 0.0
+        projection_segment: tuple[int, int, int, int] | None = None
+        if reference.projection_fallback_enabled and not hough_found:
+            (
+                projection_found,
+                projection_strength,
+                projection_coverage,
+                projection_segment,
+            ) = self._projection_reference(
+                blurred,
+                search_mask,
+                reference,
+                x1,
+                y1,
+            )
+            if projection_found and projection_segment is not None:
+                accepted.append(projection_segment)
+
+        found = bool(hough_found or projection_found)
         return (
             found,
             {
                 "reference_orientation": reference.orientation,
                 "reference_segment_count": len(accepted),
-                "reference_total_length_ratio": round(
-                    total_length_ratio, 5
-                ),
+                "reference_total_length_ratio": round(total_length_ratio, 5),
+                "reference_best_length_ratio": round(best_length_ratio, 5),
                 "reference_best_angle_deg": (
-                    round(best_angle, 3)
-                    if best_angle is not None
-                    else None
+                    round(best_angle, 3) if best_angle is not None else None
                 ),
+                "reference_hough_found": hough_found,
+                "reference_projection_found": projection_found,
+                "reference_projection_strength": round(projection_strength, 4),
+                "reference_projection_coverage_ratio": round(projection_coverage, 5),
             },
             accepted,
         )
+
+    @staticmethod
+    def _projection_reference(
+        blurred: np.ndarray,
+        search_mask: np.ndarray,
+        reference: ReferenceConfig,
+        x_offset: int,
+        y_offset: int,
+    ) -> tuple[bool, float, float, tuple[int, int, int, int] | None]:
+        if reference.orientation == "horizontal":
+            gradient = np.abs(cv2.Sobel(blurred, cv2.CV_32F, 0, 1, ksize=3))
+            masked = gradient * (search_mask > 0)
+            valid_counts = np.maximum(1, np.count_nonzero(search_mask, axis=1))
+            profile = masked.sum(axis=1) / valid_counts
+        elif reference.orientation == "vertical":
+            gradient = np.abs(cv2.Sobel(blurred, cv2.CV_32F, 1, 0, ksize=3))
+            masked = gradient * (search_mask > 0)
+            valid_counts = np.maximum(1, np.count_nonzero(search_mask, axis=0))
+            profile = masked.sum(axis=0) / valid_counts
+        else:
+            return False, 0.0, 0.0, None
+
+        if profile.size == 0 or not np.any(np.isfinite(profile)):
+            return False, 0.0, 0.0, None
+
+        index = int(np.nanargmax(profile))
+        peak = float(profile[index])
+        median = float(np.median(profile))
+        mad = float(np.median(np.abs(profile - median)))
+        strength = max(0.0, (peak - median) / max(1.0, 1.4826 * mad))
+
+        if reference.orientation == "horizontal":
+            values = gradient[index]
+            valid = search_mask[index] > 0
+        else:
+            values = gradient[:, index]
+            valid = search_mask[:, index] > 0
+
+        valid_values = values[valid]
+        if valid_values.size == 0:
+            return False, strength, 0.0, None
+
+        threshold = max(
+            float(np.percentile(valid_values, 70.0)),
+            float(np.median(valid_values) + np.std(valid_values)),
+            8.0,
+        )
+        active = valid & (values >= threshold)
+        coverage = float(np.count_nonzero(active) / max(1, np.count_nonzero(valid)))
+
+        found = bool(
+            strength >= reference.projection_min_strength
+            and coverage >= reference.projection_min_coverage_ratio
+        )
+        if not found:
+            return False, strength, coverage, None
+
+        coordinates = np.flatnonzero(active)
+        if coordinates.size == 0:
+            return False, strength, coverage, None
+
+        first = int(coordinates[0])
+        last = int(coordinates[-1])
+        if reference.orientation == "horizontal":
+            segment = (first + x_offset, index + y_offset, last + x_offset, index + y_offset)
+        else:
+            segment = (index + x_offset, first + y_offset, index + x_offset, last + y_offset)
+        return True, strength, coverage, segment
 
     def _render_debug(
         self,
@@ -840,8 +972,6 @@ class FrameValidator:
             return "frame_blurry"
         if not checks["exposure_ok"]:
             return "invalid_exposure"
-        if not checks["reference_line_found"]:
-            return "reference_line_missing"
         if not checks["boot_present"]:
             return "boot_not_detected"
         if not checks["boot_centered"]:
@@ -857,6 +987,8 @@ class FrameValidator:
             return "move_boot_farther"
         if not checks["boot_complete"]:
             return "boot_cropped_or_too_high"
+        if not checks["reference_line_found"]:
+            return "reference_line_missing"
         return None
 
     @staticmethod

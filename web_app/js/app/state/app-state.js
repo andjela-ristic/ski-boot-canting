@@ -10,8 +10,6 @@ export function createAppState() {
   return {
     currentStream: null,
     facingMode: "environment",
-    selectedVideoFile: null,
-    clipPreviewUrl: null,
     resultOverlayObjectUrl: null,
     readinessLoopHandle: null,
     readinessRequestInFlight: false,

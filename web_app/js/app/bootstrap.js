@@ -59,14 +59,14 @@ export async function bootstrapApp() {
       }).catch((error) => {
         console.error(error);
         statusPresenter.setStatus(
-          "The browser camera is not available right now. Use Record or choose video.",
+          "The browser camera is not available right now. Quick 2-second capture cannot start.",
           "warning",
         );
         refreshChrome();
       });
     } else {
       statusPresenter.setStatus(
-        "The app is ready. For this session, use Record or choose video.",
+        "The app is ready, but Quick 2-second capture needs HTTPS camera access for this session.",
         "warning",
       );
     }

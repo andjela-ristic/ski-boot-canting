@@ -40,7 +40,7 @@ RUNTIME_ROOT = Path(
     )
 ).expanduser().resolve()
 SUPPORTED_IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg"}
-SUPPORTED_VIDEO_EXTENSIONS = {".mp4", ".mov", ".avi", ".mkv", ".m4v"}
+SUPPORTED_VIDEO_EXTENSIONS = {".mp4", ".mov", ".avi", ".mkv", ".m4v", ".webm"}
 WINDOWS_ABSOLUTE_PATH_RE = re.compile(r"^[A-Za-z]:[\\/]")
 
 
@@ -617,7 +617,7 @@ class PipelineRunner:
         if resolved.suffix.lower() not in SUPPORTED_VIDEO_EXTENSIONS:
             raise ApiError(
                 400,
-                "Only .mp4, .mov, .avi, .mkv, and .m4v inputs are supported by this API.",
+                "Only .mp4, .mov, .avi, .mkv, .m4v, and .webm inputs are supported by this API.",
                 details={"video_path": str(resolved)},
             )
 
@@ -931,7 +931,7 @@ class PipelineRunner:
             if suffix:
                 raise ApiError(
                     400,
-                    "Uploaded video must use one of: .mp4, .mov, .avi, .mkv, .m4v",
+                    "Uploaded video must use one of: .mp4, .mov, .avi, .mkv, .m4v, .webm",
                     details={"video_filename": filename},
                 )
             filename = f"{filename}.mp4"
