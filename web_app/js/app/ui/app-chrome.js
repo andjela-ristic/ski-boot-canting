@@ -28,12 +28,12 @@ function renderCapabilityPills(options) {
 function renderCaptureNote(options) {
   if (window.isSecureContext) {
     options.elements.captureNote.textContent =
-      "Tap Quick 2-second capture to record a short clip and upload it immediately for analysis.";
+      "Tap Quick 2-second capture to record in-app, or choose a saved video clip for upload.";
     return;
   }
 
   options.elements.captureNote.textContent =
-    "Quick 2-second capture requires browser camera access. Open the app through HTTPS for this session.";
+    "Quick 2-second capture needs HTTPS camera access, but Choose video can still upload a saved clip.";
 }
 
 function renderPreviewPlaceholder(options) {
@@ -57,6 +57,7 @@ function syncBusyState(options) {
   const liveUnavailable = !options.liveAvailable;
 
   options.elements.recordButton.disabled = options.state.busy || liveUnavailable;
+  options.elements.uploadButton.disabled = options.state.busy;
   options.elements.toggleCamera.disabled = options.state.busy || liveUnavailable;
   options.elements.resetBaseUrl.disabled = options.state.busy;
   options.elements.toggleCamera.classList.toggle("is-hidden", liveUnavailable);
@@ -70,4 +71,7 @@ function syncBusyState(options) {
   } else {
     options.elements.recordButton.textContent = "Quick 2-second capture";
   }
+
+  options.elements.uploadButton.textContent =
+    options.state.activeOperation === "uploading" ? "Uploading..." : "Choose video";
 }

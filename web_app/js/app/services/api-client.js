@@ -10,12 +10,10 @@ export async function checkCaptureReadiness(options) {
     body: formData,
   });
 
-  let payload = null;
-  try {
-    payload = await response.json();
-  } catch (error) {
-    throw new Error("The backend did not return a valid readiness JSON response.");
-  }
+  const payload = await readJsonResponse(
+    response,
+    "The backend did not return a valid readiness JSON response.",
+  );
 
   if (!response.ok) {
     throw new Error(payload.error || `The backend returned status ${response.status}.`);
@@ -44,12 +42,10 @@ export async function uploadVideo(options) {
     body: formData,
   });
 
-  let payload = null;
-  try {
-    payload = await response.json();
-  } catch (error) {
-    throw new Error("The backend did not return a valid JSON response.");
-  }
+  const payload = await readJsonResponse(
+    response,
+    "The backend did not return a valid JSON response.",
+  );
 
   if (!response.ok) {
     throw new Error(payload.error || `The backend returned status ${response.status}.`);
@@ -218,6 +214,24 @@ function normalizeFrame(rawFrame, index, selectedFrameIndex) {
 function toFiniteNumber(value) {
   const numeric = Number(value);
   return Number.isFinite(numeric) ? numeric : null;
+}
+
+async function readJsonResponse(response, fallbackMessage) {
+  const rawBody = await response.text();
+  if (!rawBody) {
+    throw new Error(`${fallbackMessage} Empty response body.`);
+  }
+
+  try {
+    return JSON.parse(rawBody);
+  } catch (error) {
+    const contentType = extractString(response.headers.get("Content-Type")) || "unknown";
+    const snippet = rawBody.replace(/\s+/g, " ").trim().slice(0, 220);
+    const detail = snippet ? ` Response started with: ${snippet}` : "";
+    throw new Error(
+      `${fallbackMessage} Status ${response.status}, content type ${contentType}.${detail}`,
+    );
+  }
 }
 
 async function readApiError(response, fallbackMessage) {

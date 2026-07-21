@@ -11,6 +11,7 @@ export function createAppState() {
     currentStream: null,
     facingMode: "environment",
     resultOverlayObjectUrl: null,
+    capturedClipObjectUrl: null,
     readinessLoopHandle: null,
     readinessRequestInFlight: false,
     readinessConsecutiveSuccess: 0,

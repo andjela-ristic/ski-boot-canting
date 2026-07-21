@@ -52,11 +52,39 @@
     <button class="primary-button" id="record-button" type="button">
       Quick 2-second capture
     </button>
+    <button class="secondary-button" id="upload-button" type="button">
+      Choose video
+    </button>
+    <input
+      id="video-upload-input"
+      type="file"
+      accept="video/*,.mp4,.mov,.avi,.mkv,.m4v,.webm"
+      capture="environment"
+      class="upload-input"
+    />
   </div>
 
   <p class="support-note" id="capture-note">
     This flow records a 2-second clip and uploads it immediately for analysis.
   </p>
+
+  <div class="captured-clip-shell is-hidden" id="captured-clip-shell">
+    <div class="captured-clip-header">
+      <p class="captured-clip-title">Clip preview</p>
+      <p class="captured-clip-note" id="captured-clip-note">
+        Preview of the exact clip being sent to the backend.
+      </p>
+    </div>
+    <video
+      id="captured-clip-preview"
+      class="captured-clip-preview"
+      playsinline
+      muted
+      controls
+      loop
+      preload="metadata"
+    ></video>
+  </div>
 
   <details class="advanced-settings">
     <summary>Advanced Settings</summary>

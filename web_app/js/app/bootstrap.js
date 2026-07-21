@@ -79,6 +79,10 @@ export async function bootstrapApp() {
         URL.revokeObjectURL(state.resultOverlayObjectUrl);
         state.resultOverlayObjectUrl = null;
       }
+      if (state.capturedClipObjectUrl) {
+        URL.revokeObjectURL(state.capturedClipObjectUrl);
+        state.capturedClipObjectUrl = null;
+      }
     });
   } catch (error) {
     console.error(error);

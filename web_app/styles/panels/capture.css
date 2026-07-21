@@ -124,6 +124,10 @@
   gap: 12px;
 }
 
+.upload-input {
+  display: none;
+}
+
 .advanced-settings {
   border: 1px solid var(--line);
   border-radius: var(--radius-md);

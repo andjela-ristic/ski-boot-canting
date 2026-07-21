@@ -26,6 +26,7 @@ const QUICK_CAPTURE_DURATION_MS = 2000;
 export function bindCapturePanel(options) {
   options.elements.captureNote.textContent = buildCaptureNote();
   syncGuideScaleUi(options);
+  clearCapturedClipPreview(options);
   startReadinessLoop(options);
 
   options.elements.resetBaseUrl.addEventListener("click", () => {
@@ -92,6 +93,7 @@ export function bindCapturePanel(options) {
         durationMs: QUICK_CAPTURE_DURATION_MS,
         refreshChrome: options.refreshChrome,
       });
+      showCapturedClipPreview(options, file);
 
       stopCurrentStream({
         elements: options.elements,
@@ -117,6 +119,45 @@ export function bindCapturePanel(options) {
         state: options.state,
         refreshChrome: options.refreshChrome,
       });
+      options.state.busy = false;
+      options.state.activeOperation = null;
+      options.refreshChrome();
+    }
+  });
+
+  options.elements.uploadButton.addEventListener("click", () => {
+    if (options.state.busy) {
+      return;
+    }
+
+    options.elements.videoUploadInput.value = "";
+    options.elements.videoUploadInput.click();
+  });
+
+  options.elements.videoUploadInput.addEventListener("change", async (event) => {
+    const file = event.target.files && event.target.files[0];
+    if (!file || options.state.busy) {
+      return;
+    }
+
+    const clipDurationMs = getClipDurationMs(options.elements);
+
+    try {
+      options.state.busy = true;
+      options.state.activeOperation = "uploading";
+      options.refreshChrome();
+      options.setStatus(`Uploading ${file.name} for analysis...`, "info");
+      persistForm(options.elements);
+
+      const result = await uploadSelectedVideo(options, file, clipDurationMs);
+      rememberResultOverlay(options, result);
+      options.renderResult(result);
+      options.setStatus(`Analysis finished. ${file.name} was processed.`, "success");
+    } catch (error) {
+      console.error(error);
+      options.setStatus(normalizeError(error, "Video upload failed."), "error");
+    } finally {
+      options.elements.videoUploadInput.value = "";
       options.state.busy = false;
       options.state.activeOperation = null;
       options.refreshChrome();
@@ -278,6 +319,30 @@ function rememberResultOverlay(options, result) {
   }
 
   options.state.resultOverlayObjectUrl = result.overlayObjectUrl || null;
+}
+
+function showCapturedClipPreview(options, file) {
+  if (options.state.capturedClipObjectUrl) {
+    URL.revokeObjectURL(options.state.capturedClipObjectUrl);
+  }
+
+  const objectUrl = URL.createObjectURL(file);
+  options.state.capturedClipObjectUrl = objectUrl;
+  options.elements.capturedClipPreview.src = objectUrl;
+  options.elements.capturedClipShell.classList.remove("is-hidden");
+  options.elements.capturedClipNote.textContent =
+    "Preview of the exact clip being sent to the backend.";
+  options.elements.capturedClipPreview.currentTime = 0;
+  options.elements.capturedClipPreview.play().catch(() => undefined);
+}
+
+function clearCapturedClipPreview(options) {
+  options.elements.capturedClipPreview.pause();
+  options.elements.capturedClipPreview.removeAttribute("src");
+  options.elements.capturedClipPreview.load();
+  options.elements.capturedClipShell.classList.add("is-hidden");
+  options.elements.capturedClipNote.textContent =
+    "Preview of the exact clip being sent to the backend.";
 }
 
 function syncGuideScaleUi(options) {
