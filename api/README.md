@@ -5,6 +5,7 @@
 ## Behavior
 
 - accepts a single `image_path`
+- accepts a single `video_path` on `/frames` and samples multiple frames
 - runs all 9 existing pipeline steps in order
 - returns only the Step 09 overlay plus total processing time
 - does not persist anything to a database
@@ -66,6 +67,16 @@ Stop:
 docker compose down
 ```
 
+## Docker And Mobile
+
+Backend je isti za Android i iOS. Razlika je samo u `Base URL` koji klijent koristi da pogodi Docker port mapiran na host masini.
+
+- Android emulator -> `http://10.0.2.2:8000`
+- iOS simulator -> `http://127.0.0.1:8000`
+- fizicki Android/iPhone uredjaj -> `http://<LAN-IP-tvog-racunara>:8000`
+
+Compose vec podize backend sa otvorenim CORS headerima (`API_CORS_ALLOW_ORIGIN=*`), pa isti kontejner moze da sluzi web preview i mobilne klijente.
+
 ## Endpoints
 
 ### `GET /health`
@@ -109,8 +120,69 @@ JSON response example:
 }
 ```
 
+### `POST /frames`
+
+Request body:
+
+```json
+{
+  "video_path": "data/videos/sample.mp4",
+  "keep_artifacts": false,
+  "include_step_logs": false
+}
+```
+
+Ili `multipart/form-data` upload sa Flutter klijenta:
+
+- `video`: binarni fajl videa
+- `clip_duration_ms`: npr. `2000`
+- `frame_count`: npr. `6`
+- `keep_artifacts`: `true|false`
+
+Behavior:
+
+- samples `6-10` frames from config field `api.frames.sample_count`
+- extracts frames uniformly across the video
+- analyzes all sampled frames in parallel
+- returns per-frame analysis plus averaged numeric metadata tree
+
+Za `multipart` upload trenutno vraca jedan validan stub overlay da Flutter flow moze da se testira end-to-end iako finalna multi-frame fuzija jos nije implementirana.
+
+Response shape:
+
+```json
+{
+  "video_path": "C:\\Users\\panonit\\Documents\\ml-ski-boot-canting\\data\\videos\\sample.mp4",
+  "frame_count": 6,
+  "processing_time_ms": 8123.45,
+  "frame_sampling": {
+    "sample_count": 6,
+    "max_workers": 4
+  },
+  "frames": [
+    {
+      "frame_index": 0,
+      "timestamp_ms": 0.0,
+      "analysis": {
+        "image_name": "frame_00.png",
+        "processing_time_ms": 1321.4,
+        "overlay_data_url": "data:image/png;base64,..."
+      },
+      "metadata": {
+        "...": "full step 09 metadata for that frame"
+      }
+    }
+  ],
+  "average_metadata": {
+    "...": "recursive average over numeric metadata fields"
+  },
+  "artifacts_dir": null
+}
+```
+
 ## Notes
 
 - input currently supports `.png`, `.jpg`, and `.jpeg`
+- video input currently supports `.mp4`, `.mov`, `.avi`, `.mkv`, and `.m4v`
 - `keep_artifacts: true` keeps the temporary job folder so you can inspect intermediate outputs later
 - the pipeline config is injected per request through `PIPELINE_CONFIG`

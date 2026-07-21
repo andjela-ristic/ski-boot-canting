@@ -42,6 +42,46 @@ class AnalyzeRequest:
 
 
 @dataclass(slots=True)
+class FramesRequest:
+    video_path: str
+    keep_artifacts: bool = False
+    include_step_logs: bool = False
+
+    @classmethod
+    def from_dict(cls, payload: dict[str, Any]) -> "FramesRequest":
+        if not isinstance(payload, dict):
+            raise ValueError("Request body must be a JSON object.")
+
+        video_path = payload.get("video_path")
+        if not isinstance(video_path, str) or not video_path.strip():
+            raise ValueError("Field 'video_path' is required and must be a non-empty string.")
+
+        keep_artifacts = payload.get("keep_artifacts", False)
+        if not isinstance(keep_artifacts, bool):
+            raise ValueError("Field 'keep_artifacts' must be a boolean.")
+
+        include_step_logs = payload.get("include_step_logs", False)
+        if not isinstance(include_step_logs, bool):
+            raise ValueError("Field 'include_step_logs' must be a boolean.")
+
+        return cls(
+            video_path=video_path.strip(),
+            keep_artifacts=keep_artifacts,
+            include_step_logs=include_step_logs,
+        )
+
+
+@dataclass(slots=True)
+class UploadedFramesRequest:
+    video_filename: str
+    video_bytes: bytes
+    keep_artifacts: bool = False
+    include_step_logs: bool = False
+    frame_count: int | None = None
+    clip_duration_ms: int | None = None
+
+
+@dataclass(slots=True)
 class StepExecutionLog:
     step: str
     script_name: str
@@ -94,3 +134,25 @@ class AnalyzeResult:
             payload["step_logs"] = [item.to_dict() for item in self.step_logs]
 
         return payload
+
+
+@dataclass(slots=True)
+class FrameAnalysisResult:
+    frame_index: int
+    timestamp_ms: float
+    analysis: AnalyzeResult
+
+    def to_dict(self, include_step_logs: bool = False) -> dict[str, Any]:
+        return {
+            "frame_index": self.frame_index,
+            "timestamp_ms": round(self.timestamp_ms, 2),
+            "analysis": self.analysis.to_json_payload(
+                persistence={
+                    "saved": False,
+                    "backend": "noop",
+                    "message": "Frame batch analyses are not individually persisted.",
+                },
+                include_step_logs=include_step_logs,
+            ),
+            "metadata": self.analysis.metadata,
+        }
