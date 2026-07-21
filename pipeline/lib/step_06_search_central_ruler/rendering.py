@@ -5,7 +5,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from .context import COLOR_ALL_FRAGMENTS, COLOR_CANDIDATE, COLOR_FINAL_AXIS, COLOR_SELECTED_FRAGMENTS, COLOR_TEXT, PROCESSED_DIR, PROJECT_ROOT, WORKING_PNG_DIR, cfg, get_step_dirs, put_text, resolve_project_path, to_bgr
+from .context import COLOR_ALL_FRAGMENTS, COLOR_CANDIDATE, COLOR_FINAL_AXIS, COLOR_SELECTED_FRAGMENTS, COLOR_TEXT, PROCESSED_DIR, WORKING_PNG_DIR, cfg, get_step_dirs, put_text, relative_project_path, resolve_project_path, to_bgr
 from .geometry import line_x_at_y
 
 
@@ -14,7 +14,7 @@ def load_base_edge_image(data: dict) -> tuple[np.ndarray, str | None]:
     if source_path is not None and source_path.exists():
         image = cv2.imread(str(source_path), cv2.IMREAD_GRAYSCALE)
         if image is not None:
-            return image, str(source_path.relative_to(PROJECT_ROOT))
+            return image, relative_project_path(source_path)
 
     image_name = data.get("image_name", "")
     for path in [
@@ -24,7 +24,7 @@ def load_base_edge_image(data: dict) -> tuple[np.ndarray, str | None]:
         if path.exists():
             image = cv2.imread(str(path), cv2.IMREAD_GRAYSCALE)
             if image is not None:
-                return image, str(path.relative_to(PROJECT_ROOT))
+                return image, relative_project_path(path)
 
     height = int(data.get("height", 4032))
     width = int(data.get("width", 3024))

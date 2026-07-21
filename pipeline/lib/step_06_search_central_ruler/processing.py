@@ -125,11 +125,11 @@ def build_analysis(
         "source_step": data.get("processing_step", "05_valid_hough_lines_in_roi"),
         "width": width,
         "height": height,
-        "input_json_file": str(json_path.relative_to(PROJECT_ROOT)),
+        "input_json_file": relative_project_path(json_path),
         "base_edge_file": base_edge_path,
         "source_file": data.get("source_file"),
         "roi_mask_file": data.get("roi_mask_file"),
-        "resolved_input_dir": str(get_step_dirs()["input_dir"].relative_to(PROJECT_ROOT)),
+        "resolved_input_dir": relative_project_path(get_step_dirs()["input_dir"]),
         "input_line_count": len(lines),
         "filtered_line_count": len(filtered_lines),
         "nms_line_count": int(search_result.get("nms_line_count", len(filtered_lines))),
@@ -233,7 +233,7 @@ def process_json_file(json_path: Path) -> dict:
         snapshot_path = candidate_snapshot_dir / f"C{snapshot_index:02d}_{image_name}"
         if not cv2.imwrite(str(snapshot_path), snapshot_image):
             raise RuntimeError(f"Could not save candidate snapshot: {snapshot_path}")
-        candidate_snapshot_files.append(str(snapshot_path.relative_to(PROJECT_ROOT)))
+        candidate_snapshot_files.append(relative_project_path(snapshot_path))
         del snapshot_image
 
     metadata = deepcopy(analysis["metadata"])
@@ -246,8 +246,8 @@ def process_json_file(json_path: Path) -> dict:
         metadata["timings_sec"].get("analysis_total", 0.0)
         + snapshot_rendering_duration_sec
     )
-    metadata["output_overlay_file"] = str(overlay_path.relative_to(PROJECT_ROOT))
-    metadata["output_comparison_file"] = str(comparison_path.relative_to(PROJECT_ROOT))
+    metadata["output_overlay_file"] = relative_project_path(overlay_path)
+    metadata["output_comparison_file"] = relative_project_path(comparison_path)
     metadata["candidate_snapshot_files"] = candidate_snapshot_files
     metadata["timings_sec"]["save"] = float(
         time.perf_counter()
@@ -265,10 +265,10 @@ def process_json_file(json_path: Path) -> dict:
         "selected_fragment_count": best_candidate["selected_fragment_count"] if best_candidate else 0,
         "best_score": best_candidate["score"] if best_candidate else None,
         "best_tilt_deg": best_candidate["tilt_deg"] if best_candidate else None,
-        "overlay_path": str(overlay_path.relative_to(PROJECT_ROOT)),
-        "metadata_path": str(metadata_path.relative_to(PROJECT_ROOT)),
-        "comparison_path": str(comparison_path.relative_to(PROJECT_ROOT)),
-        "candidate_snapshot_dir": str(candidate_snapshot_dir.relative_to(PROJECT_ROOT)),
+        "overlay_path": relative_project_path(overlay_path),
+        "metadata_path": relative_project_path(metadata_path),
+        "comparison_path": relative_project_path(comparison_path),
+        "candidate_snapshot_dir": relative_project_path(candidate_snapshot_dir),
     }
 
 def collect_json_files(image_filter: str | None = None, limit: int | None = None) -> list[Path]:

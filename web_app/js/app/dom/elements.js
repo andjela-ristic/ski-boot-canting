@@ -9,7 +9,6 @@ export function getAppElements() {
     cameraPill: requireElement("camera-pill"),
     cameraPreview: requireElement("camera-preview"),
     readinessGuide: requireElement("readiness-guide"),
-    readinessGuideBadge: requireElement("readiness-guide-badge"),
     readinessGuideDetail: requireElement("readiness-guide-detail"),
     guideScale: requireElement("guide-scale"),
     guideScaleValue: requireElement("guide-scale-value"),

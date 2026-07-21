@@ -48,6 +48,13 @@ METADATA_DIR = PROJECT_ROOT / PATHS_CONFIG["metadata_dir"]
 CSV_PATH = METADATA_DIR / "processing_05_valid_hough_lines_in_roi.csv"
 
 
+def relative_project_path(path: Path) -> str:
+    try:
+        return str(path.relative_to(PROJECT_ROOT))
+    except ValueError:
+        return str(path)
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Detect Hough line segments from cleaned edges and keep only lines valid inside ROI."
@@ -446,8 +453,8 @@ def save_valid_lines_json(
 
     payload = {
         "image_name": image_name,
-        "source_file": str(edge_path.relative_to(PROJECT_ROOT)),
-        "roi_mask_file": str(roi_path.relative_to(PROJECT_ROOT)),
+        "source_file": relative_project_path(edge_path),
+        "roi_mask_file": relative_project_path(roi_path),
         "processing_step": "05_valid_hough_lines_in_roi",
         "width": width,
         "height": height,
@@ -575,9 +582,9 @@ def main() -> None:
             cv2.imwrite(str(valid_overlay_output_path), valid_overlay)
             cv2.imwrite(str(comparison_output_path), comparison)
 
-            raw_overlay_output_file = str(raw_overlay_output_path.relative_to(PROJECT_ROOT))
-            valid_overlay_output_file = str(valid_overlay_output_path.relative_to(PROJECT_ROOT))
-            comparison_output_file = str(comparison_output_path.relative_to(PROJECT_ROOT))
+            raw_overlay_output_file = relative_project_path(raw_overlay_output_path)
+            valid_overlay_output_file = relative_project_path(valid_overlay_output_path)
+            comparison_output_file = relative_project_path(comparison_output_path)
 
         if save_valid_lines_json_enabled:
             json_output_path = VALID_LINES_JSON_DIR / f"{Path(image_name).stem}.json"
@@ -599,9 +606,9 @@ def main() -> None:
 
         metadata_rows.append(
             {
-                "source_file": str(edge_path.relative_to(PROJECT_ROOT)),
-                "edge_input_file": str(edge_path.relative_to(PROJECT_ROOT)),
-                "roi_mask_file": str(roi_path.relative_to(PROJECT_ROOT)),
+                "source_file": relative_project_path(edge_path),
+                "edge_input_file": relative_project_path(edge_path),
+                "roi_mask_file": relative_project_path(roi_path),
                 "raw_overlay_output_file": raw_overlay_output_file,
                 "valid_overlay_output_file": valid_overlay_output_file,
                 "comparison_output_file": comparison_output_file,

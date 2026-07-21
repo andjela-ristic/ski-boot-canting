@@ -43,6 +43,13 @@ CLAHE = cv2.createCLAHE(
 )
 
 
+def relative_project_path(path: Path) -> str:
+    try:
+        return str(path.relative_to(PROJECT_ROOT))
+    except ValueError:
+        return str(path)
+
+
 def normalize_illumination_bgr(
     image_bgr: np.ndarray,
     *,
@@ -220,8 +227,8 @@ def main(*, debug: bool = False) -> None:
         height, width = normalized_bgr.shape[:2]
 
         metadata_rows.append({
-            "source_file": str(image_path.relative_to(PROJECT_ROOT)),
-            "output_file": str(output_path.relative_to(PROJECT_ROOT)),
+            "source_file": relative_project_path(image_path),
+            "output_file": relative_project_path(output_path),
             "width": width,
             "height": height,
             "processing_step": "01_illumination_normalization",

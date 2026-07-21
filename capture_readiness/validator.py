@@ -9,7 +9,7 @@ import math
 import cv2
 import numpy as np
 
-from .config import ReadinessConfig
+from .config import BootConfig, GuideConfig, ReadinessConfig, ReferenceConfig
 from .models import Candidate, ValidationResult
 
 
@@ -49,6 +49,7 @@ class FrameValidator:
         encoded_frame: bytes,
         *,
         include_debug: bool = False,
+        guide_scale: float = 1.0,
     ) -> ValidationResult:
         if not encoded_frame:
             raise FrameValidationError("The uploaded frame is empty.")
@@ -63,13 +64,18 @@ class FrameValidator:
         if frame is None:
             raise FrameValidationError("The uploaded data is not a decodable image.")
 
-        return self.validate(frame, include_debug=include_debug)
+        return self.validate(
+            frame,
+            include_debug=include_debug,
+            guide_scale=guide_scale,
+        )
 
     def validate(
         self,
         frame: np.ndarray,
         *,
         include_debug: bool = False,
+        guide_scale: float = 1.0,
     ) -> ValidationResult:
         started = perf_counter()
 
@@ -81,6 +87,9 @@ class FrameValidator:
         source_height, source_width = frame.shape[:2]
         processed = self._resize_for_processing(frame)
         height, width = processed.shape[:2]
+        active_config, normalized_guide_scale = self._config_for_guide_scale(
+            guide_scale
+        )
 
         gray = cv2.cvtColor(processed, cv2.COLOR_BGR2GRAY)
         quality_checks, quality_metrics = self._quality_checks(gray)
@@ -88,25 +97,29 @@ class FrameValidator:
         guide_rect = self._ratio_rect(
             width,
             height,
-            self.config.guide.x_min_ratio,
-            self.config.guide.x_max_ratio,
-            self.config.guide.y_min_ratio,
-            self.config.guide.y_max_ratio,
+            active_config.guide.x_min_ratio,
+            active_config.guide.x_max_ratio,
+            active_config.guide.y_min_ratio,
+            active_config.guide.y_max_ratio,
         )
         gx1, gy1, gx2, gy2 = guide_rect
         guide_gray = gray[gy1:gy2, gx1:gx2]
 
-        candidate = self._find_boot_candidate(guide_gray)
+        candidate = self._find_boot_candidate(guide_gray, active_config)
         reference_found, reference_metrics, reference_segments = (
-            self._detect_reference_line(gray)
+            self._detect_reference_line(gray, active_config)
         )
 
-        boot_checks, boot_metrics = self._boot_checks(candidate, guide_gray.shape)
+        boot_checks, boot_metrics = self._boot_checks(
+            candidate,
+            guide_gray.shape,
+            active_config,
+        )
         checks = {
             **quality_checks,
             **boot_checks,
             "reference_line_found": (
-                reference_found or not self.config.reference.required
+                reference_found or not active_config.reference.required
             ),
         }
 
@@ -118,10 +131,14 @@ class FrameValidator:
         ]
         score = float(np.clip(np.mean(score_parts), 0.0, 1.0))
         success = (
-            score >= self.config.success_score_threshold
+            score >= active_config.success_score_threshold
             and checks["boot_scale_ok"]
         )
-        reason = None if success else self._failure_reason(checks, candidate)
+        reason = None if success else self._failure_reason(
+            checks,
+            candidate,
+            active_config.boot,
+        )
 
         latency_ms = (perf_counter() - started) * 1000.0
         debug_image_base64 = None
@@ -139,6 +156,11 @@ class FrameValidator:
             **quality_metrics,
             **boot_metrics,
             **reference_metrics,
+            "guide_scale": round(normalized_guide_scale, 3),
+            "guide_x_min_ratio": round(active_config.guide.x_min_ratio, 5),
+            "guide_x_max_ratio": round(active_config.guide.x_max_ratio, 5),
+            "guide_y_min_ratio": round(active_config.guide.y_min_ratio, 5),
+            "guide_y_max_ratio": round(active_config.guide.y_max_ratio, 5),
             "processing_width": width,
             "processing_height": height,
         }
@@ -153,6 +175,99 @@ class FrameValidator:
             source_shape=(source_height, source_width),
             processed_shape=(height, width),
             debug_image_base64=debug_image_base64,
+        )
+
+    def _config_for_guide_scale(
+        self,
+        guide_scale: float,
+    ) -> tuple[ReadinessConfig, float]:
+        normalized = self._normalize_guide_scale(guide_scale)
+        if abs(normalized - 1.0) < 1e-6:
+            return self.config, normalized
+
+        return (
+            replace(
+                self.config,
+                guide=self._scaled_guide_config(self.config.guide, normalized),
+                boot=self._scaled_boot_config(self.config.boot, normalized),
+            ),
+            normalized,
+        )
+
+    @staticmethod
+    def _normalize_guide_scale(raw_value: float | None) -> float:
+        if raw_value is None:
+            return 1.0
+
+        try:
+            numeric = float(raw_value)
+        except (TypeError, ValueError):
+            return 1.0
+
+        return float(np.clip(numeric, 0.75, 1.20))
+
+    @staticmethod
+    def _scaled_guide_config(
+        guide: GuideConfig,
+        guide_scale: float,
+    ) -> GuideConfig:
+        center_x = (guide.x_min_ratio + guide.x_max_ratio) * 0.5
+        center_y = (guide.y_min_ratio + guide.y_max_ratio) * 0.5
+
+        base_width = guide.x_max_ratio - guide.x_min_ratio
+        base_height = guide.y_max_ratio - guide.y_min_ratio
+
+        max_width = min(center_x * 2.0, (1.0 - center_x) * 2.0, 0.98)
+        max_height = min(center_y * 2.0, (1.0 - center_y) * 2.0, 0.98)
+
+        width = float(np.clip(base_width * guide_scale, 0.18, max_width))
+        height = float(np.clip(base_height * guide_scale, 0.24, max_height))
+
+        return replace(
+            guide,
+            x_min_ratio=center_x - width * 0.5,
+            x_max_ratio=center_x + width * 0.5,
+            y_min_ratio=center_y - height * 0.5,
+            y_max_ratio=center_y + height * 0.5,
+        )
+
+    @staticmethod
+    def _scaled_boot_config(
+        boot: BootConfig,
+        guide_scale: float,
+    ) -> BootConfig:
+        linear_scale = 1.0 / guide_scale
+        area_scale = linear_scale * linear_scale
+
+        min_height_ratio = float(np.clip(boot.min_height_ratio * linear_scale, 0.14, 0.97))
+        max_height_ratio = float(np.clip(boot.max_height_ratio * linear_scale, min_height_ratio, 0.999))
+        min_width_ratio = float(np.clip(boot.min_width_ratio * linear_scale, 0.08, 0.94))
+        max_width_ratio = float(np.clip(boot.max_width_ratio * linear_scale, min_width_ratio, 0.999))
+        min_area_ratio = float(np.clip(boot.min_area_ratio * area_scale, 0.01, 0.95))
+        max_area_ratio = float(np.clip(boot.max_area_ratio * area_scale, min_area_ratio, 0.99))
+        min_bottom_ratio = float(
+            np.clip(
+                0.5 + (boot.min_bottom_ratio - 0.5) * linear_scale,
+                0.5,
+                0.98,
+            )
+        )
+
+        return replace(
+            boot,
+            min_height_ratio=min_height_ratio,
+            max_height_ratio=max_height_ratio,
+            min_width_ratio=min_width_ratio,
+            max_width_ratio=max_width_ratio,
+            min_area_ratio=min_area_ratio,
+            max_area_ratio=max_area_ratio,
+            min_bottom_ratio=min_bottom_ratio,
+            min_side_margin_ratio=float(
+                np.clip(boot.min_side_margin_ratio * linear_scale, 0.0, 0.25)
+            ),
+            min_top_margin_ratio=float(
+                np.clip(boot.min_top_margin_ratio * linear_scale, 0.0, 0.25)
+            ),
         )
 
     def _resize_for_processing(self, frame: np.ndarray) -> np.ndarray:
@@ -208,8 +323,12 @@ class FrameValidator:
             },
         )
 
-    def _find_boot_candidate(self, guide_gray: np.ndarray) -> Candidate | None:
-        boot = self.config.boot
+    def _find_boot_candidate(
+        self,
+        guide_gray: np.ndarray,
+        config: ReadinessConfig,
+    ) -> Candidate | None:
+        boot = config.boot
         if guide_gray.size == 0:
             return None
 
@@ -268,8 +387,8 @@ class FrameValidator:
             else:
                 mask = raw_mask
 
-            mask = self._remove_reference_like_lines(mask)
-            candidate = self._best_component(mask, source)
+            mask = self._remove_reference_like_lines(mask, config.reference)
+            candidate = self._best_component(mask, source, boot)
             if candidate is not None and (
                 best is None or candidate.score > best.score
             ):
@@ -278,10 +397,14 @@ class FrameValidator:
         return best
 
 
-    def _remove_reference_like_lines(self, mask: np.ndarray) -> np.ndarray:
+    def _remove_reference_like_lines(
+        self,
+        mask: np.ndarray,
+        reference: ReferenceConfig,
+    ) -> np.ndarray:
         """Remove very long lines that would otherwise join boot and background."""
         height, width = mask.shape
-        orientation = self.config.reference.orientation
+        orientation = reference.orientation
 
         if orientation == "horizontal":
             kernel_width = max(15, int(round(width * 0.28)))
@@ -299,8 +422,8 @@ class FrameValidator:
         self,
         mask: np.ndarray,
         source: str,
+        boot: BootConfig,
     ) -> Candidate | None:
-        boot = self.config.boot
         guide_height, guide_width = mask.shape
         guide_area = guide_height * guide_width
         if guide_area == 0:
@@ -419,8 +542,9 @@ class FrameValidator:
         self,
         candidate: Candidate | None,
         guide_shape: tuple[int, int],
+        config: ReadinessConfig,
     ) -> tuple[dict[str, bool], dict[str, float | str | None]]:
-        boot = self.config.boot
+        boot = config.boot
 
         if candidate is None:
             return (
@@ -500,8 +624,9 @@ class FrameValidator:
     def _detect_reference_line(
         self,
         gray: np.ndarray,
+        config: ReadinessConfig,
     ) -> tuple[bool, dict[str, float | int | str], list[tuple[int, int, int, int]]]:
-        reference = self.config.reference
+        reference = config.reference
         height, width = gray.shape
 
         x1, y1, x2, y2 = self._ratio_rect(
@@ -537,8 +662,8 @@ class FrameValidator:
         # The boot itself contains many long straight edges. Reference evidence
         # is therefore collected outside the frontend guide where the physical
         # table/platform line should remain visible on one or both sides.
-        guide_x1 = int(round(width * self.config.guide.x_min_ratio)) - x1
-        guide_x2 = int(round(width * self.config.guide.x_max_ratio)) - x1
+        guide_x1 = int(round(width * config.guide.x_min_ratio)) - x1
+        guide_x2 = int(round(width * config.guide.x_max_ratio)) - x1
         guide_x1 = int(np.clip(guide_x1, 0, edges.shape[1]))
         guide_x2 = int(np.clip(guide_x2, 0, edges.shape[1]))
         if reference.exclude_guide_from_search and guide_x2 > guide_x1:
@@ -701,6 +826,7 @@ class FrameValidator:
     def _failure_reason(
         checks: dict[str, bool],
         candidate: Candidate | None,
+        boot: BootConfig,
     ) -> str | None:
         if not checks["sharpness_ok"]:
             return "frame_blurry"
@@ -715,7 +841,10 @@ class FrameValidator:
                 return "move_boot_right"
             return "move_boot_left"
         if not checks["boot_scale_ok"]:
-            if candidate is not None and candidate.height_ratio < 0.45:
+            if (
+                candidate is not None
+                and candidate.height_ratio < boot.min_height_ratio
+            ):
                 return "move_boot_closer"
             return "move_boot_farther"
         if not checks["boot_complete"]:

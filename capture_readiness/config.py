@@ -10,8 +10,8 @@ import json
 class GuideConfig:
     x_min_ratio: float = 0.20
     x_max_ratio: float = 0.80
-    y_min_ratio: float = 0.05
-    y_max_ratio: float = 0.94
+    y_min_ratio: float = 0.10
+    y_max_ratio: float = 0.90
 
 
 @dataclass(frozen=True, slots=True)

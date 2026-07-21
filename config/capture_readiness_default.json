@@ -6,8 +6,8 @@
   "guide": {
     "x_min_ratio": 0.2,
     "x_max_ratio": 0.8,
-    "y_min_ratio": 0.05,
-    "y_max_ratio": 0.94
+    "y_min_ratio": 0.1,
+    "y_max_ratio": 0.9
   },
   "quality": {
     "min_sharpness": 12.0,

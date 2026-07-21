@@ -48,6 +48,13 @@ CSV_PATH = METADATA_DIR / "processing_02_grayscale_and_blur.csv"
 PNG_WRITE_PARAMS = [cv2.IMWRITE_PNG_COMPRESSION, 1]
 
 
+def relative_project_path(path: Path) -> str:
+    try:
+        return str(path.relative_to(PROJECT_ROOT))
+    except ValueError:
+        return str(path)
+
+
 def collect_images() -> list[Path]:
     allowed_extensions = {".png", ".jpg", ".jpeg"}
 
@@ -308,15 +315,13 @@ def main(debug: bool = False) -> None:
 
         metadata_rows.append(
             {
-                "source_file": str(image_path.relative_to(PROJECT_ROOT)),
+                "source_file": relative_project_path(image_path),
                 "grayscale_file": "",
                 "grayscale_bgr2gray_file": "",
-                "grayscale_lab_l_file": str(
-                    grayscale_lab_l_path.relative_to(PROJECT_ROOT)
-                ),
+                "grayscale_lab_l_file": relative_project_path(grayscale_lab_l_path),
                 "grayscale_ycrcb_y_file": "",
                 "gaussian_file": "",
-                "bilateral_file": str(bilateral_path.relative_to(PROJECT_ROOT)),
+                "bilateral_file": relative_project_path(bilateral_path),
                 "width": width,
                 "height": height,
                 "processing_step": "02_grayscale_and_blur",

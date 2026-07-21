@@ -114,12 +114,11 @@
   left: 50%;
   bottom: 18px;
   transform: translateX(-50%);
-  display: grid;
-  gap: 6px;
-  justify-items: center;
+  display: flex;
+  justify-content: center;
 }
 
-.readiness-guide-badge {
+.readiness-guide-detail {
   padding: 10px 14px;
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.18);
@@ -136,17 +135,6 @@
     color 160ms ease;
 }
 
-.readiness-guide-detail {
-  padding: 6px 10px;
-  border-radius: 999px;
-  background: rgba(7, 16, 20, 0.54);
-  color: rgba(227, 235, 238, 0.88);
-  font-size: 0.8rem;
-  font-weight: 600;
-  white-space: nowrap;
-  backdrop-filter: blur(8px);
-}
-
 .readiness-guide.is-ready .readiness-guide-shape {
   border-color: rgba(74, 214, 132, 0.96);
   box-shadow:
@@ -155,7 +143,6 @@
     inset 0 0 0 1px rgba(74, 214, 132, 0.34);
 }
 
-.readiness-guide.is-ready .readiness-guide-badge,
 .readiness-guide.is-ready .readiness-guide-detail {
   border-color: rgba(74, 214, 132, 0.4);
   background: rgba(11, 50, 27, 0.82);
@@ -172,11 +159,8 @@
     inset 0 0 0 1px rgba(255, 91, 91, 0.28);
 }
 
-.readiness-guide.is-idle .readiness-guide-badge,
 .readiness-guide.is-idle .readiness-guide-detail,
-.readiness-guide.is-pending .readiness-guide-badge,
 .readiness-guide.is-pending .readiness-guide-detail,
-.readiness-guide.is-not-ready .readiness-guide-badge,
 .readiness-guide.is-not-ready .readiness-guide-detail {
   border-color: rgba(255, 91, 91, 0.38);
   background: rgba(61, 14, 14, 0.84);
@@ -294,7 +278,6 @@
     bottom: 14px;
   }
 
-  .readiness-guide-badge,
   .readiness-guide-detail {
     white-space: normal;
     text-align: center;

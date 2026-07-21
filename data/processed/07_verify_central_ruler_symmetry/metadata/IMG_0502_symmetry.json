@@ -10096,10 +10096,10 @@
     "visual_background_subdir": "01_illumination_normalized"
   },
   "timings_sec": {
-    "verification": 0.8254119000011997,
-    "rendering": 2.9045611000001372,
-    "analysis_total": 4.484961099999055,
-    "process_total": 6.369953900000837
+    "verification": 0.6636868999994476,
+    "rendering": 2.5989251999999397,
+    "analysis_total": 4.119819799998368,
+    "process_total": 5.737646300000051
   },
   "output_overlay_file": "data\\processed\\07_verify_central_ruler_symmetry\\overlay\\IMG_0502.png",
   "output_comparison_file": "data\\processed\\07_verify_central_ruler_symmetry\\comparison\\IMG_0502.png",

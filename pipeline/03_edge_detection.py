@@ -65,6 +65,13 @@ CSV_FIELDNAMES = [
 ]
 
 
+def relative_project_path(path: Path) -> str:
+    try:
+        return str(path.relative_to(PROJECT_ROOT))
+    except ValueError:
+        return str(path)
+
+
 def collect_images() -> list[Path]:
     return sorted(
         path
@@ -973,9 +980,7 @@ def main(*, debug: bool = False) -> None:
                 cv2.imwrite(str(variant_output_path), variant_output)
 
                 if variant["name"] == "roi_edges":
-                    roi_output_file = str(
-                        variant_output_path.relative_to(PROJECT_ROOT)
-                    )
+                    roi_output_file = relative_project_path(variant_output_path)
 
                 variant_raw_edges = None
                 variant_cleaned_edges = None
@@ -987,10 +992,8 @@ def main(*, debug: bool = False) -> None:
         input_image = None
 
         metadata_row = {
-            "source_file": str(image_path.relative_to(PROJECT_ROOT)),
-            "cleaned_output_file": str(
-                cleaned_output_path.relative_to(PROJECT_ROOT)
-            ),
+            "source_file": relative_project_path(image_path),
+            "cleaned_output_file": relative_project_path(cleaned_output_path),
             "roi_output_file": roi_output_file,
             "width": width,
             "height": height,

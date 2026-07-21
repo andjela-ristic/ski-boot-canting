@@ -17,7 +17,6 @@ import { formatFileSize, normalizeError } from "../utils/format.js";
 const READINESS_POLL_INTERVAL_MS = 250;
 const READINESS_SUCCESS_STREAK = 3;
 const READINESS_FAILURE_STREAK = 2;
-const NON_READY_GUIDE_LABEL = "Place the boot in frame";
 const NON_READY_GUIDE_DETAIL = "The frame will turn green when it is good";
 const BASE_GUIDE_WIDTH_RATIO = 0.6;
 const BASE_GUIDE_HEIGHT_RATIO = 0.8;
@@ -183,7 +182,7 @@ function startReadinessLoop(options) {
         options.state.readinessLastLatencyMs = null;
         options.state.readinessLastScore = null;
         options.state.readinessLastReason = null;
-        setGuideState(options, "idle", NON_READY_GUIDE_LABEL, "Waiting for live preview");
+        setGuideState(options, "idle", "Waiting for live preview");
       }
       return;
     }
@@ -214,29 +213,29 @@ function startReadinessLoop(options) {
       }
 
       if (options.state.readinessConsecutiveSuccess >= READINESS_SUCCESS_STREAK) {
-        setGuideState(options, "ready", "Frame is ready", formatReadinessMeta(options));
+        setGuideState(options, "ready", formatReadinessMeta(options));
         return;
       }
 
       if (options.state.readinessConsecutiveFailure >= READINESS_FAILURE_STREAK) {
-        setGuideState(options, "not-ready", NON_READY_GUIDE_LABEL, NON_READY_GUIDE_DETAIL);
+        setGuideState(options, "not-ready", NON_READY_GUIDE_DETAIL);
         return;
       }
 
-      setGuideState(options, "pending", NON_READY_GUIDE_LABEL, NON_READY_GUIDE_DETAIL);
+      setGuideState(options, "pending", NON_READY_GUIDE_DETAIL);
     } catch (error) {
       options.state.readinessConsecutiveSuccess = 0;
       options.state.readinessConsecutiveFailure = 0;
       options.state.readinessLastLatencyMs = null;
       options.state.readinessLastScore = null;
       options.state.readinessLastReason = null;
-      setGuideState(options, "idle", "Readiness check unavailable", "Check the backend endpoint");
+      setGuideState(options, "idle", "Check the backend endpoint");
     } finally {
       options.state.readinessRequestInFlight = false;
     }
   };
 
-  setGuideState(options, "idle", NON_READY_GUIDE_LABEL, "Waiting for live preview");
+  setGuideState(options, "idle", "Waiting for live preview");
   options.state.readinessLoopHandle = window.setTimeout(tick, READINESS_POLL_INTERVAL_MS);
 }
 
@@ -323,9 +322,8 @@ function syncGuideScaleUi(options) {
   options.elements.guideScaleValue.textContent = `${Math.round(guideScale * 100)}%`;
 }
 
-function setGuideState(options, stateName, label, detail = "") {
+function setGuideState(options, stateName, detail = "") {
   options.elements.readinessGuide.className = `readiness-guide is-${stateName}`;
-  options.elements.readinessGuideBadge.textContent = label;
   options.elements.readinessGuideDetail.textContent = detail;
   options.state.readinessLastOutcome = stateName;
 }
