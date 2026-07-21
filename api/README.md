@@ -1,6 +1,7 @@
 # Canting API
 
 `api/` exposes a small HTTP server on top of the existing 9-step image pipeline.
+The same server now also serves the web PWA from `/`.
 
 ## Behavior
 
@@ -67,15 +68,25 @@ Stop:
 docker compose down
 ```
 
+## Web PWA
+
+Posle pokretanja servera:
+
+- `GET /` otvara web PWA klijent
+- `GET /api` vraca servisni indeks
+- `GET /health` ostaje health endpoint
+
+Ako sve vrtis sa iste instance servera, frontend i API su na istom origin-u pa ne treba dodatni app server.
+
 ## Docker And Mobile
 
-Backend je isti za Android i iOS. Razlika je samo u `Base URL` koji klijent koristi da pogodi Docker port mapiran na host masini.
+Backend je isti za Android, iPhone i desktop browser. Bitna razlika je kako otvaras frontend:
 
-- Android emulator -> `http://10.0.2.2:8000`
-- iOS simulator -> `http://127.0.0.1:8000`
-- fizicki Android/iPhone uredjaj -> `http://<LAN-IP-tvog-racunara>:8000`
+- desktop browser: `http://127.0.0.1:8000`
+- drugi uredjaj u LAN-u: `http://<LAN-IP-tvog-racunara>:8000`
+- fizicki iPhone za live browser kameru: preporucen HTTPS tunnel ka istom serveru
 
-Compose vec podize backend sa otvorenim CORS headerima (`API_CORS_ALLOW_ORIGIN=*`), pa isti kontejner moze da sluzi web preview i mobilne klijente.
+Compose vec podize backend sa otvorenim CORS headerima (`API_CORS_ALLOW_ORIGIN=*`), ali kada frontend ide sa istog origin-a CORS vise nije presudan za glavni tok.
 
 ## Endpoints
 
@@ -132,7 +143,7 @@ Request body:
 }
 ```
 
-Ili `multipart/form-data` upload sa Flutter klijenta:
+Ili `multipart/form-data` upload sa web PWA klijenta:
 
 - `video`: binarni fajl videa
 - `clip_duration_ms`: npr. `2000`
@@ -147,7 +158,7 @@ Behavior:
 - keeps one execution slot reserved for regular `/analyze` requests
 - returns per-frame analysis plus averaged numeric metadata tree
 
-Za `multipart` upload trenutno vraca jedan validan stub overlay da Flutter flow moze da se testira end-to-end iako finalna multi-frame fuzija jos nije implementirana.
+Za `multipart` upload trenutno vraca jedan validan stub overlay da web PWA flow moze da se testira end-to-end iako finalna multi-frame fuzija jos nije implementirana.
 
 Response shape:
 

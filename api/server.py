@@ -5,6 +5,7 @@ import cgi
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
+from mimetypes import guess_type
 import os
 from pathlib import Path
 from typing import Any
@@ -14,6 +15,9 @@ from .contracts import AnalyzeRequest, FramesRequest, UploadedFramesRequest
 from .exceptions import ApiError
 from .persistence import AnalysisRepository, NoopAnalysisRepository
 from .pipeline_runner import PipelineRunner
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+WEB_ROOT = REPO_ROOT / "web_app"
 
 
 class CantingApiHandler(BaseHTTPRequestHandler):
@@ -29,14 +33,17 @@ class CantingApiHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_GET(self) -> None:
+        raw_path = self._normalize_path()
         path = self._normalize_api_path()
 
-        if path == "/health":
+        if raw_path in {"/health", "/api/health"}:
             self._write_json(
                 HTTPStatus.OK,
                 {
                     "status": "ok",
                     "endpoints": {
+                        "app": "GET /",
+                        "service": "GET /api",
                         "analyze": "POST /analyze",
                         "frames": "POST /frames",
                         "health": "GET /health",
@@ -45,18 +52,15 @@ class CantingApiHandler(BaseHTTPRequestHandler):
             )
             return
 
+        if raw_path in {"/api", "/api/"}:
+            self._write_service_index()
+            return
+
+        if not raw_path.startswith("/api") and self._try_write_web_asset(raw_path):
+            return
+
         if path == "/":
-            self._write_json(
-                HTTPStatus.OK,
-                {
-                    "service": "ski-boot-canting-api",
-                    "endpoints": {
-                        "analyze": "POST /analyze",
-                        "frames": "POST /frames",
-                        "health": "GET /health",
-                    },
-                },
-            )
+            self._write_service_index()
             return
 
         self._write_json(HTTPStatus.NOT_FOUND, {"error": "Route not found."})
@@ -238,6 +242,84 @@ class CantingApiHandler(BaseHTTPRequestHandler):
         if value is None:
             return None
         return str(value)
+
+    def _write_service_index(self) -> None:
+        self._write_json(
+            HTTPStatus.OK,
+            {
+                "service": "ski-boot-canting-api",
+                "frontend": "GET /",
+                "endpoints": {
+                    "analyze": "POST /analyze",
+                    "frames": "POST /frames",
+                    "health": "GET /health",
+                },
+            },
+        )
+
+    def _try_write_web_asset(self, request_path: str) -> bool:
+        if not WEB_ROOT.exists():
+            return False
+
+        candidate = self._resolve_web_asset_path(request_path)
+        if candidate is None or not candidate.exists() or not candidate.is_file():
+            return False
+
+        body = candidate.read_bytes()
+        content_type = self._guess_content_type(candidate)
+        self.send_response(int(HTTPStatus.OK))
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(len(body)))
+        if candidate.name == "service-worker.js":
+            self.send_header("Cache-Control", "no-cache")
+        elif candidate.suffix.lower() == ".html":
+            self.send_header("Cache-Control", "no-cache")
+        else:
+            self.send_header("Cache-Control", "public, max-age=3600")
+        self.end_headers()
+        self.wfile.write(body)
+        return True
+
+    def _resolve_web_asset_path(self, request_path: str) -> Path | None:
+        if request_path == "/favicon.ico":
+            request_path = "/favicon.png"
+
+        relative_path = "index.html" if request_path == "/" else request_path.lstrip("/")
+        web_root = WEB_ROOT.resolve()
+
+        candidate = (web_root / relative_path).resolve()
+        try:
+            candidate.relative_to(web_root)
+        except ValueError:
+            return None
+
+        if candidate.is_dir():
+            candidate = (candidate / "index.html").resolve()
+
+        if candidate.exists():
+            return candidate
+
+        if "." not in Path(relative_path).name:
+            fallback = (web_root / "index.html").resolve()
+            if fallback.exists():
+                return fallback
+
+        return None
+
+    def _guess_content_type(self, path: Path) -> str:
+        override = {
+            ".css": "text/css; charset=utf-8",
+            ".html": "text/html; charset=utf-8",
+            ".js": "application/javascript; charset=utf-8",
+            ".json": "application/json; charset=utf-8",
+            ".svg": "image/svg+xml",
+            ".webmanifest": "application/manifest+json; charset=utf-8",
+        }
+        if path.suffix.lower() in override:
+            return override[path.suffix.lower()]
+
+        guessed, _ = guess_type(path.name)
+        return guessed or "application/octet-stream"
 
     def _write_json(self, status: int | HTTPStatus, payload: dict[str, Any]) -> None:
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")

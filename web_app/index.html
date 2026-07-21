@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="sr">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <title>Ski Boot Canting</title>
+    <meta
+      name="description"
+      content="Web aplikacija za snimanje kratkog videa i pregled canting overlay rezultata."
+    />
+    <meta name="theme-color" content="#0f7f74" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Canting" />
+    <link rel="icon" href="/favicon.png" sizes="192x192" />
+    <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="stylesheet" href="/styles/base.css" />
+    <link rel="stylesheet" href="/styles/layout.css" />
+    <link rel="stylesheet" href="/styles/panels/topbar.css" />
+    <link rel="stylesheet" href="/styles/panels/hero.css" />
+    <link rel="stylesheet" href="/styles/panels/capture.css" />
+    <link rel="stylesheet" href="/styles/panels/status.css" />
+    <link rel="stylesheet" href="/styles/panels/result.css" />
+    <script type="module" src="/js/main.js"></script>
+  </head>
+  <body>
+    <div class="background-glow background-glow-left" aria-hidden="true"></div>
+    <div class="background-glow background-glow-right" aria-hidden="true"></div>
+
+    <main class="shell">
+      <div id="topbar-slot" data-slot="topbar">
+        <div class="slot-loading">Ucitivanje zaglavlja...</div>
+      </div>
+
+      <div id="hero-slot" data-slot="hero">
+        <div class="slot-loading">Ucitivanje uvodnog panela...</div>
+      </div>
+
+      <section class="content-grid">
+        <div id="capture-slot" data-slot="capture">
+          <div class="slot-loading">Ucitivanje panela za snimak...</div>
+        </div>
+
+        <div class="side-column">
+          <div id="status-slot" data-slot="status">
+            <div class="slot-loading">Ucitivanje status panela...</div>
+          </div>
+
+          <div id="result-slot" data-slot="result">
+            <div class="slot-loading">Ucitivanje panela rezultata...</div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

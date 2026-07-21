@@ -1,0 +1,70 @@
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 16px;
+}
+
+.brand-block {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.brand-mark {
+  width: 52px;
+  height: 52px;
+  border-radius: 18px;
+  background:
+    linear-gradient(145deg, rgba(15, 127, 116, 0.98), rgba(214, 130, 67, 0.84));
+  box-shadow: 0 14px 28px rgba(15, 127, 116, 0.2);
+}
+
+.brand-eyebrow {
+  margin: 0 0 6px;
+  font-size: 0.79rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--accent-strong);
+}
+
+.brand-title {
+  margin: 0;
+  font-size: 1.3rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+
+.hero-badges {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.pill {
+  padding: 0.6rem 0.9rem;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.74);
+  white-space: nowrap;
+  font-size: 0.93rem;
+}
+
+.pill.success {
+  background: var(--accent-soft);
+  border-color: rgba(15, 127, 116, 0.25);
+}
+
+.pill.warning {
+  background: var(--warn-soft);
+  border-color: rgba(175, 91, 28, 0.28);
+}
+
+@media (max-width: 760px) {
+  .topbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

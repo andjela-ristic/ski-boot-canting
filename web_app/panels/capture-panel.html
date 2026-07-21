@@ -1,0 +1,132 @@
+<article class="card stack capture-card" id="capture-card">
+  <div class="section-heading">
+    <div>
+      <p class="eyebrow">Korak 1</p>
+      <h2>Priprema snimka</h2>
+      <p class="section-copy">
+        Usmeri kameru ka cipeli i snimi kratak, miran kadar. Ako live kamera
+        nije dostupna, koristi direktan upload iz galerije.
+      </p>
+    </div>
+
+    <button class="ghost-button" id="toggle-camera" type="button">
+      Promeni kameru
+    </button>
+  </div>
+
+  <div class="preview-shell">
+    <video
+      id="camera-preview"
+      class="preview-video"
+      playsinline
+      muted
+      autoplay
+    ></video>
+    <div class="preview-overlay" id="preview-placeholder">
+      Kamera ce se pojaviti ovde kada browser dozvoli live pristup.
+    </div>
+  </div>
+
+  <div class="action-row">
+    <button class="primary-button" id="record-button" type="button">
+      Brzo snimi 2 sekunde
+    </button>
+
+    <label class="secondary-button file-button" for="video-file">
+      Snimi ili izaberi video
+    </label>
+
+    <input
+      id="video-file"
+      type="file"
+      accept="video/*"
+      capture="environment"
+      hidden
+    />
+  </div>
+
+  <div class="selected-file">
+    <p class="selected-file-label" id="selected-file-label">
+      Jos nema izabranog snimka.
+    </p>
+    <p class="selected-file-meta" id="selected-file-meta">
+      Mozes snimiti novi kadar ili izabrati postojeci video iz galerije.
+    </p>
+  </div>
+
+  <div class="preview-shell clip-shell is-hidden" id="clip-shell">
+    <video id="clip-preview" class="clip-video" controls playsinline></video>
+  </div>
+
+  <button class="analyze-button" id="upload-button" type="button">
+    Pokreni analizu
+  </button>
+
+  <p class="support-note" id="capture-note">
+    Ako live kamera nije dostupna, aplikacija ostaje potpuno upotrebljiva kroz
+    video upload.
+  </p>
+
+  <details class="advanced-settings">
+    <summary>Napredne postavke</summary>
+
+    <div class="advanced-panel">
+      <div class="advanced-header">
+        <p>
+          Ovo diras samo ako testiras drugi server ili hoces detaljniji izlaz.
+          Za uobicajeno koriscenje ostavi podrazumevane vrednosti.
+        </p>
+        <button
+          class="ghost-button ghost-button-small"
+          id="reset-base-url"
+          type="button"
+        >
+          Vrati podrazumevano
+        </button>
+      </div>
+
+      <label class="field">
+        <span>Adresa servera</span>
+        <input
+          id="base-url"
+          name="base-url"
+          type="url"
+          autocapitalize="off"
+          autocomplete="off"
+          spellcheck="false"
+          placeholder="https://tvoj-tunnel.example.com"
+        />
+      </label>
+
+      <label class="checkbox-row">
+        <input id="keep-artifacts" type="checkbox" />
+        <span>Zadrzi interne artefakte analize</span>
+      </label>
+
+      <div class="subgrid">
+        <label class="field">
+          <span>Trajanje snimka (ms)</span>
+          <input
+            id="clip-duration"
+            type="number"
+            min="500"
+            step="100"
+            value="2000"
+          />
+        </label>
+
+        <label class="field">
+          <span>Broj frejmova</span>
+          <input
+            id="frame-count"
+            type="number"
+            min="1"
+            max="30"
+            step="1"
+            value="6"
+          />
+        </label>
+      </div>
+    </div>
+  </details>
+</article>

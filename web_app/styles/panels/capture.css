@@ -1,0 +1,136 @@
+.preview-shell {
+  position: relative;
+  overflow: hidden;
+  min-height: 290px;
+  border-radius: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.58);
+  background:
+    radial-gradient(circle at top, rgba(16, 92, 86, 0.22), transparent 40%),
+    linear-gradient(145deg, rgba(11, 27, 33, 0.97), rgba(7, 15, 18, 0.98));
+}
+
+.preview-video,
+.clip-video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.preview-video {
+  min-height: 290px;
+}
+
+.clip-shell {
+  min-height: 180px;
+}
+
+.clip-video {
+  min-height: 180px;
+}
+
+.preview-overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 28px;
+  text-align: center;
+  color: rgba(240, 244, 245, 0.84);
+  background:
+    linear-gradient(180deg, rgba(10, 26, 31, 0.18), rgba(10, 26, 31, 0.72));
+}
+
+.action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.selected-file,
+.advanced-settings {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+}
+
+.selected-file {
+  padding: 16px 18px;
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.selected-file-label,
+.selected-file-meta {
+  margin: 0;
+}
+
+.selected-file-label {
+  font-weight: 700;
+}
+
+.selected-file-meta {
+  margin-top: 4px;
+  color: var(--muted);
+}
+
+.analyze-button {
+  width: 100%;
+  justify-content: center;
+}
+
+.support-note {
+  margin: -2px 0 0;
+  font-size: 0.95rem;
+  color: var(--muted);
+}
+
+.advanced-settings {
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.58);
+}
+
+.advanced-settings[open] {
+  background: rgba(255, 255, 255, 0.68);
+}
+
+.advanced-settings summary {
+  padding: 14px 16px;
+  cursor: pointer;
+  user-select: none;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.advanced-panel {
+  display: grid;
+  gap: 14px;
+  padding: 0 16px 16px;
+  background: rgba(255, 255, 255, 0.32);
+  border-top: 1px solid rgba(20, 45, 53, 0.08);
+}
+
+.advanced-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  padding-top: 14px;
+}
+
+.advanced-header p {
+  margin: 0;
+  max-width: 34rem;
+  color: var(--muted);
+}
+
+@media (max-width: 760px) {
+  .action-row,
+  .advanced-header {
+    flex-direction: column;
+  }
+
+  .preview-shell,
+  .preview-video,
+  .clip-video {
+    min-height: 240px;
+  }
+}

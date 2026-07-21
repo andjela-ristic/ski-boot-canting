@@ -22,6 +22,7 @@ RUN pip install --no-cache-dir --upgrade pip \
 COPY api ./api
 COPY pipeline ./pipeline
 COPY config ./config
+COPY web_app ./web_app
 COPY README.md ./README.md
 
 EXPOSE 8000
