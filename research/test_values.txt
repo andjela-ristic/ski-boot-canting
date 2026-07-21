@@ -14,7 +14,7 @@
     | 509   |           |              | 2.0        | 8,8        | ali sve su ok                               |
     | 510   |           | 4,4/16,16    | 3.0        | 8,8        |                                             |
     | 511   | 1.5/2.0   | 16,16        | 1.5        | 8,8        |                                             |
-    | 512   |           |              |            |            | odsekao vrh cizme nisam ni ocenjivala dalje |
+    | 512   |           |              |            |            | odsekao vrh cizme nisam ni ocenjivala dalje | ipak jesam :)
 
     Konacno best: 2.0 16,16
 

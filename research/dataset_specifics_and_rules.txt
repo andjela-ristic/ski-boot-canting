@@ -1,12 +1,7 @@
 Dataset-specific pravila i ocekivanja
 
-Svrha ovog dokumenta:
-- da eksplicitno zapise sta se ocekuje od ulaznih slika
-- da razdvoji task-specific i setup-specific pretpostavke od slucajnog overfita
-- da bude referenca za buduce promene pipeline-a
-
 Osnovni stav:
-- pipeline nije pravljen da bude potpuno genericki za bilo kakvu obucu i bilo kakvu scenu
+- pipeline nije pravljen da bude potpuno genericki za bilo kakvu scenu
 - pipeline jeste pravljen za standardizovan protokol snimanja ski pancerice radi merenja canting ugla
 - zato su neka "dataset-specific" pravila zapravo namerne i dozvoljene pretpostavke sistema
 

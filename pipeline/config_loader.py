@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 import yaml
 
@@ -27,11 +28,18 @@ def load_yaml_file(config_file: Path) -> dict:
     return config
 
 
+def resolve_config_path(path_value: str | Path) -> Path:
+    path = Path(path_value)
+    return path if path.is_absolute() else PROJECT_ROOT / path
+
+
 def load_config(config_path: str | None = None) -> dict:
-    if config_path is None:
+    resolved_source = config_path if config_path is not None else os.environ.get("PIPELINE_CONFIG")
+
+    if resolved_source is None:
         config_file = PROJECT_ROOT / "config" / "pipeline_config.yaml"
     else:
-        config_file = PROJECT_ROOT / config_path
+        config_file = resolve_config_path(resolved_source)
 
     if not config_file.exists():
         raise FileNotFoundError(f"Config file not found: {config_file}")

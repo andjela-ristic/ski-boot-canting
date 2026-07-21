@@ -1,7 +1,9 @@
 Ispitala sam moguca poboljsanja po istrazivanju o soft komjutingu.
+
 1. Da li da umesto RGB koristimo HSV?
     - Ne. Jer je HSV dobar kada znamo da ce nam cizma uvek biti crvena, ovako nema poente zakomplikovati nesto sto funkcionise. Osim toga mogu se zbog value izgubiti neke linije.
     - Medjutim, mozemo da umesto greyscale uvedemo LAB L kanal + CLAHE
+
 2. Afine transformacije?
     - Da, ali samo po ovom redosledu:
         1. nađi boot ROI / masku
@@ -10,6 +12,7 @@ Ispitala sam moguca poboljsanja po istrazivanju o soft komjutingu.
         4. rotiraj ROI da osa bude vertikalna
         5. onda meri canting / landmarke
     - U suprotnom se moze izgubiti vaznost glavne ose
+
 3. Otvaranje i zatvaranje za ROI masku (dilacija,erozija)?
     - Veliko DA!
     - Morfologija
@@ -18,6 +21,7 @@ Ispitala sam moguca poboljsanja po istrazivanju o soft komjutingu.
         → fill holes / largest contour
         → opening da ukloniš sitan šum
         → closing još jednom ako treba
+
 4. Da li da poboljsavam kontrast? 
     - Da, ali kontrolisano
     - Radicemo za:
@@ -26,6 +30,7 @@ Ispitala sam moguca poboljsanja po istrazivanju o soft komjutingu.
         centralna osa: ne treba previše detalja
 5. HOG
     - Ne
+
 6. Da li da ukljucujem segmentaciju?
     - I da i ne
     - Potrebno je pazljivo raditi da ne predje u deep learning, pokusati sa OpenCV metodama:
@@ -74,7 +79,7 @@ Experimental:
     
 03 changes:
     1. mode: manual / auto_median
-    2. opcioni pre-blur u step 03, ako želiš dodatno peglanje
+    2. opcioni pre-blur u step 03
     3. raw edges output
     4. cleaned edges output
     5. comparison view: input | raw edges | cleaned edges

@@ -1,24 +1,24 @@
 - kais mi menja siluetu cizme jako cesto, tako da ideja 
-da krenem od vrha i dna i trazim linije, otpada
+da krenem od vrha i dna i trazim linije, otpada - DEPRECATED
 
-- ako cizma nije centrirana klipuje se vrh (slika 512) - odbacujem sliku jer je bas los kadar
+- ako cizma nije centrirana klipuje se vrh (slika 512) - odbacujem sliku jer je bas los kadar - FIXED (nisam odbacila)
 
 - osim kajisa koji vraca dosta linija i krugova, imam problem i sa plocicom koja je ili na vrhu cizme ili na sredini koja ima sarafe,
 i ona mi vraca dosta false-positive-a koji su prilicno agresivni. tako da pre odlucivanja mora da se napravi filter selekcije
-korisnih oblika.
+korisnih oblika. - DEPRECATED
 pored toga, hough mi cesto vraca linije koje su dobre ali nekada ih naginje na jednu stranu i onda kada radim do produzivanje
-budu mnogo zakrivljenje
+budu mnogo zakrivljenje - DEPRECATED
 
 - logika kojom se trenutno vodim jeste da svaki fragment linije koja je uocena bude izduzena po roi masci do kraja. znaci vodim linije 
 od pocetka maske do kraja i trazim gde ima preklapanja. ako je neki fragment jako mali ali tacan, a drugi fragment je duzi ali 
 pod odredjenim uglom, ti fragmenti ce se spojiti ali tako da mali fragment ima manji uticaj na nagib nego veliki fragment i ako on nije 
-kompletno tacan.
+kompletno tacan. - DEPRECATED
 
 - uzimanje krugova je dobro ali centri tih krugova nisu savrseni, a ideja je bila da ako je moja potencijalna centralna linija deo centra 
-kruga, njoj ce se dodeliti poen koji odredjuje prioritet linije. ti poeni ce na kraju odluciti da li se radi o rendom liniji ili centralnoj
+kruga, njoj ce se dodeliti poen koji odredjuje prioritet linije. ti poeni ce na kraju odluciti da li se radi o rendom liniji ili centralnoj - DEPRECATED
 
 - veliki problem predstavlja i limitirani test krug od 10 slika. sve trenutne cizme su istog brenda, a ukupno imamo dva modela po dve
 cizme (leva i desna). kada se promeni brend cizme, postoji mogucnost da logika sa krugovima nece vise imati smisla, i morace da postoji 
-drugacija fallback logika za odredjivanje prioriteta linije.
+drugacija fallback logika za odredjivanje prioriteta linije. -FIXED
 
-- dilacija i erozija ne rade dovoljno dobar posao
+- dilacija i erozija ne rade dovoljno dobar posao -DEPRECATED
