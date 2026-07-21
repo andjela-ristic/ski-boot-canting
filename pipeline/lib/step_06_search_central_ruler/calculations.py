@@ -1049,11 +1049,17 @@ def prune_support_to_dominant_chain(selected_support: list[dict], roi_profile: d
         )
         return True, float(max(0.0, edge_quality)), True
 
+    path_metrics_cache: dict[tuple[int, ...], dict[str, float]] = {}
+
     def path_metrics(path_indices: tuple[int, ...]) -> dict[str, float]:
+        cached_metrics = path_metrics_cache.get(path_indices)
+        if cached_metrics is not None:
+            return cached_metrics
+
         support = [items[index] for index in path_indices]
         merged = merge_support_intervals(support)
         if not merged:
-            return {
+            empty_metrics = {
                 "unique_ratio": 0.0,
                 "span_ratio": 0.0,
                 "continuity": 0.0,
@@ -1063,6 +1069,8 @@ def prune_support_to_dominant_chain(selected_support: list[dict], roi_profile: d
                 "support_strength_ratio": 0.0,
                 "fragment_ratio": 0.0,
             }
+            path_metrics_cache[path_indices] = empty_metrics
+            return empty_metrics
         unique_length = interval_union_length(merged)
         span = max(1.0, merged[-1][1] - merged[0][0])
         alignment_weights = [
@@ -1081,7 +1089,7 @@ def prune_support_to_dominant_chain(selected_support: list[dict], roi_profile: d
         top_gap = max(0.0, merged[0][0] - roi_y_min)
         bottom_gap = max(0.0, roi_y_max - merged[-1][1])
         extent_ratio = clip01(1.0 - (top_gap + bottom_gap) / roi_span)
-        return {
+        metrics = {
             "unique_ratio": clip01(unique_length / roi_span),
             "span_ratio": clip01(span / roi_span),
             "continuity": clip01(unique_length / span),
@@ -1097,6 +1105,8 @@ def prune_support_to_dominant_chain(selected_support: list[dict], roi_profile: d
                 len(support) / max(1, total_selected_fragment_count)
             ),
         }
+        path_metrics_cache[path_indices] = metrics
+        return metrics
 
     def fast_path_score(
         path_indices: tuple[int, ...],

@@ -18,7 +18,11 @@ def process_image(json_path: Path | str) -> dict:
     return process_json_file(Path(json_path))
 
 
-def build_analysis(json_path: Path) -> dict:
+def build_analysis(
+    json_path: Path,
+    *,
+    materialize_candidate_snapshots: bool = True,
+) -> dict:
     analysis_started_at = time.perf_counter()
     data = load_json(json_path)
     image_name = data.get("image_name", json_path.stem + ".png")
@@ -65,22 +69,23 @@ def build_analysis(json_path: Path) -> dict:
     if bool(context.STEP_CONFIG.get("save_all_final_candidates", False)):
         saved_candidate_count = len(ranked_candidates)
     candidate_snapshot_images = []
-    for index, candidate in enumerate(
-        ranked_candidates[:saved_candidate_count],
-        start=1,
-    ):
-        candidate_snapshot_images.append(
-            {
-                "index": index,
-                "image": draw_candidate_snapshot(
-                    fragment_background=fragment_background,
-                    candidate=candidate,
-                    roi_profile=roi_profile,
-                    image_name=image_name,
-                    candidate_label=f"C{index}",
-                ),
-            }
-        )
+    if materialize_candidate_snapshots:
+        for index, candidate in enumerate(
+            ranked_candidates[:saved_candidate_count],
+            start=1,
+        ):
+            candidate_snapshot_images.append(
+                {
+                    "index": index,
+                    "image": draw_candidate_snapshot(
+                        fragment_background=fragment_background,
+                        candidate=candidate,
+                        roi_profile=roi_profile,
+                        image_name=image_name,
+                        candidate_label=f"C{index}",
+                    ),
+                }
+            )
     rendering_duration_sec = time.perf_counter() - rendering_started_at
     total_analysis_duration_sec = time.perf_counter() - analysis_started_at
 
@@ -176,11 +181,17 @@ def build_analysis(json_path: Path) -> dict:
         "ranked_candidates": ranked_candidates,
         "filtered_lines": filtered_lines,
         "candidate_snapshot_images": candidate_snapshot_images,
+        "_fragment_background": fragment_background,
+        "_roi_profile": roi_profile,
+        "_saved_candidate_count": min(saved_candidate_count, len(ranked_candidates)),
     }
 
 def process_json_file(json_path: Path) -> dict:
     process_started_at = time.perf_counter()
-    analysis = build_analysis(json_path)
+    analysis = build_analysis(
+        json_path,
+        materialize_candidate_snapshots=False,
+    )
     dirs = get_step_dirs()
     image_name = analysis["image_name"]
 
@@ -200,19 +211,49 @@ def process_json_file(json_path: Path) -> dict:
         raise RuntimeError(f"Could not save comparison: {comparison_path}")
 
     candidate_snapshot_files = []
-    for snapshot in analysis.get("candidate_snapshot_images", []):
-        snapshot_index = int(snapshot["index"])
+    snapshot_rendering_duration_sec = 0.0
+    fragment_background = analysis["_fragment_background"]
+    roi_profile = analysis["_roi_profile"]
+    saved_candidate_count = int(analysis["_saved_candidate_count"])
+    for snapshot_index, candidate in enumerate(
+        analysis["ranked_candidates"][:saved_candidate_count],
+        start=1,
+    ):
+        snapshot_render_started_at = time.perf_counter()
+        snapshot_image = draw_candidate_snapshot(
+            fragment_background=fragment_background,
+            candidate=candidate,
+            roi_profile=roi_profile,
+            image_name=image_name,
+            candidate_label=f"C{snapshot_index}",
+        )
+        snapshot_rendering_duration_sec += (
+            time.perf_counter() - snapshot_render_started_at
+        )
         snapshot_path = candidate_snapshot_dir / f"C{snapshot_index:02d}_{image_name}"
-        if not cv2.imwrite(str(snapshot_path), snapshot["image"]):
+        if not cv2.imwrite(str(snapshot_path), snapshot_image):
             raise RuntimeError(f"Could not save candidate snapshot: {snapshot_path}")
         candidate_snapshot_files.append(str(snapshot_path.relative_to(PROJECT_ROOT)))
+        del snapshot_image
 
     metadata = deepcopy(analysis["metadata"])
+    metadata.setdefault("timings_sec", {})
+    metadata["timings_sec"]["rendering"] = float(
+        metadata["timings_sec"].get("rendering", 0.0)
+        + snapshot_rendering_duration_sec
+    )
+    metadata["timings_sec"]["analysis_total"] = float(
+        metadata["timings_sec"].get("analysis_total", 0.0)
+        + snapshot_rendering_duration_sec
+    )
     metadata["output_overlay_file"] = str(overlay_path.relative_to(PROJECT_ROOT))
     metadata["output_comparison_file"] = str(comparison_path.relative_to(PROJECT_ROOT))
     metadata["candidate_snapshot_files"] = candidate_snapshot_files
-    metadata.setdefault("timings_sec", {})
-    metadata["timings_sec"]["save"] = float(time.perf_counter() - process_started_at - metadata["timings_sec"].get("analysis_total", 0.0))
+    metadata["timings_sec"]["save"] = float(
+        time.perf_counter()
+        - process_started_at
+        - metadata["timings_sec"].get("analysis_total", 0.0)
+    )
     metadata["timings_sec"]["process_total"] = float(time.perf_counter() - process_started_at)
     save_json(metadata_path, metadata)
 

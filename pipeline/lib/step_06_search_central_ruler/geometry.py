@@ -106,14 +106,22 @@ def build_row_profile(mask: np.ndarray) -> dict | None:
     row_widths = np.zeros(height, dtype=np.int32)
     row_centers = np.full(height, np.nan, dtype=np.float64)
 
-    for y_index in range(height):
-        row_x = np.flatnonzero(mask[y_index] > 0)
-        if row_x.size < 2:
-            continue
-        left_bounds[y_index] = int(row_x[0])
-        right_bounds[y_index] = int(row_x[-1])
-        row_widths[y_index] = int(row_x[-1] - row_x[0] + 1)
-        row_centers[y_index] = float((row_x[0] + row_x[-1]) / 2.0)
+    mask_bool = mask > 0
+    valid_row_mask = np.count_nonzero(mask_bool, axis=1) >= 2
+    valid_row_indices = np.flatnonzero(valid_row_mask)
+    if valid_row_indices.size:
+        all_left = np.argmax(mask_bool, axis=1).astype(np.int32, copy=False)
+        all_right = (
+            width
+            - 1
+            - np.argmax(mask_bool[:, ::-1], axis=1).astype(np.int32, copy=False)
+        )
+        left = all_left[valid_row_indices]
+        right = all_right[valid_row_indices]
+        left_bounds[valid_row_indices] = left
+        right_bounds[valid_row_indices] = right
+        row_widths[valid_row_indices] = right - left + 1
+        row_centers[valid_row_indices] = (left + right) / 2.0
 
     valid_rows = np.flatnonzero(row_widths > 0)
     if valid_rows.size == 0:

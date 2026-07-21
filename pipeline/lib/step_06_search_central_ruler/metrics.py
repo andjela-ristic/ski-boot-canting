@@ -154,10 +154,17 @@ def compute_row_balance_metrics_cached(
     return result
 
 
-def _nearest_distances(values: np.ndarray, targets: np.ndarray) -> np.ndarray:
+def _nearest_distances(
+    values: np.ndarray,
+    targets: np.ndarray,
+    *,
+    assume_sorted: bool = False,
+) -> np.ndarray:
     if values.size == 0 or targets.size == 0:
         return np.empty(0, dtype=np.float64)
-    values = np.sort(values.astype(np.float64, copy=False))
+    values = values.astype(np.float64, copy=False)
+    if not assume_sorted:
+        values = np.sort(values)
     targets = targets.astype(np.float64, copy=False)
     positions = np.searchsorted(values, targets)
     left_positions = np.clip(positions - 1, 0, values.size - 1)
@@ -187,54 +194,115 @@ def _prepare_edge_mask(edge_image: np.ndarray, roi_profile: dict) -> np.ndarray:
     return np.where(roi_mask, edge_mask, 0).astype(np.uint8)
 
 
+def prepare_mirror_symmetry_context(
+    edge_image: np.ndarray | None,
+    roi_profile: dict,
+) -> dict | None:
+    """Precompute image-only mirror data once per analyzed image.
+
+    Candidate axes only change the split between the already sorted left/right
+    edge coordinates. The expensive Canny pass and row scans are independent
+    of the candidate and therefore must not be repeated for every axis.
+    """
+    if edge_image is None or not bool(cfg("mirror_symmetry", "enabled", default=True)):
+        return None
+
+    edge_mask = _prepare_edge_mask(edge_image, roi_profile)
+    row_step = max(1, int(cfg("mirror_symmetry", "row_step_px", default=6)))
+    sampled_rows = roi_profile["trimmed_rows"][::row_step]
+    row_edges_by_sample: list[np.ndarray] = []
+    for y_value in sampled_rows.tolist():
+        left_bound = int(roi_profile["left_bounds"][y_value])
+        right_bound = int(roi_profile["right_bounds"][y_value])
+        if right_bound <= left_bound:
+            row_edges_by_sample.append(np.empty(0, dtype=np.float64))
+            continue
+        row_edges = (
+            np.flatnonzero(edge_mask[y_value, left_bound : right_bound + 1] > 0)
+            + left_bound
+        )
+        row_edges_by_sample.append(row_edges.astype(np.float64, copy=False))
+
+    return {
+        "sampled_rows": sampled_rows,
+        "row_edges_by_sample": tuple(row_edges_by_sample),
+        "max_distance_px": max(
+            1.0,
+            float(cfg("mirror_symmetry", "max_distance_px", default=12.0)),
+        ),
+        "center_exclusion_px": float(
+            cfg("mirror_symmetry", "center_exclusion_px", default=3.0)
+        ),
+        "min_edge_pixels": max(
+            1,
+            int(cfg("mirror_symmetry", "min_edge_pixels_per_side", default=2)),
+        ),
+        "min_valid_row_ratio": float(
+            cfg("mirror_symmetry", "min_valid_row_ratio", default=0.08)
+        ),
+        "trim_fraction": clip01(
+            float(cfg("mirror_symmetry", "trim_fraction", default=0.10))
+        ),
+    }
+
+
 def compute_mirror_symmetry_score(
     axis: dict[str, float],
     edge_image: np.ndarray | None,
     roi_profile: dict,
+    mirror_context: dict | None = None,
 ) -> dict[str, float | bool | int]:
+    resolved_context = mirror_context
+    if resolved_context is None:
+        resolved_context = prepare_mirror_symmetry_context(edge_image, roi_profile)
+
+    max_distance_px = (
+        float(resolved_context["max_distance_px"])
+        if resolved_context is not None
+        else float(cfg("mirror_symmetry", "max_distance_px", default=12.0))
+    )
     neutral = {
         "mirror_left_to_right_score": 0.5,
         "mirror_right_to_left_score": 0.5,
         "mirror_symmetry_score": 0.5,
         "mirror_valid_row_ratio": 0.0,
-        "mirror_median_distance_px": float(cfg("mirror_symmetry", "max_distance_px", default=12.0)),
+        "mirror_median_distance_px": max_distance_px,
         "mirror_valid_row_count": 0,
         "mirror_is_reliable": False,
     }
-    if edge_image is None or not bool(cfg("mirror_symmetry", "enabled", default=True)):
+    if resolved_context is None:
         return neutral
 
-    edge_mask = _prepare_edge_mask(edge_image, roi_profile)
-    row_step = max(1, int(cfg("mirror_symmetry", "row_step_px", default=6)))
-    max_distance_px = max(1.0, float(cfg("mirror_symmetry", "max_distance_px", default=12.0)))
-    center_exclusion_px = float(cfg("mirror_symmetry", "center_exclusion_px", default=3.0))
-    min_edge_pixels = max(1, int(cfg("mirror_symmetry", "min_edge_pixels_per_side", default=2)))
-    min_valid_row_ratio = float(cfg("mirror_symmetry", "min_valid_row_ratio", default=0.08))
-    trim_fraction = clip01(float(cfg("mirror_symmetry", "trim_fraction", default=0.10)))
+    sampled_rows = resolved_context["sampled_rows"]
+    row_edges_by_sample = resolved_context["row_edges_by_sample"]
+    center_exclusion_px = float(resolved_context["center_exclusion_px"])
+    min_edge_pixels = int(resolved_context["min_edge_pixels"])
+    min_valid_row_ratio = float(resolved_context["min_valid_row_ratio"])
+    trim_fraction = float(resolved_context["trim_fraction"])
 
-    sampled_rows = roi_profile["trimmed_rows"][::row_step]
     ltr_scores: list[float] = []
     rtl_scores: list[float] = []
     all_distances: list[float] = []
 
-    for y_value in sampled_rows.tolist():
-        left_bound = int(roi_profile["left_bounds"][y_value])
-        right_bound = int(roi_profile["right_bounds"][y_value])
-        if right_bound <= left_bound:
-            continue
-        row_edges = np.flatnonzero(edge_mask[y_value, left_bound : right_bound + 1] > 0) + left_bound
+    axis_a = float(axis["a"])
+    axis_b = float(axis["b"])
+    for y_value, row_edges in zip(sampled_rows.tolist(), row_edges_by_sample):
         if row_edges.size == 0:
             continue
-        axis_x = float(line_x_at_y(axis, float(y_value)))
-        left_x = row_edges[row_edges < axis_x - center_exclusion_px].astype(np.float64)
-        right_x = row_edges[row_edges > axis_x + center_exclusion_px].astype(np.float64)
+        axis_x = axis_a * float(y_value) + axis_b
+        left_x = row_edges[row_edges < axis_x - center_exclusion_px]
+        right_x = row_edges[row_edges > axis_x + center_exclusion_px]
         if left_x.size < min_edge_pixels or right_x.size < min_edge_pixels:
             continue
 
         mirrored_left = 2.0 * axis_x - left_x
         mirrored_right = 2.0 * axis_x - right_x
-        ltr_distances = np.clip(_nearest_distances(right_x, mirrored_left), 0.0, max_distance_px)
-        rtl_distances = np.clip(_nearest_distances(left_x, mirrored_right), 0.0, max_distance_px)
+        ltr_distances = np.clip(
+            _nearest_distances(right_x, mirrored_left, assume_sorted=True), 0.0, max_distance_px
+        )
+        rtl_distances = np.clip(
+            _nearest_distances(left_x, mirrored_right, assume_sorted=True), 0.0, max_distance_px
+        )
         if ltr_distances.size == 0 or rtl_distances.size == 0:
             continue
         ltr_scores.append(float(1.0 - np.mean(ltr_distances) / max_distance_px))
@@ -368,9 +436,17 @@ def apply_mirror_symmetry(
     candidate: dict,
     edge_image: np.ndarray | None,
     roi_profile: dict,
+    mirror_context: dict | None = None,
 ) -> dict:
     result = dict(candidate)
-    result.update(compute_mirror_symmetry_score(result, edge_image, roi_profile))
+    result.update(
+        compute_mirror_symmetry_score(
+            result,
+            edge_image,
+            roi_profile,
+            mirror_context=mirror_context,
+        )
+    )
     return update_candidate_scores(result)
 
 

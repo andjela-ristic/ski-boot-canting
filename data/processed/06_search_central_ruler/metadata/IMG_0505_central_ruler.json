@@ -2015,11 +2015,11 @@
     }
   },
   "timings_sec": {
-    "search": 8.142271300002903,
-    "rendering": 0.3166547000000719,
-    "analysis_total": 8.61161390000052,
-    "save": 1.264144499997201,
-    "process_total": 9.875760699997045
+    "search": 2.5162487999987206,
+    "rendering": 0.2624147000060475,
+    "analysis_total": 2.937905900005717,
+    "save": 1.0222567999953753,
+    "process_total": 3.9601634000027843
   },
   "parameters": {
     "enabled": true,
@@ -2356,11 +2356,11 @@
   "reproducibility": {
     "effective_step_config_sha256": "a76cfc33d19885f815c03a48d5face90ffd40fe9ee28749cd12ac6303f736991",
     "pipeline_config_file": "config\\pipeline_config.yaml",
-    "pipeline_config_sha256": "eeb382e65d4a2d51afff668491321cc3b124ef2c137363b9c7a0b8f7fa7f7eed",
+    "pipeline_config_sha256": "4de8df44837b27f07beebe064240d318faa254fbfc4bc1aca87bf8815b3cb8c2",
     "input_json_sha256": "35d8f6255ea0cb7027104d0cab28402ca0c81e472298a8e995c36cb9944eed85",
     "base_edge_sha256": "8bc3cc834a7c0290b83757474b3a9551a8cd0fa231880ca4d3dcbed030ca6276",
     "roi_mask_sha256": "09b53dc196f205f9f5f4b81aae62b49d9eec05c42997585098538755893dd5ee",
-    "step06_source_sha256": "06587ab07b687e926ddde3f2cc259f8ee760bb13db3f8a0eece26587a259f325",
+    "step06_source_sha256": "303f78f9fab1508f438a7d6fe4997fb72cc30312f84ffe1a7728e0bce9f37670",
     "step06_source_files": [
       {
         "path": "pipeline\\06_search_central_ruler.py",
@@ -2376,7 +2376,7 @@
       },
       {
         "path": "pipeline\\lib\\step_06_search_central_ruler\\calculations.py",
-        "sha256": "92efeb1756a38949d2d1177912e51ce94503098c4a08f6b6bba8243238a607c7"
+        "sha256": "7822151e2d6c5c0a65cabe673eadeb441ea4edc0b3f1f30222c981ee385f5e7c"
       },
       {
         "path": "pipeline\\lib\\step_06_search_central_ruler\\context.py",
@@ -2384,15 +2384,15 @@
       },
       {
         "path": "pipeline\\lib\\step_06_search_central_ruler\\geometry.py",
-        "sha256": "4f751efd99c5664b802ac9e085b078ba3ca6d50d839b1a7e02ea30797372cdad"
+        "sha256": "b623dc6c7d344d9b5a5163aa16e301be9e43c7134d21713ad2baf8500a3dbdba"
       },
       {
         "path": "pipeline\\lib\\step_06_search_central_ruler\\metrics.py",
-        "sha256": "b6d8ad8cf434235d1482433396c868d8382b45910f472bcce6d5944b5c074867"
+        "sha256": "b70b1b68d6f584c6ac90d3bef2649e2c91b348e4b569aeab16975a83c7fe0e7a"
       },
       {
         "path": "pipeline\\lib\\step_06_search_central_ruler\\processing.py",
-        "sha256": "cd687a6e78c128a4ff786d9ed5fa1e9f4629ff4311c5ace9e1730d88a62f0f4c"
+        "sha256": "e31a88f0b17ab35a5b761f4da3522267561d1650a868513a79364d2b28ba908e"
       },
       {
         "path": "pipeline\\lib\\step_06_search_central_ruler\\rendering.py",
@@ -2400,7 +2400,7 @@
       },
       {
         "path": "pipeline\\lib\\step_06_search_central_ruler\\search.py",
-        "sha256": "6971559321b7a556801712c8ae37ec1ba2d7fb32c074ef109fae6326fe7a258b"
+        "sha256": "0044e6004147f1b7790c85b72add43ec4ad04c413d8013c6afe93d425897939c"
       },
       {
         "path": "pipeline\\lib\\step_06_search_central_ruler\\sorting.py",

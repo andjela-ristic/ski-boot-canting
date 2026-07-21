@@ -2,10 +2,11 @@ import {
   deriveDefaultBaseUrl,
   getClipDurationMs,
   getFrameCount,
+  getGuideScale,
   normalizedBaseUrlValue,
   persistForm,
 } from "../state/app-state.js";
-import { checkCaptureReadiness, uploadAnalyzeImage, uploadVideo } from "../services/api-client.js";
+import { checkCaptureReadiness, uploadVideo } from "../services/api-client.js";
 import {
   canUseLiveCamera,
   initializeCamera,
@@ -18,9 +19,12 @@ const READINESS_SUCCESS_STREAK = 3;
 const READINESS_FAILURE_STREAK = 2;
 const NON_READY_GUIDE_LABEL = "Place the boot in frame";
 const NON_READY_GUIDE_DETAIL = "The frame will turn green when it is good";
+const BASE_GUIDE_WIDTH_RATIO = 0.6;
+const BASE_GUIDE_HEIGHT_RATIO = 0.8;
 
 export function bindCapturePanel(options) {
   options.elements.captureNote.textContent = buildCaptureNote();
+  syncGuideScaleUi(options);
   startReadinessLoop(options);
 
   options.elements.resetBaseUrl.addEventListener("click", () => {
@@ -39,6 +43,10 @@ export function bindCapturePanel(options) {
     persistForm(options.elements);
   });
   options.elements.clipDuration.addEventListener("change", () => {
+    persistForm(options.elements);
+  });
+  options.elements.guideScale.addEventListener("input", () => {
+    syncGuideScaleUi(options);
     persistForm(options.elements);
   });
 
@@ -115,7 +123,7 @@ export function bindCapturePanel(options) {
       options.state.busy = true;
       options.state.activeOperation = "uploading";
       options.refreshChrome();
-      options.setStatus("Preparing a representative frame for analysis...", "info");
+      options.setStatus("Uploading the original video for analysis...", "info");
       persistForm(options.elements);
 
       const requestOptions = {
@@ -126,32 +134,7 @@ export function bindCapturePanel(options) {
         frameCount: getFrameCount(options.elements),
       };
 
-      let result;
-
-      try {
-        const analysisFrame = await extractAnalysisFrameFromClip(
-          options.elements.clipPreview,
-          options.state.selectedVideoFile,
-        );
-        options.setStatus("Running analysis on the extracted frame...", "info");
-        result = await uploadAnalyzeImage({
-          file: analysisFrame,
-          baseUrl: requestOptions.baseUrl,
-          keepArtifacts: requestOptions.keepArtifacts,
-        });
-        result.sourceName = options.state.selectedVideoFile.name;
-      } catch (error) {
-        if (!isFrameExtractionError(error)) {
-          throw error;
-        }
-
-        console.warn(error);
-        options.setStatus(
-          "Local frame extraction failed, so the app is falling back to the slower video upload path.",
-          "warning",
-        );
-        result = await uploadVideo(requestOptions);
-      }
+      const result = await uploadVideo(requestOptions);
 
       rememberResultOverlay(options, result);
       options.renderResult(result);
@@ -215,6 +198,7 @@ function startReadinessLoop(options) {
       const readiness = await checkCaptureReadiness({
         frame,
         baseUrl: normalizedBaseUrlValue(options.elements),
+        guideScale: getGuideScale(options.elements),
       });
 
       options.state.readinessLastLatencyMs = readiness.latencyMs;
@@ -263,9 +247,22 @@ async function capturePreviewFrame(videoElement) {
     throw new Error("Preview frame is not ready.");
   }
 
-  const targetWidth = Math.min(720, Math.max(480, sourceWidth));
-  const scale = targetWidth / sourceWidth;
-  const targetHeight = Math.max(1, Math.round(sourceHeight * scale));
+  const viewportWidth = Math.max(1, Math.round(videoElement.clientWidth || sourceWidth));
+  const viewportHeight = Math.max(1, Math.round(videoElement.clientHeight || sourceHeight));
+  const coverScale = Math.max(
+    viewportWidth / sourceWidth,
+    viewportHeight / sourceHeight,
+  );
+  const visibleSourceWidth = sourceWidth / coverScale;
+  const visibleSourceHeight = sourceHeight / coverScale;
+  const visibleSourceX = Math.max(0, (sourceWidth - visibleSourceWidth) * 0.5);
+  const visibleSourceY = Math.max(0, (sourceHeight - visibleSourceHeight) * 0.5);
+
+  const targetWidth = Math.min(720, Math.max(480, viewportWidth));
+  const targetHeight = Math.max(
+    1,
+    Math.round(targetWidth * (visibleSourceHeight / visibleSourceWidth)),
+  );
 
   const canvas = document.createElement("canvas");
   canvas.width = targetWidth;
@@ -276,7 +273,17 @@ async function capturePreviewFrame(videoElement) {
     throw new Error("Canvas context is not available.");
   }
 
-  context.drawImage(videoElement, 0, 0, targetWidth, targetHeight);
+  context.drawImage(
+    videoElement,
+    visibleSourceX,
+    visibleSourceY,
+    visibleSourceWidth,
+    visibleSourceHeight,
+    0,
+    0,
+    targetWidth,
+    targetHeight,
+  );
 
   const blob = await new Promise((resolve, reject) => {
     canvas.toBlob(
@@ -298,139 +305,22 @@ async function capturePreviewFrame(videoElement) {
   });
 }
 
-async function extractAnalysisFrameFromClip(videoElement, sourceFile) {
-  try {
-    await ensureClipPreviewReady(videoElement);
-
-    const sourceWidth = videoElement.videoWidth || 0;
-    const sourceHeight = videoElement.videoHeight || 0;
-    if (sourceWidth <= 0 || sourceHeight <= 0) {
-      throw new Error("Clip preview dimensions are not available.");
-    }
-
-    const duration = Number.isFinite(videoElement.duration) ? videoElement.duration : 0;
-    if (duration > 0.1) {
-      const targetTime = Math.max(0, Math.min(duration * 0.5, duration - 0.05));
-      await seekClipPreview(videoElement, targetTime);
-    } else if (videoElement.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
-      await waitForVideoEvent(videoElement, "loadeddata");
-    }
-
-    const canvas = document.createElement("canvas");
-    canvas.width = sourceWidth;
-    canvas.height = sourceHeight;
-
-    const context = canvas.getContext("2d", { alpha: false });
-    if (!context) {
-      throw new Error("Canvas context is not available.");
-    }
-
-    context.drawImage(videoElement, 0, 0, sourceWidth, sourceHeight);
-
-    const blob = await new Promise((resolve, reject) => {
-      canvas.toBlob(
-        (value) => {
-          if (value) {
-            resolve(value);
-            return;
-          }
-          reject(new Error("JPEG analysis frame encoding failed."));
-        },
-        "image/jpeg",
-        0.92,
-      );
-    });
-
-    return new File([blob], `${deriveFrameFilename(sourceFile)}.jpg`, {
-      type: "image/jpeg",
-      lastModified: Date.now(),
-    });
-  } catch (error) {
-    throw createFrameExtractionError("Local frame extraction failed.", error);
-  }
-}
-
-async function ensureClipPreviewReady(videoElement) {
-  if (
-    videoElement.readyState >= HTMLMediaElement.HAVE_METADATA &&
-    videoElement.videoWidth > 0 &&
-    videoElement.videoHeight > 0
-  ) {
-    return;
-  }
-
-  if (videoElement.error) {
-    throw new Error("Clip preview reported a decode error.");
-  }
-
-  await waitForVideoEvent(videoElement, "loadedmetadata");
-}
-
-async function seekClipPreview(videoElement, targetTime) {
-  if (!Number.isFinite(targetTime) || targetTime <= 0) {
-    return;
-  }
-
-  if (
-    videoElement.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA &&
-    Math.abs(videoElement.currentTime - targetTime) < 0.03
-  ) {
-    return;
-  }
-
-  const seekPromise = waitForVideoEvent(videoElement, "seeked");
-  videoElement.currentTime = targetTime;
-  await seekPromise;
-}
-
-function waitForVideoEvent(videoElement, eventName) {
-  return new Promise((resolve, reject) => {
-    const handleSuccess = () => {
-      cleanup();
-      resolve();
-    };
-
-    const handleError = () => {
-      cleanup();
-      reject(new Error(`Video event failed while waiting for ${eventName}.`));
-    };
-
-    const cleanup = () => {
-      videoElement.removeEventListener(eventName, handleSuccess);
-      videoElement.removeEventListener("error", handleError);
-    };
-
-    videoElement.addEventListener(eventName, handleSuccess, { once: true });
-    videoElement.addEventListener("error", handleError, { once: true });
-  });
-}
-
-function deriveFrameFilename(sourceFile) {
-  const sourceName =
-    sourceFile && typeof sourceFile.name === "string" && sourceFile.name.trim()
-      ? sourceFile.name.trim()
-      : `capture-${Date.now()}`;
-  const extensionIndex = sourceName.lastIndexOf(".");
-  return extensionIndex > 0 ? sourceName.slice(0, extensionIndex) : sourceName;
-}
-
-function createFrameExtractionError(message, cause) {
-  const error = new Error(message);
-  error.name = "FrameExtractionError";
-  error.cause = cause;
-  return error;
-}
-
-function isFrameExtractionError(error) {
-  return error instanceof Error && error.name === "FrameExtractionError";
-}
-
 function rememberResultOverlay(options, result) {
   if (options.state.resultOverlayObjectUrl) {
     URL.revokeObjectURL(options.state.resultOverlayObjectUrl);
   }
 
   options.state.resultOverlayObjectUrl = result.overlayObjectUrl || null;
+}
+
+function syncGuideScaleUi(options) {
+  const guideScale = getGuideScale(options.elements);
+  const widthRatio = Math.min(0.96, BASE_GUIDE_WIDTH_RATIO * guideScale);
+  const heightRatio = Math.min(0.96, BASE_GUIDE_HEIGHT_RATIO * guideScale);
+
+  options.elements.readinessGuide.style.setProperty("--guide-width-ratio", widthRatio.toFixed(4));
+  options.elements.readinessGuide.style.setProperty("--guide-height-ratio", heightRatio.toFixed(4));
+  options.elements.guideScaleValue.textContent = `${Math.round(guideScale * 100)}%`;
 }
 
 function setGuideState(options, stateName, label, detail = "") {
@@ -454,10 +344,10 @@ function formatReadinessMeta(options) {
 
 function buildCaptureNote() {
   if (isLikelyIosDevice()) {
-    return "For the sharpest iPhone result, prefer Record or choose video. Live preview is mainly for alignment and can look softer in Safari.";
+    return "For the sharpest iPhone result, prefer Record or choose video. The app now uploads the original video for analysis instead of extracting a browser-compressed frame.";
   }
 
-  return "If the live camera is not available, the app remains fully usable through video upload.";
+  return "For maximum quality, video analysis uploads the original clip instead of a browser-extracted preview frame.";
 }
 
 function isLikelyIosDevice() {

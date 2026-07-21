@@ -282,11 +282,13 @@ class PipelineRunner:
         self,
         frame_bytes: bytes,
         include_debug: bool = False,
+        guide_scale: float = 1.0,
     ) -> dict[str, Any]:
         try:
             result = _load_capture_readiness_validator().validate_bytes(
                 frame_bytes,
                 include_debug=include_debug,
+                guide_scale=guide_scale,
             )
         except FrameValidationError as exc:
             raise ApiError(422, str(exc)) from exc
@@ -348,65 +350,33 @@ class PipelineRunner:
         include_step_logs: bool = False,
     ) -> dict[str, Any]:
         resolved_video_path = self._resolve_video_path(video_path)
-        frames_config = self._load_frames_config()
-        sample_count = frames_config["sample_count"]
-        max_workers = frames_config["max_workers"]
-
         extraction_dir = self._make_job_dir()
-        extracted_frame_paths: list[tuple[int, float, Path]] = []
 
         try:
-            extracted_frame_paths = self._extract_sampled_frames(
-                resolved_video_path,
-                extraction_dir,
-                sample_count,
+            return self._analyze_video_frames_job(
+                resolved_video_path=resolved_video_path,
+                extraction_dir=extraction_dir,
+                keep_artifacts=keep_artifacts,
+                include_step_logs=include_step_logs,
+                requested_frame_count=None,
+                input_video_path=str(resolved_video_path),
+                video_name=resolved_video_path.name,
             )
-
-            started = time.perf_counter()
-            with ThreadPoolExecutor(max_workers=max_workers) as executor:
-                future_results = list(
-                    executor.map(
-                        lambda item: self._analyze_extracted_frame(item, keep_artifacts),
-                        extracted_frame_paths,
-                    )
-                )
-            processing_time_ms = (time.perf_counter() - started) * 1000.0
-
-            frame_results = sorted(future_results, key=lambda item: item.frame_index)
-            averaged_metadata = self._average_metadata_tree(
-                [item.analysis.metadata for item in frame_results]
-            )
-
-            return {
-                "video_path": str(resolved_video_path),
-                "frame_count": len(frame_results),
-                "processing_time_ms": round(processing_time_ms, 2),
-                "frame_sampling": {
-                    "sample_count": sample_count,
-                    "max_workers": max_workers,
-                },
-                "frames": [
-                    item.to_dict(include_step_logs=include_step_logs) for item in frame_results
-                ],
-                "average_metadata": averaged_metadata,
-                "artifacts_dir": str(extraction_dir) if keep_artifacts else None,
-            }
         finally:
             if not keep_artifacts and extraction_dir.exists():
                 shutil.rmtree(extraction_dir, ignore_errors=True)
 
-    def analyze_uploaded_video_stub(
+    def analyze_uploaded_video(
         self,
         video_bytes: bytes,
         video_filename: str,
         keep_artifacts: bool = False,
+        include_step_logs: bool = False,
         requested_frame_count: int | None = None,
-        clip_duration_ms: int | None = None,
     ) -> dict[str, Any]:
         if not video_bytes:
             raise ApiError(400, "Uploaded video is empty.")
 
-        started = time.perf_counter()
         job_dir = self._make_job_dir()
 
         try:
@@ -414,67 +384,108 @@ class PipelineRunner:
             uploaded_video_path = self._prepare_uploaded_video(job_dir, safe_video_name, video_bytes)
             resolved_video_path = self._resolve_video_path(uploaded_video_path)
 
-            frames_config = self._load_frames_config()
-            sample_count = (
-                requested_frame_count
-                if requested_frame_count is not None
-                else frames_config["sample_count"]
+            return self._analyze_video_frames_job(
+                resolved_video_path=resolved_video_path,
+                extraction_dir=job_dir,
+                keep_artifacts=keep_artifacts,
+                include_step_logs=include_step_logs,
+                requested_frame_count=requested_frame_count,
+                input_video_path=f"uploaded://{safe_video_name}",
+                video_name=safe_video_name,
             )
-            if not isinstance(sample_count, int) or not 1 <= sample_count <= 30:
-                raise ApiError(
-                    400,
-                    "Field 'frame_count' must be an integer between 1 and 30.",
-                )
-
-            extracted_frame_paths = self._extract_sampled_frames(
-                resolved_video_path,
-                job_dir,
-                sample_count,
-            )
-            frame_timestamps_ms = [round(timestamp_ms, 2) for _, timestamp_ms, _ in extracted_frame_paths]
-
-            overlay_image = self._build_uploaded_video_stub_overlay(
-                safe_video_name,
-                extracted_frame_paths,
-                clip_duration_ms=clip_duration_ms,
-            )
-            overlay_png_bytes = self._encode_png_bytes(overlay_image)
-
-            overlay_output_path = job_dir / "frames_stub" / f"{Path(safe_video_name).stem}_overlay.png"
-            overlay_output_path.parent.mkdir(parents=True, exist_ok=True)
-            if not cv2.imwrite(str(overlay_output_path), overlay_image):
-                raise ApiError(
-                    500,
-                    "Failed to persist stub overlay image.",
-                    details={"overlay_output_path": str(overlay_output_path)},
-                )
-
-            processing_time_ms = (time.perf_counter() - started) * 1000.0
-
-            return {
-                "status": "stub_not_implemented",
-                "message": (
-                    "Video upload was accepted and sampled, but final multi-frame overlay "
-                    "fusion is still a stub response."
-                ),
-                "video_name": safe_video_name,
-                "input_video_path": str(resolved_video_path),
-                "processing_time_ms": round(processing_time_ms, 2),
-                "overlay_data_url": self._png_bytes_to_data_url(overlay_png_bytes),
-                "artifacts_dir": str(job_dir) if keep_artifacts else None,
-                "overlay_output_path": str(overlay_output_path) if keep_artifacts else None,
-                "metadata_output_path": None,
-                "frame_count": len(extracted_frame_paths),
-                "frame_sampling": {
-                    "sample_count": len(extracted_frame_paths),
-                    "requested_frame_count": requested_frame_count,
-                    "clip_duration_ms": clip_duration_ms,
-                },
-                "frame_timestamps_ms": frame_timestamps_ms,
-            }
         finally:
             if not keep_artifacts and job_dir.exists():
                 shutil.rmtree(job_dir, ignore_errors=True)
+
+    def _analyze_video_frames_job(
+        self,
+        resolved_video_path: Path,
+        extraction_dir: Path,
+        keep_artifacts: bool,
+        include_step_logs: bool,
+        requested_frame_count: int | None,
+        input_video_path: str,
+        video_name: str,
+    ) -> dict[str, Any]:
+        frames_config = self._load_frames_config()
+        sample_count = self._resolve_video_sample_count(
+            frames_config=frames_config,
+            requested_frame_count=requested_frame_count,
+        )
+        max_workers = min(sample_count, frames_config["max_workers"])
+
+        extracted_frame_paths = self._extract_sampled_frames(
+            resolved_video_path,
+            extraction_dir,
+            sample_count,
+        )
+
+        started = time.perf_counter()
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            future_results = list(
+                executor.map(
+                    lambda item: self._analyze_extracted_frame(item, keep_artifacts),
+                    extracted_frame_paths,
+                )
+            )
+        processing_time_ms = (time.perf_counter() - started) * 1000.0
+
+        frame_results = sorted(future_results, key=lambda item: item.frame_index)
+        averaged_metadata = self._average_metadata_tree(
+            [item.analysis.metadata for item in frame_results]
+        )
+        representative_frame = self._choose_representative_video_frame(frame_results)
+
+        return {
+            "video_name": video_name,
+            "video_path": str(resolved_video_path),
+            "input_video_path": input_video_path,
+            "processing_time_ms": round(processing_time_ms, 2),
+            "overlay_data_url": self._png_bytes_to_data_url(
+                representative_frame.analysis.overlay_png_bytes
+            ),
+            "overlay_output_path": representative_frame.analysis.overlay_output_path,
+            "metadata_output_path": representative_frame.analysis.metadata_output_path,
+            "frame_count": len(frame_results),
+            "frame_sampling": {
+                "sample_count": sample_count,
+                "max_workers": max_workers,
+                "requested_frame_count": requested_frame_count,
+            },
+            "selected_frame_index": representative_frame.frame_index,
+            "selected_timestamp_ms": round(representative_frame.timestamp_ms, 2),
+            "frames": [
+                item.to_dict(include_step_logs=include_step_logs) for item in frame_results
+            ],
+            "average_metadata": averaged_metadata,
+            "artifacts_dir": str(extraction_dir) if keep_artifacts else None,
+        }
+
+    def _resolve_video_sample_count(
+        self,
+        frames_config: dict[str, Any],
+        requested_frame_count: int | None,
+    ) -> int:
+        sample_count = (
+            requested_frame_count
+            if requested_frame_count is not None
+            else frames_config["sample_count"]
+        )
+        if not isinstance(sample_count, int) or not 1 <= sample_count <= 30:
+            raise ApiError(
+                400,
+                "Field 'frame_count' must be an integer between 1 and 30.",
+            )
+        return sample_count
+
+    def _choose_representative_video_frame(
+        self,
+        frame_results: list[FrameAnalysisResult],
+    ) -> FrameAnalysisResult:
+        if not frame_results:
+            raise ApiError(500, "Video analysis did not produce any frame results.")
+
+        return frame_results[len(frame_results) // 2]
 
     def _resolve_input_path(self, image_path: str | Path) -> Path:
         resolved = self._resolve_existing_path(image_path)

@@ -964,8 +964,8 @@
     ]
   },
   "timings_sec": {
-    "analysis_total": 2.8396331000258215,
-    "process_total": 4.509683999989647
+    "analysis_total": 2.132919199997559,
+    "process_total": 3.2814338999996835
   },
   "output_overlay_file": "data\\processed\\09_measure_canting_angle\\overlay\\IMG_0505.png",
   "output_comparison_file": "data\\processed\\09_measure_canting_angle\\comparison\\IMG_0505.png",

@@ -12214,8 +12214,8 @@
     ]
   },
   "timings_sec": {
-    "analysis_total": 0.8234361999784596,
-    "process_total": 2.036268900032155
+    "analysis_total": 0.8983875999983866,
+    "process_total": 3.103320599999279
   },
   "output_overlay_file": "data\\processed\\08_multi_validate_central_ruler\\overlay\\IMG_0510.png",
   "output_comparison_file": "data\\processed\\08_multi_validate_central_ruler\\comparison\\IMG_0510.png",

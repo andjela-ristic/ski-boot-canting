@@ -11,6 +11,8 @@ export function getAppElements() {
     readinessGuide: requireElement("readiness-guide"),
     readinessGuideBadge: requireElement("readiness-guide-badge"),
     readinessGuideDetail: requireElement("readiness-guide-detail"),
+    guideScale: requireElement("guide-scale"),
+    guideScaleValue: requireElement("guide-scale-value"),
     previewPlaceholder: requireElement("preview-placeholder"),
     recordButton: requireElement("record-button"),
     toggleCamera: requireElement("toggle-camera"),

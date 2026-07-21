@@ -38,6 +38,24 @@
     </div>
   </div>
 
+  <div class="guide-controls">
+    <label class="guide-scale-field" for="guide-scale">
+      <span>Guide size</span>
+      <input
+        id="guide-scale"
+        type="range"
+        min="0.75"
+        max="1.20"
+        step="0.05"
+        value="1"
+      />
+    </label>
+    <p class="guide-scale-value" id="guide-scale-value">100%</p>
+  </div>
+  <p class="guide-scale-caption">
+    Smaller keeps the frame tighter. Larger allows more distance while keeping the center fixed.
+  </p>
+
   <div class="action-row">
     <button class="primary-button" id="record-button" type="button">
       Quick 2-second capture

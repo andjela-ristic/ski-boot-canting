@@ -3,6 +3,7 @@ const STORAGE_KEYS = {
   keepArtifacts: "canting.keepArtifacts",
   frameCount: "canting.frameCount",
   clipDurationMs: "canting.clipDurationMs",
+  guideScale: "canting.guideScale",
 };
 
 export function createAppState() {
@@ -41,6 +42,11 @@ export function hydrateForm(elements) {
   if (clipDuration) {
     elements.clipDuration.value = clipDuration;
   }
+
+  const guideScale = window.localStorage.getItem(STORAGE_KEYS.guideScale);
+  if (guideScale) {
+    elements.guideScale.value = guideScale;
+  }
 }
 
 export function persistForm(elements) {
@@ -54,6 +60,7 @@ export function persistForm(elements) {
     STORAGE_KEYS.clipDurationMs,
     String(getClipDurationMs(elements)),
   );
+  window.localStorage.setItem(STORAGE_KEYS.guideScale, String(getGuideScale(elements)));
 }
 
 export function deriveDefaultBaseUrl() {
@@ -86,4 +93,12 @@ export function getClipDurationMs(elements) {
     return 2000;
   }
   return Math.min(10000, Math.max(500, parsed));
+}
+
+export function getGuideScale(elements) {
+  const parsed = Number.parseFloat(elements.guideScale.value);
+  if (!Number.isFinite(parsed)) {
+    return 1;
+  }
+  return Math.min(1.2, Math.max(0.75, parsed));
 }

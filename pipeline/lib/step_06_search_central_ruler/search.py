@@ -17,6 +17,7 @@ from .calculations import (
 from .metrics import (
     apply_mirror_symmetry,
     evaluate_candidate,
+    prepare_mirror_symmetry_context,
     summarize_candidate_from_support,
 )
 from .sorting import (
@@ -1109,8 +1110,14 @@ def search_best_candidate(
         max_candidates=min(mirror_pool_limit, len(final_candidate_pool)),
         sort_key=candidate_ranking_key,
     )
+    mirror_context = prepare_mirror_symmetry_context(edge_image, roi_profile)
     mirror_scored = [
-        apply_mirror_symmetry(candidate, edge_image, roi_profile)
+        apply_mirror_symmetry(
+            candidate,
+            edge_image,
+            roi_profile,
+            mirror_context=mirror_context,
+        )
         for candidate in mirror_pool
     ]
     mirror_scored = sort_candidates(mirror_scored, sort_key=candidate_ranking_key)

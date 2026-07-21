@@ -3,6 +3,7 @@ import { extractString, fallbackBasename } from "../utils/format.js";
 export async function checkCaptureReadiness(options) {
   const formData = new FormData();
   formData.set("frame", options.frame, options.frame.name || "preview.jpg");
+  formData.set("guide_scale", String(options.guideScale || 1));
 
   const response = await fetch(`${options.baseUrl}/capture-readiness`, {
     method: "POST",

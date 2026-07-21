@@ -135,6 +135,7 @@ class CantingApiHandler(BaseHTTPRequestHandler):
                 result = self.runner.analyze_capture_readiness_frame(
                     frame_bytes=readiness_request.frame_bytes,
                     include_debug=readiness_request.include_debug,
+                    guide_scale=readiness_request.guide_scale,
                 )
                 self._write_json(HTTPStatus.OK, result)
                 return
@@ -142,12 +143,12 @@ class CantingApiHandler(BaseHTTPRequestHandler):
             content_type = (self.headers.get("Content-Type", "") or "").lower()
             if content_type.startswith("multipart/form-data"):
                 upload_request = self._read_uploaded_frames_request()
-                result = self.runner.analyze_uploaded_video_stub(
+                result = self.runner.analyze_uploaded_video(
                     video_bytes=upload_request.video_bytes,
                     video_filename=upload_request.video_filename,
                     keep_artifacts=upload_request.keep_artifacts,
+                    include_step_logs=upload_request.include_step_logs,
                     requested_frame_count=upload_request.frame_count,
-                    clip_duration_ms=upload_request.clip_duration_ms,
                 )
                 self._write_json(HTTPStatus.OK, result)
                 return
@@ -308,6 +309,13 @@ class CantingApiHandler(BaseHTTPRequestHandler):
             frame_filename=filename or "preview.jpg",
             frame_bytes=frame_bytes,
             include_debug=self._parse_query_bool("debug", default=False),
+            guide_scale=self._parse_form_float(
+                form,
+                "guide_scale",
+                default=1.0,
+                minimum=0.75,
+                maximum=1.20,
+            ),
         )
 
     def _parse_form_bool(self, form: cgi.FieldStorage, field_name: str, default: bool) -> bool:
@@ -357,6 +365,29 @@ class CantingApiHandler(BaseHTTPRequestHandler):
         if value is None:
             return None
         return str(value)
+
+    def _parse_form_float(
+        self,
+        form: cgi.FieldStorage,
+        field_name: str,
+        default: float,
+        minimum: float | None = None,
+        maximum: float | None = None,
+    ) -> float:
+        value = self._extract_form_value(form, field_name)
+        if value is None or value == "":
+            return default
+
+        try:
+            parsed = float(value)
+        except ValueError as exc:
+            raise ValueError(f"Multipart field '{field_name}' must be a number.") from exc
+
+        if minimum is not None and parsed < minimum:
+            raise ValueError(f"Multipart field '{field_name}' must be >= {minimum}.")
+        if maximum is not None and parsed > maximum:
+            raise ValueError(f"Multipart field '{field_name}' must be <= {maximum}.")
+        return parsed
 
     def _parse_query_bool(self, field_name: str, default: bool) -> bool:
         query = parse_qs(urlparse(self.path).query, keep_blank_values=True)

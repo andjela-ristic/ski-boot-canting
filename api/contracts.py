@@ -95,6 +95,7 @@ class UploadedCaptureReadinessRequest:
     frame_filename: str
     frame_bytes: bytes
     include_debug: bool = False
+    guide_scale: float = 1.0
 
 
 @dataclass(slots=True)
