@@ -1,0 +1,12 @@
+.git
+.gitignore
+.venv
+.vscode
+.agents
+.codex
+__pycache__
+*.pyc
+api/.runtime
+data
+research
+scripts

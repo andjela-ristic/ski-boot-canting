@@ -14,10 +14,56 @@ Each request runs inside its own temporary workspace under `api/.runtime/jobs/..
 
 ## Start
 
-Use any Python interpreter that already has the pipeline dependencies installed (`opencv-python`, `numpy`, `PyYAML`):
+Install dependencies first:
+
+```powershell
+python -m pip install -r requirements.txt
+```
+
+Then start the API:
 
 ```powershell
 python -m api --host 127.0.0.1 --port 8000
+```
+
+If `python` is not on `PATH`, run the same command with the full interpreter path.
+
+## Docker
+
+Build:
+
+```powershell
+docker build -t ski-boot-canting-api .
+```
+
+Run:
+
+```powershell
+docker run --rm -p 8000:8000 -v "${PWD}:/app-host" ski-boot-canting-api
+```
+
+Then call the API with an image path visible inside the container, for example `/app-host/data/working_png/IMG_0502.png`.
+
+## Docker Compose
+
+Start:
+
+```powershell
+docker compose up --build
+```
+
+Compose mounts `./data` into the container as `/app/data`, so the same relative request path still works:
+
+```json
+{
+  "image_path": "data/working_png/IMG_0502.png"
+}
+```
+
+Stop:
+
+```powershell
+docker compose down
 ```
 
 ## Endpoints

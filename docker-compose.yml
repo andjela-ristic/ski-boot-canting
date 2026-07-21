@@ -1,0 +1,12 @@
+services:
+  canting-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ski-boot-canting-api
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data:ro
+      - ./api/.runtime:/app/api/.runtime
+    restart: unless-stopped
