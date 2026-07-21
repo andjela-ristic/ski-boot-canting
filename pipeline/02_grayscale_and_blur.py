@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 from pathlib import Path
+import argparse
 import csv
 
 import cv2
@@ -23,67 +26,71 @@ if bool(STEP_CONFIG.get("inherit_step_01_output", True)):
     INPUT_DIR = PROCESSED_DIR / STEP_01_CONFIG["output_subdir"]
 else:
     INPUT_DIR = PROCESSED_DIR / STEP_CONFIG["input_subdir"]
+
 OUTPUT_DIR = PROCESSED_DIR / STEP_CONFIG["output_subdir"]
 
-GRAYSCALE_DIR = OUTPUT_DIR / "grayscale"
-GRAYSCALE_METHOD_DIRS = {
-    "bgr2gray": OUTPUT_DIR / "grayscale_bgr2gray",
-    "lab_l": OUTPUT_DIR / "grayscale_lab_l",
-    "ycrcb_y": OUTPUT_DIR / "grayscale_ycrcb_y",
-}
-GAUSSIAN_DIR = OUTPUT_DIR / "gaussian_blur"
+# Active outputs.
+# - Step 03 reads grayscale_lab_l.
+# - The API pipeline runner currently validates that bilateral_filter exists.
+GRAYSCALE_LAB_L_DIR = OUTPUT_DIR / "grayscale_lab_l"
 BILATERAL_DIR = OUTPUT_DIR / "bilateral_filter"
 
+# Disabled outputs: they are not consumed by the current pipeline.
+# GRAYSCALE_DIR = OUTPUT_DIR / "grayscale"
+# GRAYSCALE_BGR2GRAY_DIR = OUTPUT_DIR / "grayscale_bgr2gray"
+# GRAYSCALE_YCRCB_Y_DIR = OUTPUT_DIR / "grayscale_ycrcb_y"
+# GAUSSIAN_DIR = OUTPUT_DIR / "gaussian_blur"
+
 CSV_PATH = METADATA_DIR / "processing_02_grayscale_and_blur.csv"
+
+# PNG remains lossless. Compression level 1 reduces CPU time at the cost of
+# somewhat larger intermediate files.
+PNG_WRITE_PARAMS = [cv2.IMWRITE_PNG_COMPRESSION, 1]
 
 
 def collect_images() -> list[Path]:
     allowed_extensions = {".png", ".jpg", ".jpeg"}
 
-    image_paths = [
+    if not INPUT_DIR.exists():
+        return []
+
+    return sorted(
         path
         for path in INPUT_DIR.iterdir()
         if path.is_file() and path.suffix.lower() in allowed_extensions
-    ]
-
-    return sorted(image_paths)
+    )
 
 
 def resize_for_display(image: np.ndarray) -> np.ndarray:
     max_height = int(DISPLAY_CONFIG["max_height"])
-
     height, width = image.shape[:2]
 
     if height <= max_height:
         return image
 
     scale = max_height / height
-    new_width = int(width * scale)
-    new_height = int(height * scale)
-
-    return cv2.resize(image, (new_width, new_height), interpolation=cv2.INTER_AREA)
+    new_size = (int(width * scale), int(height * scale))
+    return cv2.resize(image, new_size, interpolation=cv2.INTER_AREA)
 
 
 def to_bgr_for_display(image: np.ndarray) -> np.ndarray:
-    if len(image.shape) == 2:
+    if image.ndim == 2:
         return cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
-
     return image
 
 
 def add_label(image: np.ndarray, label: str) -> np.ndarray:
-    image = image.copy()
+    labeled = image.copy()
 
     cv2.rectangle(
-        image,
+        labeled,
         (0, 0),
-        (image.shape[1], 45),
+        (labeled.shape[1], 45),
         (0, 0, 0),
         thickness=-1,
     )
-
     cv2.putText(
-        image,
+        labeled,
         label,
         (15, 30),
         cv2.FONT_HERSHEY_SIMPLEX,
@@ -93,166 +100,120 @@ def add_label(image: np.ndarray, label: str) -> np.ndarray:
         cv2.LINE_AA,
     )
 
-    return image
+    return labeled
 
 
 def make_comparison_view(
     original_bgr: np.ndarray,
-    grayscale: np.ndarray,
-    gaussian: np.ndarray,
+    grayscale_lab_l: np.ndarray,
     bilateral: np.ndarray,
 ) -> np.ndarray:
-    original_display = resize_for_display(original_bgr)
-    grayscale_display = resize_for_display(to_bgr_for_display(grayscale))
-    gaussian_display = resize_for_display(to_bgr_for_display(gaussian))
-    bilateral_display = resize_for_display(to_bgr_for_display(bilateral))
-
-    target_height = min(
-        original_display.shape[0],
-        grayscale_display.shape[0],
-        gaussian_display.shape[0],
-        bilateral_display.shape[0],
-    )
-
     images = [
-        original_display,
-        grayscale_display,
-        gaussian_display,
-        bilateral_display,
+        resize_for_display(original_bgr),
+        resize_for_display(to_bgr_for_display(grayscale_lab_l)),
+        resize_for_display(to_bgr_for_display(bilateral)),
     ]
 
-    resized_images = []
+    target_height = min(image.shape[0] for image in images)
+    resized_images: list[np.ndarray] = []
 
     for image in images:
         height, width = image.shape[:2]
+
+        if height == target_height:
+            resized_images.append(image)
+            continue
+
         new_width = int(width * target_height / height)
-
-        resized = cv2.resize(
-            image,
-            (new_width, target_height),
-            interpolation=cv2.INTER_AREA,
+        resized_images.append(
+            cv2.resize(
+                image,
+                (new_width, target_height),
+                interpolation=cv2.INTER_AREA,
+            )
         )
-
-        resized_images.append(resized)
-
-    grayscale_method = get_grayscale_method()
 
     labeled_images = [
         add_label(resized_images[0], "01 normalized"),
-        add_label(resized_images[1], f"grayscale: {grayscale_method}"),
-        add_label(resized_images[2], "gaussian blur"),
-        add_label(resized_images[3], "bilateral filter"),
+        add_label(resized_images[1], "grayscale: lab_l"),
+        add_label(resized_images[2], "bilateral filter"),
     ]
 
     separator = np.full((target_height, 10, 3), 255, dtype=np.uint8)
-
-    combined = labeled_images[0]
-
-    for image in labeled_images[1:]:
-        combined = np.hstack([combined, separator, image])
-
-    return combined
-
-
-def ensure_odd_kernel_size(value: int) -> int:
-    if value < 1:
-        raise ValueError(f"Kernel size must be positive. Got: {value}")
-
-    if value % 2 == 0:
-        raise ValueError(f"Kernel size must be odd. Got: {value}")
-
-    return value
-
-
-def get_grayscale_method() -> str:
-    grayscale_config = STEP_CONFIG.get("grayscale", {})
-    method = grayscale_config.get("method", "bgr2gray")
-
-    return str(method).strip().lower()
-
-
-def convert_to_grayscale(image_bgr: np.ndarray, method: str) -> np.ndarray:
-    """
-    Supported methods:
-
-    bgr2gray:
-        Standard OpenCV luminance-weighted grayscale conversion.
-        This is NOT a simple RGB average.
-
-    lab_l:
-        Uses the L channel from LAB color space.
-        Good for geometry/edge detection because it isolates luminance.
-
-    ycrcb_y:
-        Uses the Y channel from YCrCb color space.
-        Another luminance-based alternative.
-    """
-
-    if method == "bgr2gray":
-        return cv2.cvtColor(image_bgr, cv2.COLOR_BGR2GRAY)
-
-    if method == "lab_l":
-        lab = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2LAB)
-        l_channel, _, _ = cv2.split(lab)
-        return l_channel
-
-    if method == "ycrcb_y":
-        ycrcb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2YCrCb)
-        y_channel, _, _ = cv2.split(ycrcb)
-        return y_channel
-
-    raise ValueError(
-        "Unsupported grayscale method: "
-        f"{method}. Supported: bgr2gray, lab_l, ycrcb_y"
+    return np.hstack(
+        [
+            labeled_images[0],
+            separator,
+            labeled_images[1],
+            separator,
+            labeled_images[2],
+        ]
     )
 
 
-def process_image(image_bgr: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    grayscale_method = get_grayscale_method()
-    grayscale = convert_to_grayscale(image_bgr, grayscale_method)
+def convert_to_lab_l(image_bgr: np.ndarray) -> np.ndarray:
+    """Convert BGR to the LAB L channel without allocating all split channels."""
+    lab = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2LAB)
+    grayscale_lab_l = cv2.extractChannel(lab, 0)
+    del lab
+    return grayscale_lab_l
 
-    gaussian_config = STEP_CONFIG["gaussian_blur"]
-    gaussian_kernel_size = ensure_odd_kernel_size(
-        int(gaussian_config["kernel_size"])
-    )
-    gaussian_sigma_x = float(gaussian_config["sigma_x"])
 
-    gaussian = cv2.GaussianBlur(
-        grayscale,
-        (gaussian_kernel_size, gaussian_kernel_size),
-        gaussian_sigma_x,
-    )
+# Disabled conversions: the current pipeline does not consume these outputs.
+#
+# def convert_to_bgr2gray(image_bgr: np.ndarray) -> np.ndarray:
+#     return cv2.cvtColor(image_bgr, cv2.COLOR_BGR2GRAY)
+#
+#
+# def convert_to_ycrcb_y(image_bgr: np.ndarray) -> np.ndarray:
+#     ycrcb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2YCrCb)
+#     y_channel = cv2.extractChannel(ycrcb, 0)
+#     del ycrcb
+#     return y_channel
 
+
+def build_bilateral(image_bgr: np.ndarray) -> np.ndarray:
+    """Preserve the existing bilateral output semantics: filter BGR2GRAY."""
     bilateral_config = STEP_CONFIG["bilateral_filter"]
-    bilateral_diameter = int(bilateral_config["diameter"])
-    bilateral_sigma_color = float(bilateral_config["sigma_color"])
-    bilateral_sigma_space = float(bilateral_config["sigma_space"])
 
+    grayscale_bgr2gray = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2GRAY)
     bilateral = cv2.bilateralFilter(
-        grayscale,
-        bilateral_diameter,
-        bilateral_sigma_color,
-        bilateral_sigma_space,
+        grayscale_bgr2gray,
+        int(bilateral_config["diameter"]),
+        float(bilateral_config["sigma_color"]),
+        float(bilateral_config["sigma_space"]),
     )
+    del grayscale_bgr2gray
 
-    return grayscale, gaussian, bilateral
-
-
-def build_all_grayscale_variants(image_bgr: np.ndarray) -> dict[str, np.ndarray]:
-    grayscale_variants = {}
-
-    for method in GRAYSCALE_METHOD_DIRS:
-        grayscale_variants[method] = convert_to_grayscale(image_bgr, method)
-
-    return grayscale_variants
+    return bilateral
 
 
-def save_metadata(rows: list[dict]) -> None:
+# Disabled Gaussian processing: Step 03 currently reads grayscale_lab_l directly.
+#
+# def build_gaussian(grayscale: np.ndarray) -> np.ndarray:
+#     gaussian_config = STEP_CONFIG["gaussian_blur"]
+#     kernel_size = int(gaussian_config["kernel_size"])
+#     sigma_x = float(gaussian_config["sigma_x"])
+#     return cv2.GaussianBlur(
+#         grayscale,
+#         (kernel_size, kernel_size),
+#         sigma_x,
+#     )
+
+
+def write_image(path: Path, image: np.ndarray) -> None:
+    if not cv2.imwrite(str(path), image, PNG_WRITE_PARAMS):
+        raise RuntimeError(f"Could not write image: {path}")
+
+
+def save_metadata(rows: list[dict[str, object]]) -> None:
     if not rows:
         return
 
     METADATA_DIR.mkdir(parents=True, exist_ok=True)
 
+    # Keep the previous CSV schema for compatibility. Disabled output columns
+    # are intentionally written as empty strings.
     fieldnames = [
         "source_file",
         "grayscale_file",
@@ -272,23 +233,38 @@ def save_metadata(rows: list[dict]) -> None:
         "bilateral_sigma_space",
     ]
 
-    with open(CSV_PATH, "w", newline="", encoding="utf-8") as file:
+    with CSV_PATH.open("w", newline="", encoding="utf-8") as file:
         writer = csv.DictWriter(file, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(rows)
 
 
-def main() -> None:
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Run Step 02 grayscale and blur processing."
+    )
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Show comparison windows while processing images.",
+    )
+    return parser.parse_args()
+
+
+def main(debug: bool = False) -> None:
     if not STEP_CONFIG["enabled"]:
         print("Step 02 is disabled in config.")
         return
 
-    GRAYSCALE_DIR.mkdir(parents=True, exist_ok=True)
-    for grayscale_dir in GRAYSCALE_METHOD_DIRS.values():
-        grayscale_dir.mkdir(parents=True, exist_ok=True)
-    GAUSSIAN_DIR.mkdir(parents=True, exist_ok=True)
+    GRAYSCALE_LAB_L_DIR.mkdir(parents=True, exist_ok=True)
     BILATERAL_DIR.mkdir(parents=True, exist_ok=True)
     METADATA_DIR.mkdir(parents=True, exist_ok=True)
+
+    # Disabled directories are intentionally not created.
+    # GRAYSCALE_DIR.mkdir(parents=True, exist_ok=True)
+    # GRAYSCALE_BGR2GRAY_DIR.mkdir(parents=True, exist_ok=True)
+    # GRAYSCALE_YCRCB_Y_DIR.mkdir(parents=True, exist_ok=True)
+    # GAUSSIAN_DIR.mkdir(parents=True, exist_ok=True)
 
     image_paths = collect_images()
 
@@ -296,129 +272,101 @@ def main() -> None:
         print(f"No images found in: {INPUT_DIR}")
         return
 
-    grayscale_method = get_grayscale_method()
-
-    gaussian_config = STEP_CONFIG["gaussian_blur"]
     bilateral_config = STEP_CONFIG["bilateral_filter"]
-
-    gaussian_kernel_size = ensure_odd_kernel_size(
-        int(gaussian_config["kernel_size"])
-    )
-    gaussian_sigma_x = float(gaussian_config["sigma_x"])
-
-    bilateral_diameter = int(bilateral_config["diameter"])
-    bilateral_sigma_color = float(bilateral_config["sigma_color"])
-    bilateral_sigma_space = float(bilateral_config["sigma_space"])
-
-    metadata_rows = []
+    metadata_rows: list[dict[str, object]] = []
+    show_windows = debug
+    wait_between_images = bool(DISPLAY_CONFIG.get("wait_between_images", False))
 
     print()
-    print("Processing step 02: grayscale and blur")
+    print("Processing step 02: active grayscale and blur outputs")
     print(f"Input:  {INPUT_DIR}")
     print(f"Output: {OUTPUT_DIR}")
-    print(f"Grayscale method: {grayscale_method}")
-    print()
-    print("Controls:")
-    print("  n / SPACE / ENTER  -> next image")
-    print("  q / ESC            -> quit")
-    print()
+    print("Active outputs: grayscale_lab_l, bilateral_filter")
+
+    if show_windows:
+        print()
+        print("Controls:")
+        print("  n / SPACE / ENTER  -> next image")
+        print("  q / ESC            -> quit")
 
     for index, image_path in enumerate(image_paths, start=1):
-        image_bgr = cv2.imread(str(image_path))
+        image_bgr = cv2.imread(str(image_path), cv2.IMREAD_COLOR)
 
         if image_bgr is None:
             print(f"Could not read image: {image_path}")
             continue
 
-        grayscale_variants = build_all_grayscale_variants(image_bgr)
-        grayscale, gaussian, bilateral = process_image(image_bgr)
-
-        grayscale_output_path = GRAYSCALE_DIR / image_path.name
-        grayscale_variant_paths = {
-            method: output_dir / image_path.name
-            for method, output_dir in GRAYSCALE_METHOD_DIRS.items()
-        }
-        gaussian_output_path = GAUSSIAN_DIR / image_path.name
-        bilateral_output_path = BILATERAL_DIR / image_path.name
-
-        cv2.imwrite(str(grayscale_output_path), grayscale)
-        for method, output_path in grayscale_variant_paths.items():
-            cv2.imwrite(str(output_path), grayscale_variants[method])
-        cv2.imwrite(str(gaussian_output_path), gaussian)
-        cv2.imwrite(str(bilateral_output_path), bilateral)
-
         height, width = image_bgr.shape[:2]
 
-        metadata_rows.append({
-            "source_file": str(image_path.relative_to(PROJECT_ROOT)),
-            "grayscale_file": str(grayscale_output_path.relative_to(PROJECT_ROOT)),
-            "grayscale_bgr2gray_file": str(
-                grayscale_variant_paths["bgr2gray"].relative_to(PROJECT_ROOT)
-            ),
-            "grayscale_lab_l_file": str(
-                grayscale_variant_paths["lab_l"].relative_to(PROJECT_ROOT)
-            ),
-            "grayscale_ycrcb_y_file": str(
-                grayscale_variant_paths["ycrcb_y"].relative_to(PROJECT_ROOT)
-            ),
-            "gaussian_file": str(gaussian_output_path.relative_to(PROJECT_ROOT)),
-            "bilateral_file": str(bilateral_output_path.relative_to(PROJECT_ROOT)),
-            "width": width,
-            "height": height,
-            "processing_step": "02_grayscale_and_blur",
-            "grayscale_method": grayscale_method,
-            "gaussian_kernel_size": gaussian_kernel_size,
-            "gaussian_sigma_x": gaussian_sigma_x,
-            "bilateral_diameter": bilateral_diameter,
-            "bilateral_sigma_color": bilateral_sigma_color,
-            "bilateral_sigma_space": bilateral_sigma_space,
-        })
+        grayscale_lab_l = convert_to_lab_l(image_bgr)
+        grayscale_lab_l_path = GRAYSCALE_LAB_L_DIR / image_path.name
+        write_image(grayscale_lab_l_path, grayscale_lab_l)
+
+        bilateral = build_bilateral(image_bgr)
+        bilateral_path = BILATERAL_DIR / image_path.name
+        write_image(bilateral_path, bilateral)
+
+        metadata_rows.append(
+            {
+                "source_file": str(image_path.relative_to(PROJECT_ROOT)),
+                "grayscale_file": "",
+                "grayscale_bgr2gray_file": "",
+                "grayscale_lab_l_file": str(
+                    grayscale_lab_l_path.relative_to(PROJECT_ROOT)
+                ),
+                "grayscale_ycrcb_y_file": "",
+                "gaussian_file": "",
+                "bilateral_file": str(bilateral_path.relative_to(PROJECT_ROOT)),
+                "width": width,
+                "height": height,
+                "processing_step": "02_grayscale_and_blur",
+                "grayscale_method": "lab_l",
+                "gaussian_kernel_size": "",
+                "gaussian_sigma_x": "",
+                "bilateral_diameter": int(bilateral_config["diameter"]),
+                "bilateral_sigma_color": float(bilateral_config["sigma_color"]),
+                "bilateral_sigma_space": float(bilateral_config["sigma_space"]),
+            }
+        )
 
         print(f"[{index}/{len(image_paths)}] Saved: {image_path.name}")
 
-        if DISPLAY_CONFIG["show_windows"]:
+        if show_windows:
             comparison = make_comparison_view(
                 image_bgr,
-                grayscale,
-                gaussian,
+                grayscale_lab_l,
                 bilateral,
             )
-
             title = (
-                f"02 Grayscale and blur | "
-                f"{index}/{len(image_paths)} | "
-                f"{image_path.name} | "
-                f"{grayscale_method}"
+                "02 Grayscale and blur | "
+                f"{index}/{len(image_paths)} | {image_path.name}"
             )
 
             cv2.imshow(title, comparison)
-
-            if DISPLAY_CONFIG["wait_between_images"]:
-                key = cv2.waitKey(0) & 0xFF
-            else:
-                key = cv2.waitKey(500) & 0xFF
-
+            key = cv2.waitKey(0 if wait_between_images else 500) & 0xFF
             cv2.destroyWindow(title)
 
-            if key in [ord("q"), 27]:
+            del comparison
+
+            if key in (ord("q"), 27):
                 print("Stopped by user.")
+                del grayscale_lab_l, bilateral, image_bgr
                 break
 
-    save_metadata(metadata_rows)
+        # Release full-resolution arrays before reading the next image.
+        del grayscale_lab_l, bilateral, image_bgr
 
-    cv2.destroyAllWindows()
+    save_metadata(metadata_rows)
+    if show_windows:
+        cv2.destroyAllWindows()
 
     print()
     print("Done.")
-    print(f"Grayscale method: {grayscale_method}")
-    print(f"Grayscale saved to: {GRAYSCALE_DIR}")
-    print(f"Grayscale bgr2gray saved to: {GRAYSCALE_METHOD_DIRS['bgr2gray']}")
-    print(f"Grayscale lab_l saved to: {GRAYSCALE_METHOD_DIRS['lab_l']}")
-    print(f"Grayscale ycrcb_y saved to: {GRAYSCALE_METHOD_DIRS['ycrcb_y']}")
-    print(f"Gaussian blur saved to: {GAUSSIAN_DIR}")
+    print(f"Grayscale LAB L saved to: {GRAYSCALE_LAB_L_DIR}")
     print(f"Bilateral filter saved to: {BILATERAL_DIR}")
     print(f"Metadata saved to: {CSV_PATH}")
 
 
 if __name__ == "__main__":
-    main()
+    args = parse_args()
+    main(debug=args.debug)

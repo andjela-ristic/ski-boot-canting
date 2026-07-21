@@ -14,7 +14,7 @@ api:
   frames:
     sample_count: 6
     max_workers: 3
-    
+
 step_01_illumination_normalization:
   enabled: true
   method: LAB_CLAHE

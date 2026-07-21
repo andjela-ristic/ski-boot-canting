@@ -1,4 +1,6 @@
 from pathlib import Path
+from time import perf_counter
+import argparse
 import csv
 
 import cv2
@@ -21,79 +23,107 @@ METADATA_DIR = PROJECT_ROOT / PATHS_CONFIG["metadata_dir"]
 
 CSV_PATH = METADATA_DIR / "processing_01_illumination_normalization.csv"
 
+CLAHE_CONFIG = STEP_CONFIG["clahe"]
+CLAHE_CLIP_LIMIT = float(CLAHE_CONFIG["clip_limit"])
+CLAHE_TILE_GRID_SIZE = tuple(int(value) for value in CLAHE_CONFIG["tile_grid_size"])
+CLAHE_TILE_GRID_SIZE_LABEL = (
+    f"{CLAHE_TILE_GRID_SIZE[0]}x{CLAHE_TILE_GRID_SIZE[1]}"
+)
 
-def normalize_illumination_bgr(image_bgr: np.ndarray) -> np.ndarray:
+# 0 is fastest and produces larger PNG files. Decoded pixels remain identical.
+PNG_COMPRESSION = max(0, min(9, int(STEP_CONFIG.get("png_compression", 0))))
+
+# OpenCV normally enables optimized kernels by default, but make the intent explicit.
+cv2.setUseOptimized(True)
+
+# Reuse one CLAHE instance instead of rebuilding it for every image.
+CLAHE = cv2.createCLAHE(
+    clipLimit=CLAHE_CLIP_LIMIT,
+    tileGridSize=CLAHE_TILE_GRID_SIZE,
+)
+
+
+def normalize_illumination_bgr(
+    image_bgr: np.ndarray,
+    *,
+    preserve_input: bool = False,
+) -> np.ndarray:
+    """
+    Normalize the LAB lightness channel with minimal temporary allocations.
+
+    When preserve_input is False, image_bgr is reused as the destination buffer.
+    This lowers peak memory without changing the returned pixel values.
+    """
     lab = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2LAB)
 
-    l_channel, a_channel, b_channel = cv2.split(lab)
+    # Extract only L. Unlike cv2.split, this does not allocate copies of A and B.
+    l_channel = cv2.extractChannel(lab, 0)
 
-    clahe_config = STEP_CONFIG["clahe"]
+    # CLAHE supports an explicit destination; reuse the L-channel allocation.
+    CLAHE.apply(l_channel, l_channel)
 
-    clip_limit = float(clahe_config["clip_limit"])
-    tile_grid_size = tuple(clahe_config["tile_grid_size"])
+    # Replace only the normalized L channel in the existing LAB image.
+    cv2.insertChannel(l_channel, lab, 0)
 
-    clahe = cv2.createCLAHE(
-        clipLimit=clip_limit,
-        tileGridSize=tile_grid_size
-    )
+    if preserve_input:
+        return cv2.cvtColor(lab, cv2.COLOR_LAB2BGR)
 
-    normalized_l = clahe.apply(l_channel)
+    # The original image is no longer needed in production mode, so reuse it.
+    cv2.cvtColor(lab, cv2.COLOR_LAB2BGR, dst=image_bgr)
+    return image_bgr
 
-    normalized_lab = cv2.merge(
-        [normalized_l, a_channel, b_channel]
-    )
-
-    normalized_bgr = cv2.cvtColor(normalized_lab, cv2.COLOR_LAB2BGR)
-
-    return normalized_bgr
 
 def resize_for_display(image: np.ndarray) -> np.ndarray:
     max_height = int(DISPLAY_CONFIG["max_height"])
-
     height, width = image.shape[:2]
 
     if height <= max_height:
         return image
 
     scale = max_height / height
-    new_width = int(width * scale)
-    new_height = int(height * scale)
+    return cv2.resize(
+        image,
+        (round(width * scale), max_height),
+        interpolation=cv2.INTER_AREA,
+    )
 
-    return cv2.resize(image, (new_width, new_height), interpolation=cv2.INTER_AREA)
 
 def make_side_by_side(original: np.ndarray, processed: np.ndarray) -> np.ndarray:
+    # Both images have identical source dimensions, so one resize per image is enough.
     original_display = resize_for_display(original)
     processed_display = resize_for_display(processed)
 
-    height = min(original_display.shape[0], processed_display.shape[0])
-
-    original_display = cv2.resize(
-        original_display,
-        (int(original_display.shape[1] * height / original_display.shape[0]), height)
+    separator = np.full(
+        (original_display.shape[0], 10, 3),
+        255,
+        dtype=np.uint8,
     )
 
-    processed_display = cv2.resize(
-        processed_display,
-        (int(processed_display.shape[1] * height / processed_display.shape[0]), height)
+    return np.concatenate(
+        (original_display, separator, processed_display),
+        axis=1,
     )
-
-    separator = np.full((height, 10, 3), 255, dtype=np.uint8)
-
-    combined = np.hstack([original_display, separator, processed_display])
-
-    return combined
 
 
 def collect_images() -> list[Path]:
     allowed_extensions = {".png", ".jpg", ".jpeg"}
 
-    image_paths = [
+    return sorted(
         path
         for path in INPUT_DIR.iterdir()
         if path.is_file() and path.suffix.lower() in allowed_extensions
-    ]
+    )
 
-    return sorted(image_paths)
+
+def save_processed_image(output_path: Path, image: np.ndarray) -> None:
+    params: list[int] = []
+
+    if output_path.suffix.lower() == ".png":
+        params = [cv2.IMWRITE_PNG_COMPRESSION, PNG_COMPRESSION]
+
+    saved = cv2.imwrite(str(output_path), image, params)
+    if not saved:
+        raise OSError(f"Could not write image: {output_path}")
 
 
 def save_metadata(rows: list[dict]) -> None:
@@ -111,6 +141,10 @@ def save_metadata(rows: list[dict]) -> None:
         "method",
         "clahe_clip_limit",
         "clahe_tile_grid_size",
+        "read_time_ms",
+        "processing_time_ms",
+        "write_time_ms",
+        "total_time_ms",
     ]
 
     with open(CSV_PATH, "w", newline="", encoding="utf-8") as file:
@@ -119,7 +153,19 @@ def save_metadata(rows: list[dict]) -> None:
         writer.writerows(rows)
 
 
-def main() -> None:
+def parse_arguments() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Normalize image illumination using CLAHE."
+    )
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Show original and processed images in OpenCV windows.",
+    )
+    return parser.parse_args()
+
+
+def main(*, debug: bool = False) -> None:
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     METADATA_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -129,35 +175,49 @@ def main() -> None:
         print(f"No images found in: {INPUT_DIR}")
         return
 
-    metadata_rows = []
+    show_windows = debug
+    wait_between_images = bool(DISPLAY_CONFIG.get("wait_between_images", True))
+    image_count = len(image_paths)
+    metadata_rows: list[dict] = []
 
     print()
     print("Processing step 01: illumination normalization")
     print(f"Input:  {INPUT_DIR}")
     print(f"Output: {OUTPUT_DIR}")
-    print()
-    print("Controls:")
-    print("  n / SPACE / ENTER  -> next image")
-    print("  q / ESC            -> quit")
-    print()
-    clahe_config = STEP_CONFIG["clahe"]
-    clip_limit = float(clahe_config["clip_limit"])
-    tile_grid_size = tuple(clahe_config["tile_grid_size"])
-    tile_grid_size_label = f"{tile_grid_size[0]}x{tile_grid_size[1]}"
+    print(f"PNG compression: {PNG_COMPRESSION}")
+
+    if show_windows:
+        print()
+        print("Controls:")
+        print("  n / SPACE / ENTER  -> next image")
+        print("  q / ESC            -> quit")
 
     for index, image_path in enumerate(image_paths, start=1):
-        image_bgr = cv2.imread(str(image_path))
+        total_started = perf_counter()
+
+        read_started = perf_counter()
+        image_bgr = cv2.imread(str(image_path), cv2.IMREAD_COLOR)
+        read_time_ms = (perf_counter() - read_started) * 1000.0
 
         if image_bgr is None:
             print(f"Could not read image: {image_path}")
             continue
 
-        normalized_bgr = normalize_illumination_bgr(image_bgr)
+        processing_started = perf_counter()
+        normalized_bgr = normalize_illumination_bgr(
+            image_bgr,
+            preserve_input=show_windows,
+        )
+        processing_time_ms = (perf_counter() - processing_started) * 1000.0
 
         output_path = OUTPUT_DIR / image_path.name
-        cv2.imwrite(str(output_path), normalized_bgr)
 
-        height, width = image_bgr.shape[:2]
+        write_started = perf_counter()
+        save_processed_image(output_path, normalized_bgr)
+        write_time_ms = (perf_counter() - write_started) * 1000.0
+
+        total_time_ms = (perf_counter() - total_started) * 1000.0
+        height, width = normalized_bgr.shape[:2]
 
         metadata_rows.append({
             "source_file": str(image_path.relative_to(PROJECT_ROOT)),
@@ -165,34 +225,42 @@ def main() -> None:
             "width": width,
             "height": height,
             "processing_step": "01_illumination_normalization",
-            "method":  STEP_CONFIG["method"],
-            "clahe_clip_limit": clip_limit,
-            "clahe_tile_grid_size": tile_grid_size_label,
+            "method": STEP_CONFIG["method"],
+            "clahe_clip_limit": CLAHE_CLIP_LIMIT,
+            "clahe_tile_grid_size": CLAHE_TILE_GRID_SIZE_LABEL,
+            "read_time_ms": round(read_time_ms, 3),
+            "processing_time_ms": round(processing_time_ms, 3),
+            "write_time_ms": round(write_time_ms, 3),
+            "total_time_ms": round(total_time_ms, 3),
         })
 
-        print(f"[{index}/{len(image_paths)}] Saved: {output_path.name}")
+        print(
+            f"[{index}/{image_count}] Saved: {output_path.name} | "
+            f"read={read_time_ms:.1f} ms, "
+            f"process={processing_time_ms:.1f} ms, "
+            f"write={write_time_ms:.1f} ms, "
+            f"total={total_time_ms:.1f} ms"
+        )
 
-        if DISPLAY_CONFIG["show_windows"]:
+        if show_windows:
             comparison = make_side_by_side(image_bgr, normalized_bgr)
-
-            title = f"01 Illumination normalization | {index}/{len(image_paths)} | {image_path.name}"
+            title = (
+                f"01 Illumination normalization | "
+                f"{index}/{image_count} | {image_path.name}"
+            )
 
             cv2.imshow(title, comparison)
-
-            if DISPLAY_CONFIG["wait_between_images"]:
-                key = cv2.waitKey(0) & 0xFF
-            else:
-                key = cv2.waitKey(500) & 0xFF
-
+            key = cv2.waitKey(0 if wait_between_images else 500) & 0xFF
             cv2.destroyWindow(title)
 
-            if key in [ord("q"), 27]:
+            if key in (ord("q"), 27):
                 print("Stopped by user.")
                 break
 
     save_metadata(metadata_rows)
 
-    cv2.destroyAllWindows()
+    if show_windows:
+        cv2.destroyAllWindows()
 
     print()
     print("Done.")
@@ -201,4 +269,5 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    args = parse_arguments()
+    main(debug=args.debug)
