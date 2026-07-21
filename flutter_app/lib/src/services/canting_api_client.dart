@@ -1,7 +1,7 @@
 import '../models/analyze_result.dart';
 import 'dart:convert';
-import 'dart:io';
 
+import 'package:camera/camera.dart';
 import 'package:http/http.dart' as http;
 
 class CantingApiException implements Exception {
@@ -22,7 +22,7 @@ class CantingApiClient {
 
   Future<AnalyzeResult> uploadVideoClip({
     required String baseUrl,
-    required String videoPath,
+    required XFile videoFile,
     Duration clipDuration = const Duration(seconds: 2),
     int frameCount = 6,
     bool keepArtifacts = false,
@@ -33,9 +33,9 @@ class CantingApiClient {
     final ownsClient = _httpClient == null;
 
     try {
-      final file = File(videoPath);
-      if (!file.existsSync()) {
-        throw CantingApiException('Recorded video file does not exist: $videoPath');
+      final videoBytes = await videoFile.readAsBytes();
+      if (videoBytes.isEmpty) {
+        throw CantingApiException('Recorded video file is empty.');
       }
 
       final request = http.MultipartRequest('POST', uri)
@@ -45,10 +45,12 @@ class CantingApiClient {
         ..fields['frame_count'] = frameCount.toString();
 
       request.files.add(
-        await http.MultipartFile.fromPath(
+        http.MultipartFile.fromBytes(
           'video',
-          videoPath,
-          filename: _extractFilename(videoPath),
+          videoBytes,
+          filename: _extractFilename(
+            videoFile.name.isNotEmpty ? videoFile.name : videoFile.path,
+          ),
         ),
       );
 

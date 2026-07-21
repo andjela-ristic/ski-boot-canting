@@ -7,9 +7,14 @@ display:
   wait_between_images: true
   max_height: 900
 api:
+  execution:
+    max_parallel: 4
+    reserved_high_priority_slots: 1
+
   frames:
     sample_count: 6
-    max_workers: 4
+    max_workers: 3
+    
 step_01_illumination_normalization:
   enabled: true
   method: LAB_CLAHE

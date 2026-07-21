@@ -181,7 +181,7 @@ class _AnalyzePageState extends State<AnalyzePage> {
 
       final result = await _apiClient.uploadVideoClip(
         baseUrl: _baseUrlController.text,
-        videoPath: recordedFile.path,
+        videoFile: recordedFile,
         clipDuration: const Duration(seconds: 2),
         frameCount: 6,
       );
@@ -400,7 +400,7 @@ class _AnalyzePageState extends State<AnalyzePage> {
       case TargetPlatform.android:
         return 'Android emulator + Docker backend: http://10.0.2.2:8000';
       case TargetPlatform.iOS:
-        return 'iOS simulator + Docker backend: http://127.0.0.1:8000';
+        return 'iOS simulator: http://127.0.0.1:8000, fizicki iPhone: http://<LAN-IP>:8000';
       default:
         return 'Desktop + Docker backend: http://127.0.0.1:8000';
     }
@@ -415,7 +415,7 @@ class _AnalyzePageState extends State<AnalyzePage> {
       case TargetPlatform.android:
         return 'Android emulator koristi host alias 10.0.2.2 da pogodi Docker backend.';
       case TargetPlatform.iOS:
-        return 'iOS simulator koristi localhost/127.0.0.1 za Docker backend na Mac hostu.';
+        return 'Za iOS simulator koristi 127.0.0.1, a za fizicki iPhone rucno unesi LAN IP masine gde radi Docker backend.';
       default:
         return 'Za fizicki uredjaj koristi LAN IP host masine umesto localhost.';
     }

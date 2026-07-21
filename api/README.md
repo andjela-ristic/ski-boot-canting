@@ -144,6 +144,7 @@ Behavior:
 - samples `6-10` frames from config field `api.frames.sample_count`
 - extracts frames uniformly across the video
 - analyzes all sampled frames in parallel
+- keeps one execution slot reserved for regular `/analyze` requests
 - returns per-frame analysis plus averaged numeric metadata tree
 
 Za `multipart` upload trenutno vraca jedan validan stub overlay da Flutter flow moze da se testira end-to-end iako finalna multi-frame fuzija jos nije implementirana.

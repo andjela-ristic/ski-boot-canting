@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
 from dataclasses import dataclass
 from functools import lru_cache
 import importlib.util
@@ -14,6 +15,7 @@ import re
 import shutil
 import subprocess
 import sys
+import threading
 import time
 import uuid
 from typing import Any, Callable
@@ -39,6 +41,52 @@ class PipelineStep:
     script_name: str
     args_factory: Callable[[str], list[str]]
     expected_outputs_factory: Callable[[Path, str], list[Path]]
+
+
+class PipelineExecutionCoordinator:
+    def __init__(self, max_parallel: int, reserved_high_priority_slots: int) -> None:
+        self.max_parallel = max_parallel
+        self.reserved_high_priority_slots = reserved_high_priority_slots
+        self._active_total = 0
+        self._active_low_priority = 0
+        self._pending_high_priority = 0
+        self._condition = threading.Condition()
+
+    @contextmanager
+    def acquire(self, priority: str) -> Any:
+        is_high_priority = priority == "high"
+
+        with self._condition:
+            if is_high_priority:
+                self._pending_high_priority += 1
+                try:
+                    while self._active_total >= self.max_parallel:
+                        self._condition.wait()
+                    self._pending_high_priority -= 1
+                    self._active_total += 1
+                except Exception:
+                    self._pending_high_priority -= 1
+                    self._condition.notify_all()
+                    raise
+            else:
+                low_priority_limit = max(1, self.max_parallel - self.reserved_high_priority_slots)
+                while (
+                    self._active_total >= self.max_parallel
+                    or self._active_low_priority >= low_priority_limit
+                    or self._pending_high_priority > 0
+                ):
+                    self._condition.wait()
+                self._active_total += 1
+                self._active_low_priority += 1
+
+        try:
+            yield
+        finally:
+            with self._condition:
+                self._active_total -= 1
+                if not is_high_priority:
+                    self._active_low_priority -= 1
+                self._condition.notify_all()
 
 
 def _image_filter_args(image_name: str) -> list[str]:
@@ -175,67 +223,100 @@ def _tail_text(text: str, max_chars: int = 6000) -> str:
     return cleaned[-max_chars:]
 
 
+@lru_cache(maxsize=1)
+def _load_execution_coordinator() -> PipelineExecutionCoordinator:
+    api_config = _load_base_config().get("api", {})
+    execution_config = api_config.get("execution", {})
+
+    max_parallel = execution_config.get("max_parallel", 2)
+    reserved_high_priority_slots = execution_config.get("reserved_high_priority_slots", 1)
+
+    if not isinstance(max_parallel, int) or max_parallel <= 0:
+        raise ApiError(500, "Config field 'api.execution.max_parallel' must be a positive integer.")
+    if not isinstance(reserved_high_priority_slots, int) or reserved_high_priority_slots < 0:
+        raise ApiError(
+            500,
+            "Config field 'api.execution.reserved_high_priority_slots' must be a non-negative integer.",
+        )
+    if reserved_high_priority_slots >= max_parallel:
+        raise ApiError(
+            500,
+            "Config field 'api.execution.reserved_high_priority_slots' must be smaller than 'api.execution.max_parallel'.",
+        )
+
+    return PipelineExecutionCoordinator(
+        max_parallel=max_parallel,
+        reserved_high_priority_slots=reserved_high_priority_slots,
+    )
+
+
 class PipelineRunner:
-    def analyze_image(self, image_path: str | Path, keep_artifacts: bool = False) -> AnalyzeResult:
+    def analyze_image(
+        self,
+        image_path: str | Path,
+        keep_artifacts: bool = False,
+        priority: str = "high",
+    ) -> AnalyzeResult:
         resolved_image_path = self._resolve_input_path(image_path)
         image_name = resolved_image_path.name
         job_dir = self._make_job_dir()
 
         try:
-            copied_image = self._prepare_job_input(job_dir, resolved_image_path)
-            config_path = self._write_job_config(job_dir)
+            with _load_execution_coordinator().acquire(priority):
+                copied_image = self._prepare_job_input(job_dir, resolved_image_path)
+                config_path = self._write_job_config(job_dir)
 
-            started = time.perf_counter()
-            step_logs = self._run_pipeline(job_dir, copied_image.name, config_path)
-            processing_time_ms = (time.perf_counter() - started) * 1000.0
+                started = time.perf_counter()
+                step_logs = self._run_pipeline(job_dir, copied_image.name, config_path)
+                processing_time_ms = (time.perf_counter() - started) * 1000.0
 
-            overlay_path = job_dir / "processed" / "09_measure_canting_angle" / "overlay" / copied_image.name
-            metadata_path = (
-                job_dir
-                / "processed"
-                / "09_measure_canting_angle"
-                / "metadata"
-                / f"{copied_image.stem}_canting_angle.json"
-            )
-
-            if not overlay_path.exists():
-                raise ApiError(
-                    500,
-                    "Pipeline finished without producing Step 09 overlay.",
-                    details={
-                        "expected_overlay_path": str(overlay_path),
-                        "step_logs": [item.to_dict() for item in step_logs],
-                    },
+                overlay_path = job_dir / "processed" / "09_measure_canting_angle" / "overlay" / copied_image.name
+                metadata_path = (
+                    job_dir
+                    / "processed"
+                    / "09_measure_canting_angle"
+                    / "metadata"
+                    / f"{copied_image.stem}_canting_angle.json"
                 )
 
-            if not metadata_path.exists():
-                raise ApiError(
-                    500,
-                    "Pipeline finished without producing Step 09 metadata.",
-                    details={
-                        "expected_metadata_path": str(metadata_path),
-                        "step_logs": [item.to_dict() for item in step_logs],
-                    },
+                if not overlay_path.exists():
+                    raise ApiError(
+                        500,
+                        "Pipeline finished without producing Step 09 overlay.",
+                        details={
+                            "expected_overlay_path": str(overlay_path),
+                            "step_logs": [item.to_dict() for item in step_logs],
+                        },
+                    )
+
+                if not metadata_path.exists():
+                    raise ApiError(
+                        500,
+                        "Pipeline finished without producing Step 09 metadata.",
+                        details={
+                            "expected_metadata_path": str(metadata_path),
+                            "step_logs": [item.to_dict() for item in step_logs],
+                        },
+                    )
+
+                overlay_png_bytes = overlay_path.read_bytes()
+                metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+
+                artifacts_dir = str(job_dir) if keep_artifacts else None
+                overlay_output_path = str(overlay_path) if keep_artifacts else None
+                metadata_output_path = str(metadata_path) if keep_artifacts else None
+
+                return AnalyzeResult(
+                    image_name=image_name,
+                    input_image_path=str(resolved_image_path),
+                    processing_time_ms=processing_time_ms,
+                    overlay_png_bytes=overlay_png_bytes,
+                    metadata=metadata,
+                    artifacts_dir=artifacts_dir,
+                    overlay_output_path=overlay_output_path,
+                    metadata_output_path=metadata_output_path,
+                    step_logs=step_logs,
                 )
-
-            overlay_png_bytes = overlay_path.read_bytes()
-            metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
-
-            artifacts_dir = str(job_dir) if keep_artifacts else None
-            overlay_output_path = str(overlay_path) if keep_artifacts else None
-            metadata_output_path = str(metadata_path) if keep_artifacts else None
-
-            return AnalyzeResult(
-                image_name=image_name,
-                input_image_path=str(resolved_image_path),
-                processing_time_ms=processing_time_ms,
-                overlay_png_bytes=overlay_png_bytes,
-                metadata=metadata,
-                artifacts_dir=artifacts_dir,
-                overlay_output_path=overlay_output_path,
-                metadata_output_path=metadata_output_path,
-                step_logs=step_logs,
-            )
         finally:
             if not keep_artifacts and job_dir.exists():
                 shutil.rmtree(job_dir, ignore_errors=True)
@@ -596,7 +677,11 @@ class PipelineRunner:
         keep_artifacts: bool,
     ) -> FrameAnalysisResult:
         frame_index, timestamp_ms, frame_path = item
-        analysis = self.analyze_image(frame_path, keep_artifacts=keep_artifacts)
+        analysis = self.analyze_image(
+            frame_path,
+            keep_artifacts=keep_artifacts,
+            priority="low",
+        )
         return FrameAnalysisResult(
             frame_index=frame_index,
             timestamp_ms=timestamp_ms,
