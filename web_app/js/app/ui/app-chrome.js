@@ -14,7 +14,7 @@ function renderCapabilityPills(options) {
     options.elements.securePill.className = "pill warning";
   }
 
-  if (options.liveAvailable) {
+  if (options.previewAvailable) {
     options.elements.cameraPill.textContent = options.state.currentStream
       ? "In-app camera: active"
       : "In-app camera: available";
@@ -26,14 +26,20 @@ function renderCapabilityPills(options) {
 }
 
 function renderCaptureNote(options) {
-  if (window.isSecureContext) {
+  if (options.previewAvailable && options.quickCaptureAvailable) {
     options.elements.captureNote.textContent =
       "Tap Quick 2-second capture to record in-app, or choose a saved video clip for upload.";
     return;
   }
 
+  if (options.previewAvailable) {
+    options.elements.captureNote.textContent =
+      "Live preview is available. If Quick capture stays unavailable in this browser, Choose video still works.";
+    return;
+  }
+
   options.elements.captureNote.textContent =
-    "Quick 2-second capture needs HTTPS camera access, but Choose video can still upload a saved clip.";
+    "Live preview needs HTTPS camera access, but Choose video can still upload a saved clip.";
 }
 
 function renderPreviewPlaceholder(options) {
@@ -43,7 +49,7 @@ function renderPreviewPlaceholder(options) {
     return;
   }
 
-  if (options.liveAvailable) {
+  if (options.previewAvailable) {
     options.elements.previewPlaceholder.textContent =
       "Camera preview will appear here when the browser allows live access.";
     return;
@@ -54,19 +60,20 @@ function renderPreviewPlaceholder(options) {
 }
 
 function syncBusyState(options) {
-  const liveUnavailable = !options.liveAvailable;
+  const previewUnavailable = !options.previewAvailable;
+  const quickCaptureUnavailable = !options.quickCaptureAvailable;
 
-  options.elements.recordButton.disabled = options.state.busy || liveUnavailable;
+  options.elements.recordButton.disabled = options.state.busy || quickCaptureUnavailable;
   options.elements.uploadButton.disabled = options.state.busy;
-  options.elements.toggleCamera.disabled = options.state.busy || liveUnavailable;
+  options.elements.toggleCamera.disabled = options.state.busy || previewUnavailable;
   options.elements.resetBaseUrl.disabled = options.state.busy;
-  options.elements.toggleCamera.classList.toggle("is-hidden", liveUnavailable);
+  options.elements.toggleCamera.classList.toggle("is-hidden", previewUnavailable);
 
   if (options.state.activeOperation === "recording") {
     options.elements.recordButton.textContent = "Recording...";
   } else if (options.state.activeOperation === "uploading") {
     options.elements.recordButton.textContent = "Uploading...";
-  } else if (liveUnavailable) {
+  } else if (quickCaptureUnavailable) {
     options.elements.recordButton.textContent = "Quick capture unavailable";
   } else {
     options.elements.recordButton.textContent = "Quick 2-second capture";

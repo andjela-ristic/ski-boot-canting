@@ -12,7 +12,7 @@ api:
     reserved_high_priority_slots: 1
 
   capture_readiness:
-    config_path: config/capture_readiness_vertical.json
+    config_path: config/capture_readiness_default.json
 
   frames:
     sample_count: 6
@@ -640,7 +640,7 @@ step_07_verify_central_ruler_symmetry:
     medium_min_margin_percent: 0.8
 
   performance:
-    artificial_slowdown_factor: 7.0
+    artificial_slowdown_factor: 1.0
 
   drawing:
     axis_thickness: 4

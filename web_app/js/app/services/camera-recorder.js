@@ -16,23 +16,23 @@ const RESOLUTION_FALLBACKS = [
   { width: 1280, height: 720 },
 ];
 
-export function canUseLiveCamera() {
+export function canUseCameraPreview() {
   return Boolean(
     window.isSecureContext &&
       navigator.mediaDevices &&
-      typeof navigator.mediaDevices.getUserMedia === "function" &&
-      typeof window.MediaRecorder === "function",
+      typeof navigator.mediaDevices.getUserMedia === "function",
   );
+}
+
+export function canUseLiveCamera() {
+  return canUseCameraPreview() && typeof window.MediaRecorder === "function";
 }
 
 export async function initializeCamera(options) {
   options.setStatus("Preparing the camera...", "info");
   stopCurrentStream(options);
 
-  const stream = await navigator.mediaDevices.getUserMedia({
-    video: buildPreferredVideoConstraints(options.state.facingMode),
-    audio: false,
-  });
+  const stream = await openPreferredCameraStream(options.state.facingMode);
 
   await upgradeVideoTrack(stream);
 
@@ -51,6 +51,25 @@ export async function initializeCamera(options) {
     `The camera is ready${streamDetails}. You can record a clip directly in the app.${iosHint}`,
     "success",
   );
+}
+
+async function openPreferredCameraStream(facingMode) {
+  const attempts = [
+    { video: buildPreferredVideoConstraints(facingMode), audio: false },
+    { video: { facingMode: { ideal: facingMode } }, audio: false },
+    { video: true, audio: false },
+  ];
+
+  let lastError = null;
+  for (const constraints of attempts) {
+    try {
+      return await navigator.mediaDevices.getUserMedia(constraints);
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError || new Error("Unable to open the camera stream.");
 }
 
 export async function ensureCameraStream(options) {

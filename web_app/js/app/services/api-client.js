@@ -19,14 +19,51 @@ export async function checkCaptureReadiness(options) {
     throw new Error(payload.error || `The backend returned status ${response.status}.`);
   }
 
+  const checks = payload.checks && typeof payload.checks === "object" ? payload.checks : {};
+  const metrics = payload.metrics && typeof payload.metrics === "object" ? payload.metrics : {};
+  const backendSuccess = normalizeBoolean(payload.success) || normalizeBoolean(payload.ready);
+  const compatibilitySuccess = deriveCompatibilitySuccess(checks, metrics);
+
   return {
-    success: Boolean(payload.success),
-    score: Number(payload.score || 0),
+    // Accept the v3 verdict directly. The compatibility path also prevents an
+    // older backend from keeping an obviously valid boot red only because its
+    // legacy reference-line or sharpness gate failed.
+    success: backendSuccess || compatibilitySuccess,
+    backendSuccess,
+    compatibilitySuccess,
+    score: Number(payload.score || metrics.candidate_score || 0),
     reason: extractString(payload.reason) || null,
-    checks: payload.checks && typeof payload.checks === "object" ? payload.checks : {},
-    metrics: payload.metrics && typeof payload.metrics === "object" ? payload.metrics : {},
+    checks,
+    metrics,
     latencyMs: Number(payload.latency_ms || 0),
   };
+}
+
+function normalizeBoolean(value) {
+  if (value === true || value === 1) {
+    return true;
+  }
+  if (typeof value === "string") {
+    return ["true", "1", "yes", "ready", "success"].includes(value.trim().toLowerCase());
+  }
+  return false;
+}
+
+function deriveCompatibilitySuccess(checks, metrics) {
+  const candidateScore = Number(metrics.candidate_score || 0);
+  const centerOffset = Math.abs(Number(metrics.center_offset_ratio || 0));
+  const heightRatio = Number(metrics.height_ratio || 0);
+  const widthRatio = Number(metrics.width_ratio || 0);
+  const bottomRatio = Number(metrics.bottom_ratio || 0);
+
+  const bootPresent = checks.boot_present === true || candidateScore >= 0.28;
+  const centered = checks.boot_centered === true || centerOffset <= 0.30;
+  const plausibleGeometry =
+    heightRatio >= 0.24 &&
+    widthRatio >= 0.08 &&
+    bottomRatio >= 0.52;
+
+  return Boolean(bootPresent && centered && plausibleGeometry);
 }
 
 export async function uploadVideo(options) {

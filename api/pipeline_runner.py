@@ -241,7 +241,20 @@ def _tail_text(text: str, max_chars: int = 6000) -> str:
     return cleaned[-max_chars:]
 
 
-@lru_cache(maxsize=1)
+@lru_cache(maxsize=8)
+def _build_capture_readiness_validator(
+    config_path_key: str,
+    config_mtime_ns: int,
+) -> FrameValidator:
+    # config_mtime_ns is intentionally part of the cache key. Editing the JSON
+    # now takes effect without leaving an old validator cached for the lifetime
+    # of the API process.
+    del config_mtime_ns
+    if config_path_key == "__defaults__":
+        return FrameValidator(load_capture_readiness_config())
+    return FrameValidator(load_capture_readiness_config(Path(config_path_key)))
+
+
 def _load_capture_readiness_validator() -> FrameValidator:
     api_config = _load_base_config().get("api", {})
     readiness_config = api_config.get("capture_readiness", {})
@@ -250,13 +263,23 @@ def _load_capture_readiness_validator() -> FrameValidator:
     env_path = os.environ.get("CAPTURE_READINESS_CONFIG", "").strip()
     config_path = env_path or configured_path
 
-    if config_path:
-        resolved_config_path = PROJECT_ROOT / config_path
-        if Path(config_path).is_absolute():
-            resolved_config_path = Path(config_path)
-        return FrameValidator(load_capture_readiness_config(resolved_config_path))
+    if not config_path:
+        return _build_capture_readiness_validator("__defaults__", 0)
 
-    return FrameValidator(load_capture_readiness_config())
+    resolved_config_path = PROJECT_ROOT / config_path
+    if Path(config_path).is_absolute():
+        resolved_config_path = Path(config_path)
+    resolved_config_path = resolved_config_path.expanduser().resolve()
+    if not resolved_config_path.exists():
+        raise ApiError(
+            500,
+            f"Capture readiness config does not exist: {resolved_config_path}",
+        )
+
+    return _build_capture_readiness_validator(
+        str(resolved_config_path),
+        resolved_config_path.stat().st_mtime_ns,
+    )
 
 
 @lru_cache(maxsize=1)

@@ -2,7 +2,7 @@
   "processing_max_width": 480,
   "jpeg_max_bytes": 3000000,
   "opencv_threads": 1,
-  "success_score_threshold": 0.58,
+  "success_score_threshold": 0.44,
   "guide": {
     "x_min_ratio": 0.2,
     "x_max_ratio": 0.8,
@@ -10,27 +10,27 @@
     "y_max_ratio": 0.9
   },
   "quality": {
-    "min_sharpness": 6.0,
-    "min_mean_brightness": 10.0,
-    "max_mean_brightness": 247.0,
-    "max_dark_ratio": 0.94,
-    "max_bright_ratio": 0.94,
+    "min_sharpness": 2.0,
+    "min_mean_brightness": 7.0,
+    "max_mean_brightness": 250.0,
+    "max_dark_ratio": 0.97,
+    "max_bright_ratio": 0.97,
     "dark_pixel_threshold": 8,
     "bright_pixel_threshold": 247
   },
   "boot": {
-    "min_height_ratio": 0.34,
-    "max_height_ratio": 0.998,
-    "min_width_ratio": 0.12,
-    "max_width_ratio": 0.95,
-    "min_area_ratio": 0.035,
-    "max_area_ratio": 0.94,
-    "max_center_offset_ratio": 0.22,
-    "min_bottom_ratio": 0.64,
+    "min_height_ratio": 0.26,
+    "max_height_ratio": 0.999,
+    "min_width_ratio": 0.09,
+    "max_width_ratio": 0.98,
+    "min_area_ratio": 0.018,
+    "max_area_ratio": 0.96,
+    "max_center_offset_ratio": 0.3,
+    "min_bottom_ratio": 0.54,
     "min_side_margin_ratio": 0.0,
     "min_top_margin_ratio": 0.0,
-    "min_candidate_score": 0.34,
-    "scale_tolerance_ratio": 0.14,
+    "min_candidate_score": 0.28,
+    "scale_tolerance_ratio": 0.2,
     "guide_border_ignore_ratio": 0.015,
     "canny_low": 26,
     "canny_high": 100,
@@ -39,7 +39,7 @@
     "open_kernel": 3
   },
   "reference": {
-    "required": true,
+    "required": false,
     "orientation": "vertical",
     "exclude_guide_from_search": false,
     "x_min_ratio": 0.34,
@@ -58,6 +58,6 @@
     "projection_min_strength": 2.0,
     "projection_min_coverage_ratio": 0.08,
     "allow_strong_boot_fallback": true,
-    "strong_boot_fallback_score": 0.54
+    "strong_boot_fallback_score": 0.38
   }
 }

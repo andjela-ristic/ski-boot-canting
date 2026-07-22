@@ -103,9 +103,10 @@ class FrameValidator:
             active_config.guide.y_max_ratio,
         )
         gx1, gy1, gx2, gy2 = guide_rect
+        guide_frame = processed[gy1:gy2, gx1:gx2]
         guide_gray = gray[gy1:gy2, gx1:gx2]
 
-        candidate = self._find_boot_candidate(guide_gray, active_config)
+        candidate = self._find_boot_candidate(guide_frame, guide_gray, active_config)
         reference_detected, reference_metrics, reference_segments = (
             self._detect_reference_line(gray, active_config)
         )
@@ -123,8 +124,8 @@ class FrameValidator:
             and candidate.score >= reference.strong_boot_fallback_score
             and boot_checks["boot_present"]
             and boot_checks["boot_centered"]
-            and boot_checks["boot_scale_ok"]
-            and boot_checks["boot_complete"]
+            and (boot_checks["boot_scale_ok"] or candidate.score >= 0.62)
+            and (boot_checks["boot_complete"] or candidate.bottom_ratio >= 0.58)
         )
         reference_satisfied = bool(
             reference_detected
@@ -142,38 +143,48 @@ class FrameValidator:
 
         candidate_score = candidate.score if candidate is not None else 0.0
         # Readiness is a preview UX signal, not the final measurement verdict.
-        # Use soft evidence aggregation and reserve hard rejection for clearly
-        # unusable exposure or a missing/off-centre boot.
+        # Use soft evidence aggregation and reserve hard rejection for boot
+        # placement/geometry issues. Exposure and sharpness remain diagnostics.
         geometry_passes = sum(
             int(boot_checks[name])
             for name in ("boot_present", "boot_centered", "boot_scale_ok", "boot_complete")
         )
+        # The live guide is deliberately permissive: it should answer the
+        # narrow question "is a plausible boot placed in the measurement area?".
+        # Precise line quality and canting validity belong to the full pipeline.
         score = float(np.clip(
-            0.05 * float(quality_checks["sharpness_ok"])
-            + 0.08 * float(quality_checks["exposure_ok"])
-            + 0.42 * candidate_score
-            + 0.18 * float(boot_checks["boot_centered"])
-            + 0.11 * float(boot_checks["boot_scale_ok"])
-            + 0.08 * float(boot_checks["boot_complete"])
-            + 0.08 * float(reference_satisfied),
+            0.64 * candidate_score
+            + 0.20 * float(boot_checks["boot_centered"])
+            + 0.08 * float(boot_checks["boot_scale_ok"])
+            + 0.05 * float(boot_checks["boot_complete"])
+            + 0.03 * float(reference_satisfied),
             0.0,
             1.0,
         ))
 
         sharpness_satisfied = bool(
-            quality_checks["sharpness_ok"] or candidate_score >= 0.56
+            quality_checks["sharpness_ok"] or candidate_score >= 0.38
         )
         reference_soft_satisfied = bool(
-            reference_satisfied or (candidate_score >= 0.52 and geometry_passes >= 3)
+            reference_satisfied or (candidate_score >= 0.38 and geometry_passes >= 2)
         )
-        success = bool(
-            score >= active_config.success_score_threshold
-            and quality_checks["exposure_ok"]
-            and sharpness_satisfied
+        strong_visual_candidate = bool(
+            candidate is not None
+            and candidate.score >= 0.38
             and boot_checks["boot_present"]
             and boot_checks["boot_centered"]
-            and geometry_passes >= 3
+            and candidate.height_ratio >= 0.26
+            and candidate.width_ratio >= 0.09
+            and candidate.bottom_ratio >= 0.54
+        )
+        success = bool(
+            boot_checks["boot_present"]
+            and boot_checks["boot_centered"]
             and reference_soft_satisfied
+            and (
+                score >= active_config.success_score_threshold
+                or strong_visual_candidate
+            )
         )
         reason = None if success else self._failure_reason(
             checks,
@@ -208,6 +219,8 @@ class FrameValidator:
             "reference_accepted_softly": bool(
                 reference_soft_satisfied and not reference_satisfied
             ),
+            "strong_visual_candidate": strong_visual_candidate,
+            "validator_version": "capture-readiness-v3",
             "guide_scale": round(normalized_guide_scale, 3),
             "guide_x_min_ratio": round(active_config.guide.x_min_ratio, 5),
             "guide_x_max_ratio": round(active_config.guide.x_max_ratio, 5),
@@ -403,6 +416,7 @@ class FrameValidator:
 
     def _find_boot_candidate(
         self,
+        guide_frame: np.ndarray,
         guide_gray: np.ndarray,
         config: ReadinessConfig,
     ) -> Candidate | None:
@@ -416,7 +430,26 @@ class FrameValidator:
             0,
         )
 
-        otsu_threshold, dark_mask = cv2.threshold(
+        # A ski boot is commonly the most chromatically distinct tall object
+        # in the guide. This detector is intentionally only an additional cue;
+        # grayscale/edge fallbacks remain available for neutral-coloured boots.
+        saturated_candidate = self._saturated_boot_candidate(
+            guide_frame,
+            boot,
+        )
+        if (
+            saturated_candidate is not None
+            and saturated_candidate.score >= 0.40
+            and abs(saturated_candidate.center_offset_ratio) <= 0.34
+            and saturated_candidate.height_ratio >= 0.24
+            and 0.08 <= saturated_candidate.width_ratio <= 0.90
+        ):
+            # The current measurement rig uses a vivid red boot. When that
+            # strong cue is present, do not let a broad curtain/table edge
+            # envelope outscore the actual object and make centering meaningless.
+            return saturated_candidate
+
+        _, dark_mask = cv2.threshold(
             blurred,
             0,
             255,
@@ -443,7 +476,7 @@ class FrameValidator:
             iterations=1,
         )
 
-        best: Candidate | None = None
+        best: Candidate | None = saturated_candidate
         for source, raw_mask in (
             ("otsu_dark", dark_mask),
             ("otsu_light", light_mask),
@@ -489,6 +522,151 @@ class FrameValidator:
             best = envelope
 
         return best
+
+    def _saturated_boot_candidate(
+        self,
+        guide_frame: np.ndarray,
+        boot: BootConfig,
+    ) -> Candidate | None:
+        """Find a vivid, tall, central object such as the red test boot.
+
+        Saturation is used only as a positive cue. Neutral-coloured boots are
+        still handled by the Otsu and edge-envelope paths.
+        """
+        if guide_frame.size == 0:
+            return None
+
+        height, width = guide_frame.shape[:2]
+        if height <= 0 or width <= 0:
+            return None
+
+        hsv = cv2.cvtColor(guide_frame, cv2.COLOR_BGR2HSV)
+        hue, saturation, value = cv2.split(hsv)
+
+        red_family = ((hue <= 24) | (hue >= 162)) & (saturation >= 68)
+        vivid_colour = saturation >= 105
+        usable_value = (value >= 28) & (value <= 252)
+        mask = ((red_family | vivid_colour) & usable_value).astype(np.uint8) * 255
+
+        border_x = max(2, int(round(width * max(0.012, boot.guide_border_ignore_ratio))))
+        border_y = max(2, int(round(height * max(0.012, boot.guide_border_ignore_ratio))))
+        mask[:border_y, :] = 0
+        mask[height - border_y :, :] = 0
+        mask[:, :border_x] = 0
+        mask[:, width - border_x :] = 0
+
+        close_x = max(5, int(round(width * 0.035)) | 1)
+        close_y = max(9, int(round(height * 0.035)) | 1)
+        mask = cv2.morphologyEx(
+            mask,
+            cv2.MORPH_CLOSE,
+            cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (close_x, close_y)),
+            iterations=1,
+        )
+        mask = cv2.morphologyEx(
+            mask,
+            cv2.MORPH_OPEN,
+            cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3)),
+            iterations=1,
+        )
+
+        count, labels, stats, _ = cv2.connectedComponentsWithStats(
+            mask,
+            connectivity=8,
+            ltype=cv2.CV_32S,
+        )
+
+        selected: list[int] = []
+        min_area = max(10, int(round(width * height * 0.0025)))
+        for label in range(1, count):
+            x, y, component_width, component_height, area = map(int, stats[label])
+            if area < min_area:
+                continue
+            center_x = x + component_width * 0.5
+            if abs(center_x - width * 0.5) > width * 0.37:
+                continue
+            if component_height < height * 0.08:
+                continue
+            selected.append(label)
+
+        if not selected:
+            return None
+
+        selected_mask = np.isin(labels, selected)
+        ys, xs = np.nonzero(selected_mask)
+        if xs.size < min_area:
+            return None
+
+        if xs.size >= 50:
+            x_low, x_high = np.percentile(xs, [1.0, 99.0])
+            y_low, y_high = np.percentile(ys, [0.5, 99.5])
+        else:
+            x_low, x_high = float(xs.min()), float(xs.max())
+            y_low, y_high = float(ys.min()), float(ys.max())
+
+        pad_x = int(round(width * 0.075))
+        pad_top = int(round(height * 0.035))
+        pad_bottom = int(round(height * 0.030))
+        x1 = max(0, int(math.floor(x_low)) - pad_x)
+        x2 = min(width, int(math.ceil(x_high)) + 1 + pad_x)
+        y1 = max(0, int(math.floor(y_low)) - pad_top)
+        y2 = min(height, int(math.ceil(y_high)) + 1 + pad_bottom)
+
+        candidate_width = max(1, x2 - x1)
+        candidate_height = max(1, y2 - y1)
+        area = int(np.count_nonzero(selected_mask[y1:y2, x1:x2]))
+        guide_area = float(width * height)
+        height_ratio = candidate_height / height
+        width_ratio = candidate_width / width
+        area_ratio = area / guide_area
+        center_offset_ratio = (
+            (x1 + candidate_width * 0.5) - width * 0.5
+        ) / width
+        bottom_ratio = y2 / height
+        bbox_fill = area / float(candidate_width * candidate_height)
+
+        center_score = max(0.0, 1.0 - abs(center_offset_ratio) / 0.36)
+        height_score = self._range_score(
+            height_ratio,
+            max(0.24, boot.min_height_ratio - 0.14),
+            min(0.999, boot.max_height_ratio + 0.08),
+        )
+        width_score = self._range_score(
+            width_ratio,
+            max(0.09, boot.min_width_ratio - 0.08),
+            min(0.96, boot.max_width_ratio + 0.06),
+        )
+        bottom_score = float(np.clip((bottom_ratio - 0.48) / 0.42, 0.0, 1.0))
+        fill_score = float(np.clip(bbox_fill / 0.22, 0.0, 1.0))
+        verticality = candidate_height / max(1.0, candidate_width)
+        verticality_score = float(np.clip((verticality - 0.65) / 1.35, 0.0, 1.0))
+
+        score = (
+            0.31 * center_score
+            + 0.25 * height_score
+            + 0.12 * width_score
+            + 0.15 * bottom_score
+            + 0.10 * fill_score
+            + 0.07 * verticality_score
+        )
+
+        return Candidate(
+            x=x1,
+            y=y1,
+            width=candidate_width,
+            height=candidate_height,
+            area=area,
+            score=float(np.clip(score, 0.0, 1.0)),
+            source="saturated_colour",
+            center_offset_ratio=float(center_offset_ratio),
+            height_ratio=float(height_ratio),
+            width_ratio=float(width_ratio),
+            area_ratio=float(area_ratio),
+            bottom_ratio=float(bottom_ratio),
+            touches_top=y1 <= 1,
+            touches_left=x1 <= 1,
+            touches_right=x2 >= width - 1,
+        )
 
     def _edge_envelope_candidate(
         self,
@@ -1147,10 +1325,6 @@ class FrameValidator:
         candidate: Candidate | None,
         boot: BootConfig,
     ) -> str | None:
-        if not checks["sharpness_ok"]:
-            return "frame_blurry"
-        if not checks["exposure_ok"]:
-            return "invalid_exposure"
         if not checks["boot_present"]:
             return "boot_not_detected"
         if not checks["boot_centered"]:

@@ -18,11 +18,11 @@ class GuideConfig:
 class QualityConfig:
     # Preview frames are frequently compressed and slightly soft, so these
     # limits reject only clearly unusable frames.
-    min_sharpness: float = 8.0
-    min_mean_brightness: float = 12.0
-    max_mean_brightness: float = 245.0
-    max_dark_ratio: float = 0.90
-    max_bright_ratio: float = 0.90
+    min_sharpness: float = 2.0
+    min_mean_brightness: float = 7.0
+    max_mean_brightness: float = 250.0
+    max_dark_ratio: float = 0.97
+    max_bright_ratio: float = 0.97
     dark_pixel_threshold: int = 8
     bright_pixel_threshold: int = 247
 
@@ -31,18 +31,18 @@ class QualityConfig:
 class BootConfig:
     # Geometry limits are intentionally tolerant. The final measurement
     # pipeline remains responsible for precise canting validation.
-    min_height_ratio: float = 0.38
-    max_height_ratio: float = 0.995
-    min_width_ratio: float = 0.14
-    max_width_ratio: float = 0.92
-    min_area_ratio: float = 0.050
-    max_area_ratio: float = 0.90
-    max_center_offset_ratio: float = 0.22
-    min_bottom_ratio: float = 0.64
+    min_height_ratio: float = 0.26
+    max_height_ratio: float = 0.999
+    min_width_ratio: float = 0.09
+    max_width_ratio: float = 0.98
+    min_area_ratio: float = 0.018
+    max_area_ratio: float = 0.96
+    max_center_offset_ratio: float = 0.30
+    min_bottom_ratio: float = 0.54
     min_side_margin_ratio: float = 0.0
     min_top_margin_ratio: float = 0.0
-    min_candidate_score: float = 0.34
-    scale_tolerance_ratio: float = 0.14
+    min_candidate_score: float = 0.28
+    scale_tolerance_ratio: float = 0.20
     # Ignore a thin band at the guide boundary. This prevents a CSS/canvas
     # guide outline from becoming part of the detected boot component.
     guide_border_ignore_ratio: float = 0.02
@@ -55,7 +55,7 @@ class BootConfig:
 
 @dataclass(frozen=True, slots=True)
 class ReferenceConfig:
-    required: bool = True
+    required: bool = False
     orientation: str = "horizontal"
     exclude_guide_from_search: bool = True
     x_min_ratio: float = 0.00
@@ -85,7 +85,7 @@ class ReferenceConfig:
     # Preview frames often lose the central spine contrast, so a clearly
     # centered and complete boot should still pass readiness without forcing
     # the vertical reference detector to be perfect on two consecutive polls.
-    strong_boot_fallback_score: float = 0.54
+    strong_boot_fallback_score: float = 0.38
 
 
 @dataclass(frozen=True, slots=True)
@@ -93,7 +93,7 @@ class ReadinessConfig:
     processing_max_width: int = 480
     jpeg_max_bytes: int = 3_000_000
     opencv_threads: int = 1
-    success_score_threshold: float = 0.58
+    success_score_threshold: float = 0.44
     guide: GuideConfig = field(default_factory=GuideConfig)
     quality: QualityConfig = field(default_factory=QualityConfig)
     boot: BootConfig = field(default_factory=BootConfig)

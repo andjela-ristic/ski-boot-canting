@@ -12,6 +12,7 @@ import {
   uploadVideo,
 } from "../services/api-client.js";
 import {
+  canUseCameraPreview,
   canUseLiveCamera,
   initializeCamera,
   recordClip,
@@ -21,9 +22,9 @@ import { normalizeError } from "../utils/format.js";
 
 const READINESS_POLL_INTERVAL_MS = 250;
 const READINESS_SUCCESS_STREAK = 1;
-const READINESS_FAILURE_STREAK = 3;
+const READINESS_FAILURE_STREAK = 2;
 const READINESS_READY_HOLD_MS = 2000;
-const NON_READY_GUIDE_DETAIL = "";
+const NON_READY_GUIDE_DETAIL = "Not ready";
 const BASE_GUIDE_WIDTH_RATIO = 0.6;
 const BASE_GUIDE_HEIGHT_RATIO = 0.8;
 const QUICK_CAPTURE_TARGET_DURATION_MS = 2000;
@@ -59,7 +60,7 @@ export function bindCapturePanel(options) {
   });
 
   options.elements.toggleCamera.addEventListener("click", async () => {
-    if (!canUseLiveCamera()) {
+    if (!canUseCameraPreview()) {
       options.setStatus(
         "Camera switching is only available when live preview is running in the browser.",
         "warning",
@@ -109,16 +110,13 @@ export function bindCapturePanel(options) {
 
       options.state.activeOperation = "uploading";
       options.refreshChrome();
-      options.setStatus("Extracting a sharp frame from the captured clip...", "info");
+      options.setStatus("Uploading the original quick capture clip for analysis...", "info");
       persistForm(options.elements);
 
-      const frameFile = await extractFrameFromVideoFile(file);
-      options.setStatus("Uploading the extracted frame for analysis...", "info");
-
-      const result = await uploadCapturedFrame(options, frameFile);
+      const result = await uploadQuickCapture(options, file);
       rememberResultOverlay(options, result);
       options.renderResult(result);
-      options.setStatus("Analysis finished. The captured clip was reduced to one frame and processed.", "success");
+      options.setStatus("Analysis finished. The quick capture request was processed.", "success");
     } catch (error) {
       console.error(error);
       options.setStatus(normalizeError(error, "Recording failed."), "error");
@@ -184,6 +182,30 @@ async function uploadSelectedVideo(options, file, clipDurationMs) {
   });
 }
 
+async function uploadQuickCapture(options, file) {
+  try {
+    return await uploadVideo({
+      file,
+      baseUrl: normalizedBaseUrlValue(options.elements),
+      keepArtifacts: options.elements.keepArtifacts.checked,
+      clipDurationMs: QUICK_CAPTURE_TARGET_DURATION_MS,
+      frameCount: 1,
+    });
+  } catch (error) {
+    if (!isGatewayTimeoutError(error)) {
+      throw error;
+    }
+
+    options.setStatus(
+      "Quick capture hit HTTP 524 on /frames. Falling back to one extracted frame...",
+      "warning",
+    );
+
+    const frameFile = await extractFrameFromVideoFile(file);
+    return uploadCapturedFrame(options, frameFile);
+  }
+}
+
 async function uploadCapturedFrame(options, file) {
   return uploadAnalyzeImage({
     file,
@@ -241,6 +263,8 @@ function startReadinessLoop(options) {
       options.state.readinessLastScore = Number.isFinite(readiness.score) ? readiness.score : null;
       options.state.readinessLastReason = readiness.reason;
 
+      console.debug("capture-readiness", readiness);
+
       if (readiness.success) {
         options.state.readinessConsecutiveSuccess += 1;
         options.state.readinessConsecutiveFailure = 0;
@@ -257,11 +281,11 @@ function startReadinessLoop(options) {
 
       if (options.state.readinessConsecutiveFailure >= READINESS_FAILURE_STREAK) {
         options.state.readinessReadyHoldUntil = null;
-        setGuideState(options, "not-ready", NON_READY_GUIDE_DETAIL);
+        setGuideState(options, "not-ready", formatNotReadyDetail(readiness));
         return;
       }
 
-      setGuideState(options, "pending", NON_READY_GUIDE_DETAIL);
+      setGuideState(options, "pending", "Checking frame...");
     } catch (error) {
       options.state.readinessConsecutiveSuccess = 0;
       options.state.readinessConsecutiveFailure = 0;
@@ -269,7 +293,7 @@ function startReadinessLoop(options) {
       options.state.readinessLastScore = null;
       options.state.readinessLastReason = null;
       options.state.readinessReadyHoldUntil = null;
-      setGuideState(options, "idle", "Check the backend endpoint");
+      setGuideState(options, "idle", "Readiness endpoint unavailable");
     } finally {
       options.state.readinessRequestInFlight = false;
     }
@@ -461,6 +485,12 @@ function setGuideState(options, stateName, detail = "") {
   options.state.readinessLastOutcome = stateName;
 }
 
+function formatNotReadyDetail(readiness) {
+  const reason = readiness.reason ? String(readiness.reason).replaceAll("_", " ") : NON_READY_GUIDE_DETAIL;
+  const score = Number.isFinite(readiness.score) ? ` · ${Math.round(readiness.score * 100)}%` : "";
+  return `${reason}${score}`;
+}
+
 function formatReadinessMeta(options) {
   const score =
     Number.isFinite(options.state.readinessLastScore)
@@ -512,6 +542,11 @@ async function waitForVideoPreview(videoElement) {
     videoElement.addEventListener("loadedmetadata", handleLoadedMetadata, { once: true });
     videoElement.addEventListener("error", handleError, { once: true });
   });
+}
+
+function isGatewayTimeoutError(error) {
+  const message = error instanceof Error ? error.message : String(error || "");
+  return message.includes("HTTP 524") || message.includes("timed out");
 }
 
 async function seekVideo(videoElement, timeSeconds) {

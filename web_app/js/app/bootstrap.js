@@ -5,6 +5,7 @@ import {
   hydrateForm,
 } from "./state/app-state.js";
 import {
+  canUseCameraPreview,
   canUseLiveCamera,
   initializeCamera,
   stopCurrentStream,
@@ -30,7 +31,8 @@ export async function bootstrapApp() {
       renderChrome({
         elements,
         state,
-        liveAvailable: canUseLiveCamera(),
+        previewAvailable: canUseCameraPreview(),
+        quickCaptureAvailable: canUseLiveCamera(),
       });
     };
 
@@ -50,7 +52,7 @@ export async function bootstrapApp() {
     refreshChrome();
     statusPresenter.setStatus("Preparing the app and checking the camera...", "info");
 
-    if (canUseLiveCamera()) {
+    if (canUseCameraPreview()) {
       initializeCamera({
         elements,
         state,
@@ -59,14 +61,14 @@ export async function bootstrapApp() {
       }).catch((error) => {
         console.error(error);
         statusPresenter.setStatus(
-          "The browser camera is not available right now. Quick 2-second capture cannot start.",
+          "The browser camera is not available right now. Live preview could not start.",
           "warning",
         );
         refreshChrome();
       });
     } else {
       statusPresenter.setStatus(
-        "The app is ready, but Quick 2-second capture needs HTTPS camera access for this session.",
+        "The app is ready, but live camera preview needs HTTPS camera access for this session.",
         "warning",
       );
     }

@@ -121,7 +121,7 @@ DEFAULT_STEP_CONFIG = {
         "candidate_workers": 2,
         "snapshot_workers": 4,
         "image_write_workers": 4,
-        "artificial_slowdown_factor": 7.0,
+        "artificial_slowdown_factor": 1.0,
     },
     "drawing": {
         "axis_thickness": 4,

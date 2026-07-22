@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import argparse
-import cgi
+from dataclasses import dataclass
+from email.parser import BytesParser
+from email.policy import default as email_default_policy
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
+from io import BytesIO
 from mimetypes import guess_type
 import os
 from pathlib import Path
@@ -29,6 +32,18 @@ CLIENT_DISCONNECT_ERRORS = (
     ConnectionAbortedError,
     ConnectionResetError,
 )
+
+
+@dataclass(slots=True)
+class MultipartPart:
+    name: str
+    value: str | None = None
+    filename: str | None = None
+    content_type: str | None = None
+    file: BytesIO | None = None
+
+
+MultipartForm = dict[str, list[MultipartPart]]
 
 
 class CantingApiHandler(BaseHTTPRequestHandler):
@@ -211,31 +226,68 @@ class CantingApiHandler(BaseHTTPRequestHandler):
         raw_body = self.rfile.read(content_length)
         return json.loads(raw_body.decode("utf-8"))
 
-    def _read_uploaded_frames_request(self) -> UploadedFramesRequest:
-        form = cgi.FieldStorage(
-            fp=self.rfile,
-            headers=self.headers,
-            environ={
-                "REQUEST_METHOD": "POST",
-                "CONTENT_TYPE": self.headers.get("Content-Type", ""),
-                "CONTENT_LENGTH": self.headers.get("Content-Length", "0"),
-            },
-            keep_blank_values=True,
-        )
+    def _read_multipart_form(self) -> MultipartForm:
+        content_type = self.headers.get("Content-Type", "") or ""
+        if not content_type.lower().startswith("multipart/form-data"):
+            raise ValueError("Request must use multipart/form-data.")
 
-        video_field = form["video"] if "video" in form else None
+        try:
+            content_length = int(self.headers.get("Content-Length", "0"))
+        except ValueError as exc:
+            raise ValueError("Invalid Content-Length header.") from exc
+        if content_length <= 0:
+            raise ValueError("Multipart request body is required.")
+
+        raw_body = self.rfile.read(content_length)
+        synthetic_message = (
+            f"Content-Type: {content_type}\r\n"
+            "MIME-Version: 1.0\r\n\r\n"
+        ).encode("utf-8") + raw_body
+        message = BytesParser(policy=email_default_policy).parsebytes(synthetic_message)
+        if not message.is_multipart():
+            raise ValueError("Malformed multipart/form-data body.")
+
+        form: MultipartForm = {}
+        for part in message.iter_parts():
+            disposition = part.get_content_disposition()
+            if disposition != "form-data":
+                continue
+            name = part.get_param("name", header="content-disposition")
+            if not name:
+                continue
+
+            payload = part.get_payload(decode=True) or b""
+            filename = part.get_filename()
+            if filename is not None:
+                item = MultipartPart(
+                    name=str(name),
+                    filename=Path(filename).name,
+                    content_type=part.get_content_type(),
+                    file=BytesIO(payload),
+                )
+            else:
+                charset = part.get_content_charset() or "utf-8"
+                try:
+                    value = payload.decode(charset)
+                except (LookupError, UnicodeDecodeError):
+                    value = payload.decode("utf-8", errors="replace")
+                item = MultipartPart(name=str(name), value=value)
+
+            form.setdefault(str(name), []).append(item)
+
+        return form
+
+    def _read_uploaded_frames_request(self) -> UploadedFramesRequest:
+        form = self._read_multipart_form()
+
+        video_field = self._first_form_part(form, "video")
         if video_field is None:
             raise ValueError("Multipart field 'video' is required.")
-
-        if isinstance(video_field, list):
-            video_field = video_field[0]
-
-        video_file = getattr(video_field, "file", None)
-        if video_file is None:
+        if video_field.file is None:
             raise ValueError("Multipart field 'video' must contain a file.")
 
-        video_bytes = video_file.read()
-        filename = Path(getattr(video_field, "filename", "") or "capture.mp4").name
+        video_bytes = video_field.file.read()
+        filename = Path(video_field.filename or "capture.mp4").name
 
         return UploadedFramesRequest(
             video_filename=filename or "capture.mp4",
@@ -247,30 +299,16 @@ class CantingApiHandler(BaseHTTPRequestHandler):
         )
 
     def _read_uploaded_analyze_request(self) -> UploadedAnalyzeRequest:
-        form = cgi.FieldStorage(
-            fp=self.rfile,
-            headers=self.headers,
-            environ={
-                "REQUEST_METHOD": "POST",
-                "CONTENT_TYPE": self.headers.get("Content-Type", ""),
-                "CONTENT_LENGTH": self.headers.get("Content-Length", "0"),
-            },
-            keep_blank_values=True,
-        )
+        form = self._read_multipart_form()
 
-        image_field = form["image"] if "image" in form else None
+        image_field = self._first_form_part(form, "image")
         if image_field is None:
             raise ValueError("Multipart field 'image' is required.")
-
-        if isinstance(image_field, list):
-            image_field = image_field[0]
-
-        image_file = getattr(image_field, "file", None)
-        if image_file is None:
+        if image_field.file is None:
             raise ValueError("Multipart field 'image' must contain a file.")
 
-        image_bytes = image_file.read()
-        filename = Path(getattr(image_field, "filename", "") or "capture.jpg").name
+        image_bytes = image_field.file.read()
+        filename = Path(image_field.filename or "capture.jpg").name
 
         response_mode = (self._extract_form_value(form, "response_mode") or "json").strip().lower()
         if response_mode not in {"json", "binary"}:
@@ -285,30 +323,16 @@ class CantingApiHandler(BaseHTTPRequestHandler):
         )
 
     def _read_uploaded_capture_readiness_request(self) -> UploadedCaptureReadinessRequest:
-        form = cgi.FieldStorage(
-            fp=self.rfile,
-            headers=self.headers,
-            environ={
-                "REQUEST_METHOD": "POST",
-                "CONTENT_TYPE": self.headers.get("Content-Type", ""),
-                "CONTENT_LENGTH": self.headers.get("Content-Length", "0"),
-            },
-            keep_blank_values=True,
-        )
+        form = self._read_multipart_form()
 
-        frame_field = form["frame"] if "frame" in form else None
+        frame_field = self._first_form_part(form, "frame")
         if frame_field is None:
             raise ValueError("Multipart field 'frame' is required.")
-
-        if isinstance(frame_field, list):
-            frame_field = frame_field[0]
-
-        frame_file = getattr(frame_field, "file", None)
-        if frame_file is None:
+        if frame_field.file is None:
             raise ValueError("Multipart field 'frame' must contain a file.")
 
-        frame_bytes = frame_file.read()
-        filename = Path(getattr(frame_field, "filename", "") or "preview.jpg").name
+        frame_bytes = frame_field.file.read()
+        filename = Path(frame_field.filename or "preview.jpg").name
 
         return UploadedCaptureReadinessRequest(
             frame_filename=filename or "preview.jpg",
@@ -323,7 +347,7 @@ class CantingApiHandler(BaseHTTPRequestHandler):
             ),
         )
 
-    def _parse_form_bool(self, form: cgi.FieldStorage, field_name: str, default: bool) -> bool:
+    def _parse_form_bool(self, form: MultipartForm, field_name: str, default: bool) -> bool:
         value = self._extract_form_value(form, field_name)
         if value is None or value == "":
             return default
@@ -337,7 +361,7 @@ class CantingApiHandler(BaseHTTPRequestHandler):
 
     def _parse_form_int(
         self,
-        form: cgi.FieldStorage,
+        form: MultipartForm,
         field_name: str,
         default: int | None,
         minimum: int | None = None,
@@ -358,22 +382,20 @@ class CantingApiHandler(BaseHTTPRequestHandler):
             raise ValueError(f"Multipart field '{field_name}' must be <= {maximum}.")
         return parsed
 
-    def _extract_form_value(self, form: cgi.FieldStorage, field_name: str) -> str | None:
-        if field_name not in form:
-            return None
+    @staticmethod
+    def _first_form_part(form: MultipartForm, field_name: str) -> MultipartPart | None:
+        parts = form.get(field_name)
+        return parts[0] if parts else None
 
-        field = form[field_name]
-        if isinstance(field, list):
-            field = field[0]
-
-        value = getattr(field, "value", None)
-        if value is None:
+    def _extract_form_value(self, form: MultipartForm, field_name: str) -> str | None:
+        field = self._first_form_part(form, field_name)
+        if field is None or field.value is None:
             return None
-        return str(value)
+        return field.value
 
     def _parse_form_float(
         self,
-        form: cgi.FieldStorage,
+        form: MultipartForm,
         field_name: str,
         default: float,
         minimum: float | None = None,
@@ -435,12 +457,11 @@ class CantingApiHandler(BaseHTTPRequestHandler):
         self.send_response(int(HTTPStatus.OK))
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(body)))
-        if candidate.name == "service-worker.js":
-            self.send_header("Cache-Control", "no-cache")
-        elif candidate.suffix.lower() == ".html":
-            self.send_header("Cache-Control", "no-cache")
-        else:
-            self.send_header("Cache-Control", "public, max-age=3600")
+        # During tunnel testing the frontend changes frequently. Safari and
+        # Cloudflare must not keep an older readiness JS/CSS bundle for an hour.
+        self.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+        self.send_header("Pragma", "no-cache")
+        self.send_header("Expires", "0")
         return self._finalize_response(body)
 
     def _resolve_web_asset_path(self, request_path: str) -> Path | None:
@@ -490,6 +511,7 @@ class CantingApiHandler(BaseHTTPRequestHandler):
         self._write_cors_headers()
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
         self._finalize_response(body)
 
     def _write_binary_overlay(
