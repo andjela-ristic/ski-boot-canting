@@ -141,27 +141,39 @@ class FrameValidator:
         }
 
         candidate_score = candidate.score if candidate is not None else 0.0
+        # Readiness is a preview UX signal, not the final measurement verdict.
+        # Use soft evidence aggregation and reserve hard rejection for clearly
+        # unusable exposure or a missing/off-centre boot.
+        geometry_passes = sum(
+            int(boot_checks[name])
+            for name in ("boot_present", "boot_centered", "boot_scale_ok", "boot_complete")
+        )
         score = float(np.clip(
-            0.10 * float(quality_checks["sharpness_ok"])
-            + 0.10 * float(quality_checks["exposure_ok"])
-            + 0.35 * candidate_score
-            + 0.15 * float(boot_checks["boot_centered"])
-            + 0.12 * float(boot_checks["boot_scale_ok"])
+            0.05 * float(quality_checks["sharpness_ok"])
+            + 0.08 * float(quality_checks["exposure_ok"])
+            + 0.42 * candidate_score
+            + 0.18 * float(boot_checks["boot_centered"])
+            + 0.11 * float(boot_checks["boot_scale_ok"])
             + 0.08 * float(boot_checks["boot_complete"])
-            + 0.10 * float(reference_satisfied),
+            + 0.08 * float(reference_satisfied),
             0.0,
             1.0,
         ))
 
+        sharpness_satisfied = bool(
+            quality_checks["sharpness_ok"] or candidate_score >= 0.56
+        )
+        reference_soft_satisfied = bool(
+            reference_satisfied or (candidate_score >= 0.52 and geometry_passes >= 3)
+        )
         success = bool(
             score >= active_config.success_score_threshold
-            and quality_checks["sharpness_ok"]
             and quality_checks["exposure_ok"]
+            and sharpness_satisfied
             and boot_checks["boot_present"]
             and boot_checks["boot_centered"]
-            and boot_checks["boot_scale_ok"]
-            and boot_checks["boot_complete"]
-            and reference_satisfied
+            and geometry_passes >= 3
+            and reference_soft_satisfied
         )
         reason = None if success else self._failure_reason(
             checks,
@@ -188,6 +200,13 @@ class FrameValidator:
             "reference_detected": reference_detected,
             "reference_accepted_via_boot_fallback": bool(
                 strong_boot_fallback and not reference_detected
+            ),
+            "geometry_pass_count": geometry_passes,
+            "sharpness_accepted_softly": bool(
+                sharpness_satisfied and not quality_checks["sharpness_ok"]
+            ),
+            "reference_accepted_softly": bool(
+                reference_soft_satisfied and not reference_satisfied
             ),
             "guide_scale": round(normalized_guide_scale, 3),
             "guide_x_min_ratio": round(active_config.guide.x_min_ratio, 5),
@@ -228,14 +247,32 @@ class FrameValidator:
         )
 
     @staticmethod
-    def _normalize_guide_scale(raw_value: float | None) -> float:
+    def _normalize_guide_scale(raw_value: float | str | None) -> float:
+        """Accept either a ratio (0.90) or a UI percentage (90 / "90%")."""
         if raw_value is None:
             return 1.0
 
+        is_explicit_percent = False
+        value = raw_value
+        if isinstance(raw_value, str):
+            value = raw_value.strip()
+            if value.endswith("%"):
+                is_explicit_percent = True
+                value = value[:-1].strip()
+
         try:
-            numeric = float(raw_value)
+            numeric = float(value)
         except (TypeError, ValueError):
             return 1.0
+
+        if not np.isfinite(numeric):
+            return 1.0
+
+        # Frontends commonly expose this slider as 90-125, while the Python
+        # API originally expected 0.90-1.25. Supporting both prevents 90 from
+        # being clipped to 1.25 and falsely reporting that the boot is too big.
+        if is_explicit_percent or numeric > 2.0:
+            numeric /= 100.0
 
         return float(np.clip(numeric, 0.80, 1.25))
 
@@ -428,15 +465,141 @@ class FrameValidator:
             else:
                 mask = raw_mask
 
-            mask = self._remove_reference_like_lines(mask, config.reference)
+            # A vertical reference usually overlaps the boot body/central spine.
+            # Removing it fragments the silhouette and was a major source of
+            # false negatives. Only suppress long horizontal background lines.
+            if config.reference.orientation == "horizontal":
+                mask = self._remove_reference_like_lines(mask, config.reference)
+            mask = self._clear_guide_border(
+                mask,
+                boot.guide_border_ignore_ratio,
+            )
             candidate = self._best_component(mask, source, boot)
             if candidate is not None and (
                 best is None or candidate.score > best.score
             ):
                 best = candidate
 
+        # Connected components are brittle on shiny boots: reflections split one
+        # physical boot into many islands. Build an additional envelope from
+        # all meaningful central edge fragments and compare it with the best
+        # component instead of requiring one perfectly connected silhouette.
+        envelope = self._edge_envelope_candidate(edge_mask, boot)
+        if envelope is not None and (best is None or envelope.score > best.score):
+            best = envelope
+
         return best
 
+    def _edge_envelope_candidate(
+        self,
+        edge_mask: np.ndarray,
+        boot: BootConfig,
+    ) -> Candidate | None:
+        height, width = edge_mask.shape
+        if height == 0 or width == 0:
+            return None
+
+        # Join nearby fragments without forcing the whole guide into one blob.
+        kx = max(3, int(round(width * 0.035)) | 1)
+        ky = max(5, int(round(height * 0.025)) | 1)
+        joined = cv2.morphologyEx(
+            edge_mask,
+            cv2.MORPH_CLOSE,
+            cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (kx, ky)),
+            iterations=1,
+        )
+
+        count, labels, stats, _ = cv2.connectedComponentsWithStats(
+            joined, connectivity=8, ltype=cv2.CV_32S
+        )
+        selected = []
+        for label in range(1, count):
+            x, y, w, h, area = map(int, stats[label])
+            if area < max(12, int(width * height * 0.0015)):
+                continue
+            cx = x + w * 0.5
+            # Keep fragments plausibly belonging to the centered boot.
+            if abs(cx - width * 0.5) <= width * 0.38:
+                selected.append(label)
+
+        if not selected:
+            return None
+
+        selected_mask = np.isin(labels, selected)
+        ys, xs = np.nonzero(selected_mask)
+        if xs.size == 0:
+            return None
+
+        x1, x2 = int(xs.min()), int(xs.max()) + 1
+        y1, y2 = int(ys.min()), int(ys.max()) + 1
+        # Trim isolated extremes caused by a single reflection/noise pixel.
+        if xs.size >= 40:
+            x1, x2 = map(int, np.percentile(xs, [1.0, 99.0]))
+            y1, y2 = map(int, np.percentile(ys, [1.0, 99.5]))
+            x2 += 1
+            y2 += 1
+
+        w, h = max(1, x2 - x1), max(1, y2 - y1)
+        area = int(np.count_nonzero(selected_mask[y1:y2, x1:x2]))
+        guide_area = float(width * height)
+        height_ratio = h / height
+        width_ratio = w / width
+        area_ratio = area / guide_area
+        center_offset_ratio = ((x1 + w * 0.5) - width * 0.5) / width
+        bottom_ratio = y2 / height
+        bbox_fill = area / float(w * h)
+
+        center_score = max(0.0, 1.0 - abs(center_offset_ratio) / 0.42)
+        height_score = self._range_score(height_ratio, boot.min_height_ratio, boot.max_height_ratio)
+        width_score = self._range_score(width_ratio, boot.min_width_ratio, boot.max_width_ratio)
+        # Edge envelopes are sparse by design, therefore area is assessed more softly.
+        area_score = float(np.clip(area_ratio / max(0.018, boot.min_area_ratio * 0.55), 0.0, 1.0))
+        bottom_score = float(np.clip((bottom_ratio - 0.42) / 0.42, 0.0, 1.0))
+        fill_score = float(np.clip(bbox_fill / 0.10, 0.0, 1.0))
+        score = (
+            0.31 * center_score
+            + 0.27 * height_score
+            + 0.14 * width_score
+            + 0.10 * area_score
+            + 0.12 * bottom_score
+            + 0.06 * fill_score
+        )
+
+        return Candidate(
+            x=x1, y=y1, width=w, height=h, area=area,
+            score=float(np.clip(score, 0.0, 1.0)),
+            source="edge_envelope",
+            center_offset_ratio=float(center_offset_ratio),
+            height_ratio=float(height_ratio),
+            width_ratio=float(width_ratio),
+            area_ratio=float(area_ratio),
+            bottom_ratio=float(bottom_ratio),
+            touches_top=y1 <= 1,
+            touches_left=x1 <= 1,
+            touches_right=x2 >= width - 1,
+        )
+
+
+    @staticmethod
+    def _clear_guide_border(
+        mask: np.ndarray,
+        border_ratio: float,
+    ) -> np.ndarray:
+        """Remove only the thin guide-outline band from a candidate mask."""
+        ratio = float(np.clip(border_ratio, 0.0, 0.08))
+        if ratio <= 0.0 or mask.size == 0:
+            return mask
+
+        height, width = mask.shape
+        border_x = max(1, int(round(width * ratio)))
+        border_y = max(1, int(round(height * ratio)))
+
+        cleaned = mask.copy()
+        cleaned[:border_y, :] = 0
+        cleaned[height - border_y :, :] = 0
+        cleaned[:, :border_x] = 0
+        cleaned[:, width - border_x :] = 0
+        return cleaned
 
     def _remove_reference_like_lines(
         self,
@@ -500,6 +663,11 @@ class FrameValidator:
                 continue
             if height_ratio < 0.28 or width_ratio < 0.10:
                 continue
+            # The inverted Otsu mask often describes the bright background,
+            # not the boot. Reject near-guide-sized light components instead
+            # of letting their artificial centering dominate the score.
+            if source == "otsu_light" and (width_ratio > 0.90 or area_ratio > 0.72):
+                continue
 
             center_score = max(
                 0.0,
@@ -548,13 +716,24 @@ class FrameValidator:
             touches_left = x <= 1
             touches_right = (x + width) >= (guide_width - 1)
 
-            # A component touching two or more guide borders is almost always
-            # the thresholded background, not the boot.
             border_touches = sum((touches_top, touches_left, touches_right))
             if border_touches >= 2:
-                continue
-            if border_touches == 1:
-                score *= 0.82
+                # Do not hard-reject a large, centered edge silhouette. A
+                # preview-frame guide or the table edge can connect it to the
+                # guide boundary even though the boot placement is valid.
+                plausible_joined_boot = (
+                    source == "edges"
+                    and abs(center_offset_ratio) <= max(0.20, boot.max_center_offset_ratio)
+                    and height_ratio >= 0.55
+                    and bottom_ratio >= 0.70
+                    and area_ratio >= 0.04
+                    and bbox_fill >= 0.05
+                )
+                if not plausible_joined_boot:
+                    continue
+                score *= 0.90
+            elif border_touches == 1:
+                score *= 0.92
 
             candidate = Candidate(
                 x=x,
@@ -616,7 +795,7 @@ class FrameValidator:
         boot_present = (
             candidate.score >= boot.min_candidate_score
             and candidate.area_ratio >= (
-                0.012 if candidate.source == "edges" else boot.min_area_ratio
+                0.010 if candidate.source in {"edges", "edge_envelope"} else boot.min_area_ratio
             )
         )
         boot_centered = (

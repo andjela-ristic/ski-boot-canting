@@ -173,3 +173,19 @@ class FrameAnalysisResult:
             ),
             "metadata": self.analysis.metadata,
         }
+
+
+@dataclass(slots=True)
+class FailedFrameAnalysisResult:
+    frame_index: int
+    timestamp_ms: float
+    error: str
+    details: dict[str, Any] | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "frame_index": self.frame_index,
+            "timestamp_ms": round(self.timestamp_ms, 2),
+            "error": self.error,
+            "details": self.details or {},
+        }

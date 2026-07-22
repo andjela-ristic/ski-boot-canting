@@ -139,6 +139,48 @@
   color: var(--muted);
 }
 
+.captured-clip-shell {
+  display: grid;
+  gap: 12px;
+  width: min(100%, 360px);
+  padding: 14px;
+  margin: 0 auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.58);
+  overflow: hidden;
+}
+
+.captured-clip-header,
+.captured-clip-title,
+.captured-clip-note {
+  margin: 0;
+}
+
+.captured-clip-header {
+  display: grid;
+  gap: 4px;
+}
+
+.captured-clip-title {
+  font-weight: 700;
+  color: var(--accent-strong);
+}
+
+.captured-clip-note {
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.captured-clip-preview {
+  display: block;
+  width: 100%;
+  max-height: min(40vh, 300px);
+  border-radius: calc(var(--radius-md) - 4px);
+  object-fit: contain;
+  background: rgba(10, 26, 31, 0.9);
+}
+
 .advanced-settings {
   overflow: hidden;
   background: rgba(255, 255, 255, 0.58);
@@ -197,6 +239,10 @@
   .guide-scale-value {
     min-width: 0;
     text-align: left;
+  }
+
+  .captured-clip-preview {
+    max-height: min(32vh, 240px);
   }
 
   .readiness-guide-shape {

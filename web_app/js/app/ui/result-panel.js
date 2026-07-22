@@ -91,7 +91,7 @@ function buildResultSummary(result, frameCount, selectedFrame) {
       ? `The best sampled overlay is shown first (${buildFrameDisplayName(selectedFrame)}). `
       : "The best sampled overlay is shown first. ";
     const closableText =
-      frameCount > 1 ? "Extra frames can be closed and restored below." : "";
+      frameCount > 1 ? 'Extra frames start closed and can be opened with "Show all frames".' : "";
     return `${intro}${selectedText}All returned frame overlays are listed below. ${closableText}`.trim();
   }
 
@@ -138,6 +138,7 @@ function renderFrameGallery(options, frames) {
       closeButton.className = "ghost-button ghost-button-small frame-card-close";
       closeButton.textContent = "Close";
       closeButton.setAttribute("aria-label", `Close ${buildFrameDisplayName(frame)}`);
+      card.classList.add("is-hidden");
       closeButton.addEventListener("click", () => {
         card.classList.add("is-hidden");
         updateFrameGalleryControls(options, closableCards);

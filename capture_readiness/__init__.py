@@ -7,4 +7,4 @@ __all__ = [
     "ReadinessConfig",
     "load_config",
 ]
-__version__ = "1.1.0"
+__version__ = "1.1.2"

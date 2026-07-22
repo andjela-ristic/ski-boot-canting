@@ -225,20 +225,45 @@ async function readJsonResponse(response, fallbackMessage) {
   try {
     return JSON.parse(rawBody);
   } catch (error) {
-    const contentType = extractString(response.headers.get("Content-Type")) || "unknown";
-    const snippet = rawBody.replace(/\s+/g, " ").trim().slice(0, 220);
-    const detail = snippet ? ` Response started with: ${snippet}` : "";
-    throw new Error(
-      `${fallbackMessage} Status ${response.status}, content type ${contentType}.${detail}`,
-    );
+    throw buildUnexpectedResponseError(response, rawBody, fallbackMessage);
   }
 }
 
 async function readApiError(response, fallbackMessage) {
-  try {
-    const payload = await response.json();
-    return new Error(payload.error || fallbackMessage);
-  } catch (error) {
+  const rawBody = await response.text();
+  if (!rawBody) {
     return new Error(fallbackMessage);
   }
+
+  try {
+    const payload = JSON.parse(rawBody);
+    return new Error(payload.error || fallbackMessage);
+  } catch (error) {
+    return buildUnexpectedResponseError(response, rawBody, fallbackMessage);
+  }
+}
+
+function buildUnexpectedResponseError(response, rawBody, fallbackMessage) {
+  const contentType = extractString(response.headers.get("Content-Type")) || "unknown";
+  const normalizedBody = rawBody.replace(/\s+/g, " ").trim();
+  const looksLikeHtml =
+    contentType.includes("text/html") || /^<!doctype html\b/i.test(normalizedBody);
+
+  if (response.status === 524) {
+    return new Error(
+      "Quick capture timed out before the backend finished. The tunnel/proxy returned HTTP 524. Try a shorter/faster request or call the backend directly.",
+    );
+  }
+
+  if (looksLikeHtml && [502, 503, 504].includes(response.status)) {
+    return new Error(
+      `The request failed before the backend returned JSON. The gateway/proxy returned HTTP ${response.status}. Try again or call the backend directly.`,
+    );
+  }
+
+  const snippet = normalizedBody.slice(0, 220);
+  const detail = snippet ? ` Response started with: ${snippet}` : "";
+  return new Error(
+    `${fallbackMessage} Status ${response.status}, content type ${contentType}.${detail}`,
+  );
 }

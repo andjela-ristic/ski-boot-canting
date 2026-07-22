@@ -6,7 +6,11 @@ import {
   normalizedBaseUrlValue,
   persistForm,
 } from "../state/app-state.js";
-import { checkCaptureReadiness, uploadVideo } from "../services/api-client.js";
+import {
+  checkCaptureReadiness,
+  uploadAnalyzeImage,
+  uploadVideo,
+} from "../services/api-client.js";
 import {
   canUseLiveCamera,
   initializeCamera,
@@ -16,12 +20,14 @@ import {
 import { normalizeError } from "../utils/format.js";
 
 const READINESS_POLL_INTERVAL_MS = 250;
-const READINESS_SUCCESS_STREAK = 2;
+const READINESS_SUCCESS_STREAK = 1;
 const READINESS_FAILURE_STREAK = 3;
+const READINESS_READY_HOLD_MS = 2000;
 const NON_READY_GUIDE_DETAIL = "";
 const BASE_GUIDE_WIDTH_RATIO = 0.6;
 const BASE_GUIDE_HEIGHT_RATIO = 0.8;
-const QUICK_CAPTURE_DURATION_MS = 2000;
+const QUICK_CAPTURE_TARGET_DURATION_MS = 2000;
+const QUICK_CAPTURE_RECORD_DURATION_MS = 2200;
 
 export function bindCapturePanel(options) {
   options.elements.captureNote.textContent = buildCaptureNote();
@@ -90,10 +96,10 @@ export function bindCapturePanel(options) {
         elements: options.elements,
         state: options.state,
         setStatus: options.setStatus,
-        durationMs: QUICK_CAPTURE_DURATION_MS,
+        durationMs: QUICK_CAPTURE_RECORD_DURATION_MS,
         refreshChrome: options.refreshChrome,
       });
-      showCapturedClipPreview(options, file);
+      await showCapturedClipPreview(options, file);
 
       stopCurrentStream({
         elements: options.elements,
@@ -103,13 +109,16 @@ export function bindCapturePanel(options) {
 
       options.state.activeOperation = "uploading";
       options.refreshChrome();
-      options.setStatus("Uploading the captured 2-second clip for analysis...", "info");
+      options.setStatus("Extracting a sharp frame from the captured clip...", "info");
       persistForm(options.elements);
 
-      const result = await uploadSelectedVideo(options, file, QUICK_CAPTURE_DURATION_MS);
+      const frameFile = await extractFrameFromVideoFile(file);
+      options.setStatus("Uploading the extracted frame for analysis...", "info");
+
+      const result = await uploadCapturedFrame(options, frameFile);
       rememberResultOverlay(options, result);
       options.renderResult(result);
-      options.setStatus("Analysis finished. The captured 2-second clip was processed.", "success");
+      options.setStatus("Analysis finished. The captured clip was reduced to one frame and processed.", "success");
     } catch (error) {
       console.error(error);
       options.setStatus(normalizeError(error, "Recording failed."), "error");
@@ -175,6 +184,14 @@ async function uploadSelectedVideo(options, file, clipDurationMs) {
   });
 }
 
+async function uploadCapturedFrame(options, file) {
+  return uploadAnalyzeImage({
+    file,
+    baseUrl: normalizedBaseUrlValue(options.elements),
+    keepArtifacts: options.elements.keepArtifacts.checked,
+  });
+}
+
 function startReadinessLoop(options) {
   if (options.state.readinessLoopHandle) {
     window.clearTimeout(options.state.readinessLoopHandle);
@@ -196,6 +213,14 @@ function startReadinessLoop(options) {
         options.state.readinessLastReason = null;
         setGuideState(options, "idle", "Waiting for live preview");
       }
+      return;
+    }
+
+    if (
+      options.state.readinessReadyHoldUntil &&
+      Date.now() < options.state.readinessReadyHoldUntil
+    ) {
+      setGuideState(options, "ready", formatReadinessMeta(options));
       return;
     }
 
@@ -225,11 +250,13 @@ function startReadinessLoop(options) {
       }
 
       if (options.state.readinessConsecutiveSuccess >= READINESS_SUCCESS_STREAK) {
+        options.state.readinessReadyHoldUntil = Date.now() + READINESS_READY_HOLD_MS;
         setGuideState(options, "ready", formatReadinessMeta(options));
         return;
       }
 
       if (options.state.readinessConsecutiveFailure >= READINESS_FAILURE_STREAK) {
+        options.state.readinessReadyHoldUntil = null;
         setGuideState(options, "not-ready", NON_READY_GUIDE_DETAIL);
         return;
       }
@@ -241,6 +268,7 @@ function startReadinessLoop(options) {
       options.state.readinessLastLatencyMs = null;
       options.state.readinessLastScore = null;
       options.state.readinessLastReason = null;
+      options.state.readinessReadyHoldUntil = null;
       setGuideState(options, "idle", "Check the backend endpoint");
     } finally {
       options.state.readinessRequestInFlight = false;
@@ -321,7 +349,7 @@ function rememberResultOverlay(options, result) {
   options.state.resultOverlayObjectUrl = result.overlayObjectUrl || null;
 }
 
-function showCapturedClipPreview(options, file) {
+async function showCapturedClipPreview(options, file) {
   if (options.state.capturedClipObjectUrl) {
     URL.revokeObjectURL(options.state.capturedClipObjectUrl);
   }
@@ -332,8 +360,78 @@ function showCapturedClipPreview(options, file) {
   options.elements.capturedClipShell.classList.remove("is-hidden");
   options.elements.capturedClipNote.textContent =
     "Preview of the exact clip being sent to the backend.";
+  options.elements.capturedClipPreview.load();
+  const previewLoaded = await waitForVideoPreview(options.elements.capturedClipPreview);
+  if (!previewLoaded) {
+    options.elements.capturedClipNote.textContent =
+      "Preview could not be loaded in this browser, but the original clip will still be sent.";
+    return;
+  }
   options.elements.capturedClipPreview.currentTime = 0;
   options.elements.capturedClipPreview.play().catch(() => undefined);
+}
+
+async function extractFrameFromVideoFile(file) {
+  const objectUrl = URL.createObjectURL(file);
+  const videoElement = document.createElement("video");
+  videoElement.preload = "metadata";
+  videoElement.muted = true;
+  videoElement.playsInline = true;
+  videoElement.src = objectUrl;
+
+  try {
+    await waitForVideoPreview(videoElement);
+
+    if (!Number.isFinite(videoElement.duration) || videoElement.duration <= 0) {
+      throw new Error("Captured clip metadata is not available.");
+    }
+
+    const targetTime = Math.max(
+      0,
+      Math.min(videoElement.duration - 0.05, videoElement.duration * 0.5),
+    );
+    await seekVideo(videoElement, targetTime);
+
+    const sourceWidth = videoElement.videoWidth || 0;
+    const sourceHeight = videoElement.videoHeight || 0;
+    if (sourceWidth <= 0 || sourceHeight <= 0) {
+      throw new Error("Captured clip frame dimensions are not available.");
+    }
+
+    const canvas = document.createElement("canvas");
+    canvas.width = sourceWidth;
+    canvas.height = sourceHeight;
+
+    const context = canvas.getContext("2d", { alpha: false });
+    if (!context) {
+      throw new Error("Canvas context is not available.");
+    }
+
+    context.drawImage(videoElement, 0, 0, sourceWidth, sourceHeight);
+    const blob = await new Promise((resolve, reject) => {
+      canvas.toBlob(
+        (value) => {
+          if (value) {
+            resolve(value);
+            return;
+          }
+          reject(new Error("JPEG frame encoding failed."));
+        },
+        "image/jpeg",
+        0.92,
+      );
+    });
+
+    const frameName = (file.name || "quick-capture.mp4").replace(/\.[^.]+$/, "") + ".jpg";
+    return new File([blob], frameName, {
+      type: "image/jpeg",
+      lastModified: Date.now(),
+    });
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+    videoElement.removeAttribute("src");
+    videoElement.load();
+  }
 }
 
 function clearCapturedClipPreview(options) {
@@ -390,4 +488,53 @@ function isLikelyIosDevice() {
     /iPad|iPhone|iPod/i.test(userAgent) ||
     (platform === "MacIntel" && Number(navigator.maxTouchPoints || 0) > 1)
   );
+}
+
+async function waitForVideoPreview(videoElement) {
+  if (videoElement.readyState >= HTMLMediaElement.HAVE_METADATA) {
+    return true;
+  }
+
+  return new Promise((resolve) => {
+    const handleLoadedMetadata = () => {
+      cleanup();
+      resolve(true);
+    };
+    const handleError = () => {
+      cleanup();
+      resolve(false);
+    };
+    const cleanup = () => {
+      videoElement.removeEventListener("loadedmetadata", handleLoadedMetadata);
+      videoElement.removeEventListener("error", handleError);
+    };
+
+    videoElement.addEventListener("loadedmetadata", handleLoadedMetadata, { once: true });
+    videoElement.addEventListener("error", handleError, { once: true });
+  });
+}
+
+async function seekVideo(videoElement, timeSeconds) {
+  if (Math.abs((videoElement.currentTime || 0) - timeSeconds) < 0.02) {
+    return;
+  }
+
+  await new Promise((resolve, reject) => {
+    const handleSeeked = () => {
+      cleanup();
+      resolve();
+    };
+    const handleError = () => {
+      cleanup();
+      reject(new Error("Video seek failed while extracting the frame."));
+    };
+    const cleanup = () => {
+      videoElement.removeEventListener("seeked", handleSeeked);
+      videoElement.removeEventListener("error", handleError);
+    };
+
+    videoElement.addEventListener("seeked", handleSeeked, { once: true });
+    videoElement.addEventListener("error", handleError, { once: true });
+    videoElement.currentTime = timeSeconds;
+  });
 }

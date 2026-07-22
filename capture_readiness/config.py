@@ -37,12 +37,15 @@ class BootConfig:
     max_width_ratio: float = 0.92
     min_area_ratio: float = 0.050
     max_area_ratio: float = 0.90
-    max_center_offset_ratio: float = 0.16
-    min_bottom_ratio: float = 0.54
+    max_center_offset_ratio: float = 0.22
+    min_bottom_ratio: float = 0.64
     min_side_margin_ratio: float = 0.0
     min_top_margin_ratio: float = 0.0
-    min_candidate_score: float = 0.40
-    scale_tolerance_ratio: float = 0.055
+    min_candidate_score: float = 0.34
+    scale_tolerance_ratio: float = 0.14
+    # Ignore a thin band at the guide boundary. This prevents a CSS/canvas
+    # guide outline from becoming part of the detected boot component.
+    guide_border_ignore_ratio: float = 0.02
     canny_low: int = 32
     canny_high: int = 110
     gaussian_kernel: int = 5
@@ -79,7 +82,10 @@ class ReferenceConfig:
     # check if the line detector alone is uncertain. The slower pipeline still
     # performs the precise reference-line validation.
     allow_strong_boot_fallback: bool = True
-    strong_boot_fallback_score: float = 0.78
+    # Preview frames often lose the central spine contrast, so a clearly
+    # centered and complete boot should still pass readiness without forcing
+    # the vertical reference detector to be perfect on two consecutive polls.
+    strong_boot_fallback_score: float = 0.54
 
 
 @dataclass(frozen=True, slots=True)
@@ -87,7 +93,7 @@ class ReadinessConfig:
     processing_max_width: int = 480
     jpeg_max_bytes: int = 3_000_000
     opencv_threads: int = 1
-    success_score_threshold: float = 0.72
+    success_score_threshold: float = 0.58
     guide: GuideConfig = field(default_factory=GuideConfig)
     quality: QualityConfig = field(default_factory=QualityConfig)
     boot: BootConfig = field(default_factory=BootConfig)

@@ -22,12 +22,18 @@ import uuid
 from typing import Any, Callable
 
 import cv2
+import numpy as np
 import yaml
 
 from capture_readiness import FrameValidator, load_config as load_capture_readiness_config
 from capture_readiness.validator import FrameValidationError
 
-from .contracts import AnalyzeResult, FrameAnalysisResult, StepExecutionLog
+from .contracts import (
+    AnalyzeResult,
+    FailedFrameAnalysisResult,
+    FrameAnalysisResult,
+    StepExecutionLog,
+)
 from .exceptions import ApiError
 
 
@@ -432,13 +438,39 @@ class PipelineRunner:
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             future_results = list(
                 executor.map(
-                    lambda item: self._analyze_extracted_frame(item, keep_artifacts),
+                    lambda item: self._analyze_extracted_frame_safe(item, keep_artifacts),
                     extracted_frame_paths,
                 )
             )
         processing_time_ms = (time.perf_counter() - started) * 1000.0
 
-        frame_results = sorted(future_results, key=lambda item: item.frame_index)
+        frame_results = sorted(
+            [
+                item
+                for item in future_results
+                if isinstance(item, FrameAnalysisResult)
+            ],
+            key=lambda item: item.frame_index,
+        )
+        frame_failures = sorted(
+            [
+                item
+                for item in future_results
+                if isinstance(item, FailedFrameAnalysisResult)
+            ],
+            key=lambda item: item.frame_index,
+        )
+        if not frame_results:
+            raise ApiError(
+                500,
+                "All sampled video frames failed analysis.",
+                details={
+                    "video_path": str(resolved_video_path),
+                    "sample_count": sample_count,
+                    "frame_failures": [item.to_dict() for item in frame_failures],
+                },
+            )
+
         averaged_metadata = self._average_metadata_tree(
             [item.analysis.metadata for item in frame_results]
         )
@@ -456,6 +488,8 @@ class PipelineRunner:
             "overlay_output_path": best_frame.analysis.overlay_output_path,
             "metadata_output_path": best_frame.analysis.metadata_output_path,
             "frame_count": len(frame_results),
+            "sampled_frame_count": len(extracted_frame_paths),
+            "failed_frame_count": len(frame_failures),
             "frame_sampling": {
                 "sample_count": sample_count,
                 "max_workers": max_workers,
@@ -467,6 +501,7 @@ class PipelineRunner:
                 item.to_dict(include_step_logs=include_step_logs)
                 for item in ordered_frame_results
             ],
+            "frame_failures": [item.to_dict() for item in frame_failures],
             "average_metadata": averaged_metadata,
             "artifacts_dir": str(extraction_dir) if keep_artifacts else None,
         }
@@ -508,6 +543,7 @@ class PipelineRunner:
         return sorted(
             frame_results,
             key=lambda item: (
+                self._frame_weighted_priority(item),
                 self._frame_absolute_canting_distance(item),
                 -self._frame_measurement_confidence(item),
                 -self._frame_table_line_quality(item),
@@ -518,6 +554,13 @@ class PipelineRunner:
                 item.frame_index,
             ),
         )
+
+    def _frame_weighted_priority(self, frame_result: FrameAnalysisResult) -> float:
+        distance = self._frame_absolute_canting_distance(frame_result)
+        if not math.isfinite(distance):
+            return math.inf
+        confidence = self._frame_measurement_confidence(frame_result)
+        return 0.75 * distance - 0.25 * confidence
 
     def _frame_absolute_canting_distance(self, frame_result: FrameAnalysisResult) -> float:
         metadata = frame_result.analysis.metadata
@@ -768,33 +811,53 @@ class PipelineRunner:
             capture.release()
 
     def _build_sample_indexes(self, frame_total: int, sample_count: int) -> list[int]:
-        if frame_total < sample_count:
+        if frame_total <= 0:
             raise ApiError(
                 400,
-                "Input video does not contain enough frames for configured sampling.",
+                "Input video does not contain readable frames.",
                 details={"frame_total": frame_total, "sample_count": sample_count},
             )
 
-        if sample_count == 1:
-            return [frame_total // 2]
+        candidate_frame_total = frame_total
+        if frame_total > sample_count:
+            # Exclude the terminal frame only when doing so does not reduce the
+            # requested sample count. Very short captures should keep every
+            # decodable frame in play.
+            candidate_frame_total = frame_total - 1
 
-        last_index = frame_total - 1
-        indexes = [
-            min(last_index, max(0, round((last_index * index) / (sample_count - 1))))
-            for index in range(sample_count)
-        ]
+        effective_sample_count = min(candidate_frame_total, sample_count)
+        max_sample_index = candidate_frame_total - 1
+
+        if effective_sample_count == 1:
+            return [max(0, min(max_sample_index, candidate_frame_total // 2))]
+
+        indexes = []
+        for index in range(effective_sample_count):
+            # Sample the midpoint of each temporal bucket from the decodable
+            # range. The terminal frame is excluded only when there is enough
+            # headroom to keep the requested number of samples unchanged.
+            bucket_start = (index * candidate_frame_total) / effective_sample_count
+            bucket_end = ((index + 1) * candidate_frame_total) / effective_sample_count
+            midpoint = (bucket_start + bucket_end) * 0.5
+            frame_number = int(
+                np.clip(
+                    round(midpoint - 0.5),
+                    0,
+                    max_sample_index,
+                )
+            )
+            indexes.append(frame_number)
 
         deduplicated: list[int] = []
         for index in indexes:
             if not deduplicated or deduplicated[-1] != index:
                 deduplicated.append(index)
 
-        if len(deduplicated) < sample_count:
-            raise ApiError(
-                400,
-                "Input video is too short to produce unique sampled frames.",
-                details={"frame_total": frame_total, "sample_count": sample_count},
-            )
+        if len(deduplicated) < effective_sample_count:
+            remaining_indexes = [
+                index for index in range(candidate_frame_total) if index not in set(deduplicated)
+            ]
+            deduplicated.extend(remaining_indexes[: effective_sample_count - len(deduplicated)])
 
         return deduplicated
 
@@ -814,6 +877,31 @@ class PipelineRunner:
             timestamp_ms=timestamp_ms,
             analysis=analysis,
         )
+
+    def _analyze_extracted_frame_safe(
+        self,
+        item: tuple[int, float, Path],
+        keep_artifacts: bool,
+    ) -> FrameAnalysisResult | FailedFrameAnalysisResult:
+        try:
+            return self._analyze_extracted_frame(item, keep_artifacts)
+        except ApiError as exc:
+            frame_index, timestamp_ms, _frame_path = item
+            details = exc.to_dict().get("details")
+            return FailedFrameAnalysisResult(
+                frame_index=frame_index,
+                timestamp_ms=timestamp_ms,
+                error=exc.message,
+                details=details if isinstance(details, dict) else {},
+            )
+        except Exception as exc:
+            frame_index, timestamp_ms, _frame_path = item
+            return FailedFrameAnalysisResult(
+                frame_index=frame_index,
+                timestamp_ms=timestamp_ms,
+                error="Unexpected frame analysis error.",
+                details={"message": str(exc)},
+            )
 
     def _average_metadata_tree(self, values: list[dict[str, Any]]) -> dict[str, Any]:
         averaged = self._average_value(values)
