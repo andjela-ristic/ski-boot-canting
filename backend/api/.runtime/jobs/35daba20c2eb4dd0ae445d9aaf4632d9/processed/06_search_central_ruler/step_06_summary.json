@@ -1,0 +1,14 @@
+[
+  {
+    "image_name": "IMG_0508.png",
+    "filtered_line_count": 537,
+    "candidate_count": 239,
+    "selected_fragment_count": 5,
+    "best_score": 0.6082731624680676,
+    "best_tilt_deg": 0.19098522435968746,
+    "overlay_path": "api\\.runtime\\jobs\\35daba20c2eb4dd0ae445d9aaf4632d9\\processed\\06_search_central_ruler\\overlay\\IMG_0508.png",
+    "metadata_path": "api\\.runtime\\jobs\\35daba20c2eb4dd0ae445d9aaf4632d9\\processed\\06_search_central_ruler\\metadata\\IMG_0508_central_ruler.json",
+    "comparison_path": "api\\.runtime\\jobs\\35daba20c2eb4dd0ae445d9aaf4632d9\\processed\\06_search_central_ruler\\comparison\\IMG_0508.png",
+    "candidate_snapshot_dir": "api\\.runtime\\jobs\\35daba20c2eb4dd0ae445d9aaf4632d9\\processed\\06_search_central_ruler\\candidate_snapshots\\IMG_0508"
+  }
+]

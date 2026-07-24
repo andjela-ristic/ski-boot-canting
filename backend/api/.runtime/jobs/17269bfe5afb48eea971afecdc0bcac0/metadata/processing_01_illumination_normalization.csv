@@ -1,0 +1,2 @@
+source_file,output_file,width,height,processing_step,method,clahe_clip_limit,clahe_tile_grid_size
+api/.runtime/jobs/17269bfe5afb48eea971afecdc0bcac0/working_png/IMG_0512.png,api/.runtime/jobs/17269bfe5afb48eea971afecdc0bcac0/processed/01_illumination_normalized/IMG_0512.png,3024,4032,01_illumination_normalization,LAB_CLAHE,2.0,16x16

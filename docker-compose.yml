@@ -1,7 +1,7 @@
 services:
   canting-api:
     build:
-      context: .
+      context: ./backend
       dockerfile: Dockerfile
     container_name: ski-boot-canting-api
     environment:
@@ -11,6 +11,30 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - ./data:/app/data:ro
-      - ./api/.runtime:/app/api/.runtime
+      - ./backend/data:/app/data:ro
+      - ./backend/api/.runtime:/app/api/.runtime
+    restart: unless-stopped
+
+  canting-web:
+    build:
+      context: ./web_app
+      dockerfile: Dockerfile
+    container_name: ski-boot-canting-web
+    depends_on:
+      - canting-api
+    ports:
+      - "8080:80"
+    restart: unless-stopped
+
+  canting-tunnel:
+    image: cloudflare/cloudflared:latest
+    container_name: ski-boot-canting-tunnel
+    depends_on:
+      - canting-web
+    environment:
+      PORT: 80
+      TARGET_HOST: canting-web
+    command: ["sh", "/scripts/start_cloudflare_tunnel.sh"]
+    volumes:
+      - ./backend/scripts:/scripts:ro
     restart: unless-stopped

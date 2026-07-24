@@ -1,0 +1,211 @@
+[
+  {
+    "image_name": "IMG_0502.png",
+    "filtered_line_count": 277,
+    "candidate_count": 240,
+    "selected_fragment_count": 9,
+    "best_score": 0.6805931408378769,
+    "best_tilt_deg": 1.5286572442318636,
+    "timings_sec": {
+      "search": 7.859049499995308,
+      "rendering": 0.4337456999346614,
+      "analysis_total": 8.490670499944827,
+      "save": 1.637689700059127,
+      "process_total": 10.128364900010638
+    },
+    "overlay_path": "data\\processed\\06_search_central_ruler\\overlay\\IMG_0502.png",
+    "metadata_path": "data\\processed\\06_search_central_ruler\\metadata\\IMG_0502_central_ruler.json",
+    "comparison_path": "data\\processed\\06_search_central_ruler\\comparison\\IMG_0502.png",
+    "candidate_snapshot_dir": "data\\processed\\06_search_central_ruler\\candidate_snapshots\\IMG_0502"
+  },
+  {
+    "image_name": "IMG_0503.png",
+    "filtered_line_count": 247,
+    "candidate_count": 240,
+    "selected_fragment_count": 5,
+    "best_score": 0.7070724944404289,
+    "best_tilt_deg": 1.3154222463389103,
+    "timings_sec": {
+      "search": 3.914786599983927,
+      "rendering": 0.32535210001515225,
+      "analysis_total": 4.4985655000200495,
+      "save": 1.2326330999785569,
+      "process_total": 5.731199700006982
+    },
+    "overlay_path": "data\\processed\\06_search_central_ruler\\overlay\\IMG_0503.png",
+    "metadata_path": "data\\processed\\06_search_central_ruler\\metadata\\IMG_0503_central_ruler.json",
+    "comparison_path": "data\\processed\\06_search_central_ruler\\comparison\\IMG_0503.png",
+    "candidate_snapshot_dir": "data\\processed\\06_search_central_ruler\\candidate_snapshots\\IMG_0503"
+  },
+  {
+    "image_name": "IMG_0504.png",
+    "filtered_line_count": 402,
+    "candidate_count": 240,
+    "selected_fragment_count": 3,
+    "best_score": 0.6117005151097419,
+    "best_tilt_deg": -0.12401664509760865,
+    "timings_sec": {
+      "search": 2.9745359000226017,
+      "rendering": 0.38259650001418777,
+      "analysis_total": 3.5533383000292815,
+      "save": 1.4334743999643251,
+      "process_total": 4.986813900002744
+    },
+    "overlay_path": "data\\processed\\06_search_central_ruler\\overlay\\IMG_0504.png",
+    "metadata_path": "data\\processed\\06_search_central_ruler\\metadata\\IMG_0504_central_ruler.json",
+    "comparison_path": "data\\processed\\06_search_central_ruler\\comparison\\IMG_0504.png",
+    "candidate_snapshot_dir": "data\\processed\\06_search_central_ruler\\candidate_snapshots\\IMG_0504"
+  },
+  {
+    "image_name": "IMG_0505.png",
+    "filtered_line_count": 296,
+    "candidate_count": 240,
+    "selected_fragment_count": 3,
+    "best_score": 0.553089847908931,
+    "best_tilt_deg": 1.7357045889283889,
+    "timings_sec": {
+      "search": 3.141147899994394,
+      "rendering": 0.36018510002759285,
+      "analysis_total": 3.6975219000305515,
+      "save": 1.314806599955773,
+      "process_total": 5.012329799996223
+    },
+    "overlay_path": "data\\processed\\06_search_central_ruler\\overlay\\IMG_0505.png",
+    "metadata_path": "data\\processed\\06_search_central_ruler\\metadata\\IMG_0505_central_ruler.json",
+    "comparison_path": "data\\processed\\06_search_central_ruler\\comparison\\IMG_0505.png",
+    "candidate_snapshot_dir": "data\\processed\\06_search_central_ruler\\candidate_snapshots\\IMG_0505"
+  },
+  {
+    "image_name": "IMG_0506.png",
+    "filtered_line_count": 442,
+    "candidate_count": 240,
+    "selected_fragment_count": 4,
+    "best_score": 0.5948509652182965,
+    "best_tilt_deg": -1.0139787227853019,
+    "timings_sec": {
+      "search": 2.4528401999850757,
+      "rendering": 0.3593226999801118,
+      "analysis_total": 2.995549299987033,
+      "save": 1.1553277000202797,
+      "process_total": 4.150877800013404
+    },
+    "overlay_path": "data\\processed\\06_search_central_ruler\\overlay\\IMG_0506.png",
+    "metadata_path": "data\\processed\\06_search_central_ruler\\metadata\\IMG_0506_central_ruler.json",
+    "comparison_path": "data\\processed\\06_search_central_ruler\\comparison\\IMG_0506.png",
+    "candidate_snapshot_dir": "data\\processed\\06_search_central_ruler\\candidate_snapshots\\IMG_0506"
+  },
+  {
+    "image_name": "IMG_0507.png",
+    "filtered_line_count": 380,
+    "candidate_count": 240,
+    "selected_fragment_count": 2,
+    "best_score": 0.6189826710241063,
+    "best_tilt_deg": -0.08994336045577994,
+    "timings_sec": {
+      "search": 1.7334708999842405,
+      "rendering": 0.2950373999774456,
+      "analysis_total": 2.1839191999461036,
+      "save": 1.1097805000608787,
+      "process_total": 3.293700899987016
+    },
+    "overlay_path": "data\\processed\\06_search_central_ruler\\overlay\\IMG_0507.png",
+    "metadata_path": "data\\processed\\06_search_central_ruler\\metadata\\IMG_0507_central_ruler.json",
+    "comparison_path": "data\\processed\\06_search_central_ruler\\comparison\\IMG_0507.png",
+    "candidate_snapshot_dir": "data\\processed\\06_search_central_ruler\\candidate_snapshots\\IMG_0507"
+  },
+  {
+    "image_name": "IMG_0508.png",
+    "filtered_line_count": 537,
+    "candidate_count": 239,
+    "selected_fragment_count": 5,
+    "best_score": 0.6082731624680676,
+    "best_tilt_deg": 0.19098522435968746,
+    "timings_sec": {
+      "search": 3.55127649998758,
+      "rendering": 0.31548719995771535,
+      "analysis_total": 4.0603947999479715,
+      "save": 1.1981391000445,
+      "process_total": 5.258534599997802
+    },
+    "overlay_path": "data\\processed\\06_search_central_ruler\\overlay\\IMG_0508.png",
+    "metadata_path": "data\\processed\\06_search_central_ruler\\metadata\\IMG_0508_central_ruler.json",
+    "comparison_path": "data\\processed\\06_search_central_ruler\\comparison\\IMG_0508.png",
+    "candidate_snapshot_dir": "data\\processed\\06_search_central_ruler\\candidate_snapshots\\IMG_0508"
+  },
+  {
+    "image_name": "IMG_0509.png",
+    "filtered_line_count": 505,
+    "candidate_count": 238,
+    "selected_fragment_count": 5,
+    "best_score": 0.5958500896628931,
+    "best_tilt_deg": -0.24277727376682284,
+    "timings_sec": {
+      "search": 4.014805200014962,
+      "rendering": 0.3039262000238523,
+      "analysis_total": 4.494646200007992,
+      "save": 1.0714584999950603,
+      "process_total": 5.566105700010667
+    },
+    "overlay_path": "data\\processed\\06_search_central_ruler\\overlay\\IMG_0509.png",
+    "metadata_path": "data\\processed\\06_search_central_ruler\\metadata\\IMG_0509_central_ruler.json",
+    "comparison_path": "data\\processed\\06_search_central_ruler\\comparison\\IMG_0509.png",
+    "candidate_snapshot_dir": "data\\processed\\06_search_central_ruler\\candidate_snapshots\\IMG_0509"
+  },
+  {
+    "image_name": "IMG_0510.png",
+    "filtered_line_count": 731,
+    "candidate_count": 240,
+    "selected_fragment_count": 6,
+    "best_score": 0.5834351971024008,
+    "best_tilt_deg": -0.34458500595199276,
+    "timings_sec": {
+      "search": 4.917902400018647,
+      "rendering": 0.3645762999949511,
+      "analysis_total": 5.4760411999886855,
+      "save": 1.5981522000220139,
+      "process_total": 7.074194000015268
+    },
+    "overlay_path": "data\\processed\\06_search_central_ruler\\overlay\\IMG_0510.png",
+    "metadata_path": "data\\processed\\06_search_central_ruler\\metadata\\IMG_0510_central_ruler.json",
+    "comparison_path": "data\\processed\\06_search_central_ruler\\comparison\\IMG_0510.png",
+    "candidate_snapshot_dir": "data\\processed\\06_search_central_ruler\\candidate_snapshots\\IMG_0510"
+  },
+  {
+    "image_name": "IMG_0511.png",
+    "filtered_line_count": 410,
+    "candidate_count": 240,
+    "selected_fragment_count": 5,
+    "best_score": 0.6192996274360814,
+    "best_tilt_deg": -0.03204461607330419,
+    "timings_sec": {
+      "search": 3.6296178000047803,
+      "rendering": 0.34482440003193915,
+      "analysis_total": 4.146944500011159,
+      "save": 1.2904389999748673,
+      "process_total": 5.437384699995164
+    },
+    "overlay_path": "data\\processed\\06_search_central_ruler\\overlay\\IMG_0511.png",
+    "metadata_path": "data\\processed\\06_search_central_ruler\\metadata\\IMG_0511_central_ruler.json",
+    "comparison_path": "data\\processed\\06_search_central_ruler\\comparison\\IMG_0511.png",
+    "candidate_snapshot_dir": "data\\processed\\06_search_central_ruler\\candidate_snapshots\\IMG_0511"
+  },
+  {
+    "image_name": "IMG_0512.png",
+    "filtered_line_count": 357,
+    "candidate_count": 240,
+    "selected_fragment_count": 5,
+    "best_score": 0.6189436316143532,
+    "best_tilt_deg": -0.2515162927052508,
+    "timings_sec": {
+      "search": 2.9082832999993116,
+      "rendering": 0.33378390001598746,
+      "analysis_total": 3.4065201000194065,
+      "save": 1.1308112999831792,
+      "process_total": 4.537332300009439
+    },
+    "overlay_path": "data\\processed\\06_search_central_ruler\\overlay\\IMG_0512.png",
+    "metadata_path": "data\\processed\\06_search_central_ruler\\metadata\\IMG_0512_central_ruler.json",
+    "comparison_path": "data\\processed\\06_search_central_ruler\\comparison\\IMG_0512.png",
+    "candidate_snapshot_dir": "data\\processed\\06_search_central_ruler\\candidate_snapshots\\IMG_0512"
+  }
+]

@@ -1,0 +1,830 @@
+paths:
+  working_png_dir: C:\Users\panonit\Documents\ml-ski-boot-canting\api\.runtime\jobs\9b37ec36e2b54314a19deb0fea2cc5df\working_png
+  processed_dir: C:\Users\panonit\Documents\ml-ski-boot-canting\api\.runtime\jobs\9b37ec36e2b54314a19deb0fea2cc5df\processed
+  metadata_dir: C:\Users\panonit\Documents\ml-ski-boot-canting\api\.runtime\jobs\9b37ec36e2b54314a19deb0fea2cc5df\metadata
+display:
+  show_windows: false
+  wait_between_images: false
+  max_height: 900
+api:
+  frames:
+    sample_count: 6
+    max_workers: 4
+step_01_illumination_normalization:
+  enabled: true
+  method: LAB_CLAHE
+  clahe:
+    clip_limit: 2.0
+    clip_limit_test_values:
+    - 1.5
+    - 2.0
+    - 2.5
+    - 3.0
+    tile_grid_size:
+    - 16
+    - 16
+    tile_grid_size_test_values:
+    - - 4
+      - 4
+    - - 8
+      - 8
+    - - 16
+      - 16
+  output_subdir: 01_illumination_normalized
+step_02_grayscale_and_blur:
+  enabled: true
+  inherit_step_01_output: true
+  input_subdir: 01_illumination_normalized
+  output_subdir: 02_grayscale_blur
+  selected_output: bilateral_filter
+  grayscale:
+    enabled: true
+    method: bgr2gray
+  gaussian_blur:
+    enabled: true
+    kernel_size: 7
+    sigma_x: 2.0
+  bilateral_filter:
+    enabled: true
+    diameter: 15
+    sigma_color: 75
+    sigma_space: 75
+step_03_edge_detection:
+  enabled: true
+  selected_input: grayscale_lab_l
+  output_subdir: 03_edges
+  selected_output: cleaned
+  selected_output_test_values:
+  - raw
+  - cleaned
+  canny:
+    mode: manual
+    mode_test_values:
+    - manual
+    - auto_median
+    threshold_1: 40
+    threshold_2: 120
+    aperture_size: 3
+    use_l2_gradient: true
+    auto_sigma: 0.33
+  preprocessing:
+    enabled: false
+    gaussian_kernel_size: 3
+    gaussian_sigma_x: 0.0
+  postprocessing:
+    enabled: true
+    dilate_iterations: 1
+    dilate_kernel_size:
+    - 3
+    - 3
+    close_kernel_size:
+    - 3
+    - 3
+    open_kernel_size:
+    - 0
+    - 0
+    erode_iterations: 0
+    erode_kernel_size:
+    - 3
+    - 3
+  saved_test_variants:
+  - name: roi_edges
+    output_subdir: 03_edges/roi_edges
+    use_step_03_test_input: true
+    override:
+      selected_output: cleaned
+      canny:
+        mode: manual
+        threshold_1: 60
+        threshold_2: 140
+step_04_boot_roi_from_edges:
+  enabled: true
+  inherit_step_03_output: true
+  input_subdir: 03_edges
+  selected_input: roi_edges
+  output_subdir: 04_boot_roi_from_edges
+  edge_threshold: 1
+  noise:
+    min_component_area: 12
+  density:
+    kernel_size: 61
+    threshold_percentile: 82
+    min_threshold: 3
+  center_prior:
+    enabled: true
+    sigma_x_ratio: 0.28
+    sigma_y_ratio: 0.38
+    power: 1.2
+  morphology:
+    close_kernel_size: 65
+    dilate_kernel_size: 41
+    second_close_kernel_size: 95
+    smooth_kernel_size: 17
+    iterations_close: 1
+    iterations_dilate: 1
+    iterations_second_close: 1
+  component_selection:
+    min_area_ratio: 0.01
+    center_weight: 2.0
+    vertical_extent_weight: 1.0
+  hull:
+    enabled: true
+    mode: convex
+    approx_epsilon_ratio: 0.008
+  overlay:
+    alpha: 0.35
+    contour_thickness: 3
+  test_presets:
+  - name: wider_cutoff_more_grow
+    override: {}
+  - name: wider_cutoff_soft_center
+    override:
+      density:
+        threshold_percentile: 83
+        min_threshold: 3
+      center_prior:
+        sigma_x_ratio: 0.38
+        sigma_y_ratio: 0.48
+        power: 0.7
+      morphology:
+        close_kernel_size: 59
+        dilate_kernel_size: 35
+        second_close_kernel_size: 85
+step_05_valid_hough_lines_in_roi:
+  enabled: true
+  inherit_step_03_output: true
+  inherit_step_04_output: true
+  edge_input_subdir: 03_edges/cleaned
+  roi_mask_subdir: 04_boot_roi_from_edges/mask
+  output_subdir: 05_valid_hough_lines_in_roi
+  save:
+    debug_images: true
+    metadata_csv: false
+    valid_lines_json: true
+  roi:
+    use_inner_mask: true
+    inner_erode_kernel_size: 31
+    inner_erode_kernel_size_test_values:
+    - 21
+    - 31
+    - 41
+    inner_erode_iterations: 1
+    inner_erode_iterations_test_values:
+    - 1
+    - 2
+  hough_lines_p:
+    rho: 1
+    theta_degrees: 1
+    threshold: 55
+    threshold_test_values:
+    - 35
+    - 45
+    - 55
+    min_line_length: 75
+    min_line_length_test_values:
+    - 60
+    - 80
+    - 100
+    max_line_gap: 15
+    max_line_gap_test_values:
+    - 15
+    - 25
+    - 35
+  validation:
+    min_mask_support_ratio: 0.92
+    min_mask_support_ratio_test_values:
+    - 0.85
+    - 0.92
+    - 0.97
+    min_points_inside_mask: 60
+    min_points_inside_mask_test_values:
+    - 40
+    - 60
+    - 90
+    reference_mask_width_quantile: 0.25
+    reference_mask_width_quantile_test_values:
+    - 0.1
+    - 0.25
+    - 0.4
+    min_horizontal_clearance_ratio_of_mask_width: 0.4
+    min_horizontal_clearance_ratio_of_mask_width_test_values:
+    - 0.05
+    - 0.15
+    - 0.4
+    max_deviation_from_vertical_degrees: 20
+  drawing:
+    raw_line_thickness: 2
+    valid_line_thickness: 2
+  test_presets:
+  - name: default
+    override: {}
+  - name: looser_hough
+    override:
+      hough_lines_p:
+        threshold: 35
+        min_line_length: 60
+        max_line_gap: 35
+  - name: stricter_hough
+    override:
+      hough_lines_p:
+        threshold: 55
+        min_line_length: 100
+        max_line_gap: 15
+  - name: looser_mask_support
+    override:
+      validation:
+        min_mask_support_ratio: 0.85
+        min_points_inside_mask: 40
+        reference_mask_width_quantile: 0.25
+        min_horizontal_clearance_ratio_of_mask_width: 0.07
+        max_deviation_from_vertical_degrees: 25
+  - name: stricter_mask_support
+    override:
+      validation:
+        min_mask_support_ratio: 0.97
+        min_points_inside_mask: 90
+        reference_mask_width_quantile: 0.2
+        min_horizontal_clearance_ratio_of_mask_width: 0.15
+        max_deviation_from_vertical_degrees: 12
+  - name: narrower_inner_roi
+    override:
+      roi:
+        inner_erode_kernel_size: 41
+        inner_erode_iterations: 2
+  - name: wider_inner_roi
+    override:
+      roi:
+        inner_erode_kernel_size: 21
+        inner_erode_iterations: 1
+step_06_search_central_ruler:
+  enabled: true
+  inherit_step_05_output: true
+  input_subdir: 05_valid_hough_lines_in_roi
+  input_json_subdir: valid_lines_json
+  input_visual_subdir: 05_valid_hough_lines_in_roi/valid_lines_overlay
+  input_overlay_subdir: valid_lines_overlay
+  output_subdir: 06_search_central_ruler
+  cleanup_output_on_start: true
+  fragment_filter:
+    max_vertical_deviation_deg: 18.0
+    min_mask_support_ratio: 0.94
+    min_points_inside_mask: 60
+  roi_profile:
+    trim_top_ratio: 0.06
+    trim_bottom_ratio: 0.06
+    min_row_width_px: 140
+    sample_step_px: 10
+    center_width_quantile: 0.35
+  search:
+    max_candidate_tilt_deg: 12.0
+    coarse_angle_step_deg: 1.0
+    fine_angle_step_deg: 0.2
+    coarse_x_step_px: 14
+    fine_x_step_px: 2
+    coarse_band_half_width_px: 16.0
+    final_band_half_width_px: 9.0
+    coarse_max_angle_error_deg: 6.0
+    final_max_angle_error_deg: 4.0
+    coarse_candidate_pool_limit: 120
+    fine_candidate_pool_limit: 144
+    coarse_angle_bucket_deg: 1.0
+    max_coarse_candidates_per_angle_bucket: 3
+    coarse_x_bucket_px: 18.0
+    max_coarse_candidates_per_x_bucket: 3
+    top_coarse_candidates: 24
+    coarse_score_floor_ratio: 0.97
+    fine_score_floor_ratio: 0.98
+    fine_window_x_px: 40
+    fine_window_angle_deg: 2.2
+    min_support_fragments: 2
+  coverage:
+    bin_count: 12
+    min_supported_bins: 4
+  gaps:
+    soft_gap_px: 80
+    hard_gap_px: 260
+  endpoint_support:
+    band_ratio: 0.15
+    min_band_px: 80
+    max_band_px: 160
+  endpoint_rescue:
+    enabled: false
+    margin_px: 180.0
+    max_fragments_per_side: 2
+    max_mean_axis_distance_px: 16.0
+    max_min_axis_distance_px: 2.5
+    angle_slack_deg: 0.75
+    support_strength_scale: 0.84
+  final_fit:
+    sample_step_px: 22
+    huber_delta_px: 10.0
+    huber_iterations: 4
+    max_fit_tilt_deg: 12.0
+    endpoint_sample_weight_boost: 1.0
+    original_endpoint_sample_weight_boost: 1.0
+    enable_endpoint_weight_boost: false
+  best_fit_selection:
+    top_hypothesis_count: 24
+    min_anchor_band_coverage: 0.18
+    min_anchor_overlap_px: 24.0
+    min_anchor_fragment_ratio: 0.78
+    minimal_symmetry:
+      min_side_ratio: 0.035
+      min_clearance_row_ratio: 0.65
+      target_side_ratio: 0.12
+    formula_buckets:
+      longest_interval_px: 20.0
+      continuity_ratio_scale: 20.0
+    formula_weights:
+      geometry_score: 0.5
+      mirror_symmetry_score: 0.35
+      above_below_balance_score: 0.1
+      roi_balance_score: 0.05
+      gap_outlier_penalty: 0.1
+    axis_harmonization:
+      enabled: false
+      min_x_ref_delta_px: 0.75
+      min_tilt_delta_deg: 0.05
+      hypothesis_pull_ratio: 0.35
+  support_chain:
+    enabled: true
+    max_gap_ratio: 0.1
+    max_connection_gap_px: 220.0
+    base_max_dx_px: 10.0
+    dx_per_gap_ratio: 0.03
+    max_connection_dx_px: 34.0
+    max_angle_difference_deg: 2.0
+    min_vertical_advance_px: 8.0
+    max_path_fit_rmse_px: 12.0
+    beam_width: 10
+    top_path_count: 80
+    allow_long_bridges: true
+    max_long_bridges: 1
+    max_long_bridge_gap_ratio: 0.38
+    max_long_bridge_gap_px: 720.0
+    long_bridge_base_max_dx_px: 13.0
+    long_bridge_dx_per_gap_ratio: 0.012
+    long_bridge_max_dx_px: 27.0
+    long_bridge_max_angle_difference_deg: 4.5
+    long_bridge_quality_scale: 0.52
+    min_bridge_distance_alignment: 0.12
+    min_bridge_angle_alignment: 0.1
+  structural_hypotheses:
+    enabled: true
+    line_seed_enabled: true
+    pair_seed_enabled: true
+    roi_prior_seed_enabled: true
+    min_line_seed_length_px: 70.0
+    max_line_seed_count: 48
+    vertical_zone_count: 6
+    max_fragments_per_zone: 12
+    max_pair_source_fragments: 64
+    max_pair_seed_count: 320
+    min_pair_vertical_separation_ratio: 0.18
+    max_pair_vertical_separation_ratio: 0.96
+    max_pair_fragment_angle_error_deg: 6.5
+    pair_seed_min_axis_inside_ratio: 0.72
+    pair_seed_band_half_width_px: 21.0
+    pair_seed_max_angle_error_deg: 7.0
+    center_x_offset_ratios:
+    - -0.1
+    - -0.06
+    - -0.03
+    - 0.0
+    - 0.03
+    - 0.06
+    - 0.1
+    center_angle_offsets_deg:
+    - -4.0
+    - -2.0
+    - -1.0
+    - 0.0
+    - 1.0
+    - 2.0
+    - 4.0
+    max_structural_detailed_candidates: 96
+    reserved_pair_hypotheses: 12
+    reserved_line_hypotheses: 4
+    reserved_roi_prior_hypotheses: 6
+  fragment_nms:
+    enabled: true
+    max_angle_difference_deg: 1.5
+    max_mean_axis_distance_px: 8.0
+    min_y_overlap_ratio: 0.55
+  candidate_validation:
+    min_chain_span_ratio: 0.22
+    min_unique_vertical_coverage: 0.18
+    min_support_above_y_ref_ratio: 0.04
+    min_support_below_y_ref_ratio: 0.04
+    max_fit_rmse_px: 14.0
+    min_axis_inside_roi_ratio: 0.88
+    allow_sparse_spanning_support: true
+    sparse_min_chain_span_ratio: 0.52
+    sparse_min_unique_vertical_coverage: 0.1
+    sparse_min_support_above_y_ref_ratio: 0.025
+    sparse_min_support_below_y_ref_ratio: 0.025
+    sparse_max_fit_rmse_px: 10.0
+    sparse_min_support_fragments: 2
+  normalized_scoring:
+    geometry:
+      chain_span_ratio: 0.25
+      unique_vertical_coverage: 0.25
+      chain_continuity_ratio: 0.2
+      fit_consistency_score: 0.2
+      fragment_alignment_score: 0.1
+    final:
+      geometry_score: 0.5
+      mirror_symmetry_score: 0.35
+      above_below_balance_score: 0.1
+      roi_balance_score: 0.05
+      gap_outlier_penalty: 0.1
+    fit_rmse_scale_px: 10.0
+    gap_soft_ratio: 0.08
+    gap_hard_ratio: 0.24
+    invalid_candidate_penalty: 0.45
+  mirror_symmetry:
+    enabled: true
+    row_step_px: 6
+    max_distance_px: 12.0
+    center_exclusion_px: 3.0
+    min_edge_pixels_per_side: 2
+    min_valid_row_ratio: 0.08
+    trim_fraction: 0.1
+    evaluation_pool_limit: 160
+    edge_threshold: 24
+  support_adjustment:
+    enabled: false
+    max_midpoint_shift_px: 6.0
+    max_tilt_delta_deg: 1.5
+    max_mean_shift_px: 6.0
+    max_endpoint_shift_px: 9.0
+    allow_tilt_without_intersection_axis_distance_px: 8.0
+    require_axis_intersection_for_tilt_adjustment: true
+    min_support_strength_scale: 0.68
+    full_adjustment_top_hypotheses: 8
+    joint_adjustment_top_hypotheses: 4
+    joint_adjustment_min_original_endpoint_ratio: 0.9
+    joint_adjustment_min_original_endpoint_coverage: 0.24
+  support_extension:
+    enabled: false
+    trigger_gap_px: 180
+    max_added_fragments: 6
+    min_vertical_advance_px: 18
+    max_connection_dx_px: 26.0
+    max_connection_gap_px: 360.0
+    max_axis_distance_px: 55.0
+    max_center_distance_px: 70.0
+    max_vertical_deviation_deg: 10.0
+  candidate_deduplication:
+    max_mean_axis_distance_px: 5.0
+    max_angle_difference_deg: 0.25
+    max_saved_candidates: 10
+    progressive_fill_enabled: true
+    progressive_distance_scales:
+    - 1.0
+    - 0.65
+    - 0.35
+    - 0.0
+  candidate_portfolio:
+    enabled: true
+    top_score_slots: 4
+    reserve_best_per_source: true
+    source_order:
+    - fragment_pair
+    - fragment_axis
+    - roi_prior
+    min_score_ratio: 0.55
+    max_score_drop: 0.24
+    novelty_target_width_ratio: 0.08
+    score_weight: 0.55
+    novelty_weight: 0.45
+  scoring:
+    fragment_support_weight: 0.34
+    vertical_coverage_weight: 0.22
+    symmetry_weight: 0.24
+    roi_center_weight: 0.08
+    gap_penalty_weight: 0.14
+    endpoint_anchor_weight: 0.1
+    outside_mask_penalty_weight: 0.16
+    support_adjustment_penalty_weight: 0.08
+    low_support_penalty: 0.2
+    low_coverage_penalty: 0.2
+  drawing:
+    background_alpha: 0.78
+    all_fragment_thickness: 2
+    candidate_thickness: 2
+    selected_fragment_thickness: 3
+    final_line_thickness: 4
+    show_candidate_lines: true
+    candidate_count_to_draw: 3
+    label_candidates: true
+    font_scale: 0.64
+  test_presets:
+  - name: default
+    override: {}
+  - name: wider_band
+    override:
+      search:
+        coarse_band_half_width_px: 20.0
+        final_band_half_width_px: 11.0
+        coarse_max_angle_error_deg: 7.0
+        final_max_angle_error_deg: 5.0
+  - name: stricter_symmetry
+    override:
+      scoring:
+        symmetry_weight: 0.3
+        gap_penalty_weight: 0.16
+        outside_mask_penalty_weight: 0.18
+  - name: wider_search
+    override:
+      search:
+        max_candidate_tilt_deg: 15.0
+        coarse_x_step_px: 12
+        fine_window_x_px: 34
+step_07_verify_central_ruler_symmetry:
+  enabled: true
+  inherit_step_06_output: true
+  input_subdir: 06_search_central_ruler
+  input_metadata_subdir: metadata
+  visual_background_subdir: 01_illumination_normalized
+  output_subdir: 07_verify_central_ruler_symmetry
+  cleanup_output_on_start: true
+  candidate_limit: 10
+  segment_count: 12
+  vertical_range:
+    use_step_06_trimmed_range: true
+    trim_top_ratio: 0.02
+    trim_bottom_ratio: 0.02
+  roi_preparation:
+    keep_largest_component: true
+    close_kernel_size: 7
+    close_iterations: 1
+  consensus_corridor:
+    candidate_score_power: 2.0
+    reference_half_width_ratio: 0.42
+    row_half_width_quantile: 0.72
+    row_half_width_cap_scale: 1.05
+    minimum_half_width_px: 80
+    maximum_half_width_image_ratio: 0.3
+    edge_margin_px: 8
+    smooth_window: 51
+    max_normalized_candidate_offset: 0.6
+    min_axis_inside_corridor_ratio: 0.82
+    absolute_max_tilt_delta_deg: 5.0
+    tilt_mad_multiplier: 6.0
+    tilt_mad_floor_deg: 0.75
+  edge_input:
+    threshold: 24
+    binary_nonzero_ratio_max: 0.2
+    canny_low: 45
+    canny_high: 135
+    close_kernel_size: 3
+    close_iterations: 0
+    remove_border_components: true
+    border_component_min_height_ratio: 0.8
+    border_component_max_center_distance_ratio: 0.42
+  mirror:
+    center_exclusion_px: 4
+    max_chamfer_distance_px: 16.0
+    distance_score_scale_px: 7.0
+    min_edge_pixels_per_side: 14
+    min_edge_rows_per_side_ratio: 0.16
+    histogram_smoothing_sigma: 2.0
+    band_boundaries:
+    - 0.0
+    - 0.22
+    - 0.52
+    - 1.0
+    band_weights:
+    - 0.46
+    - 0.39
+    - 0.15
+    band_match_fractions:
+    - 0.9
+    - 0.76
+    - 0.58
+    chamfer_weight: 0.64
+    radial_histogram_weight: 0.24
+    edge_count_balance_weight: 0.12
+    coverage_reliability_power: 0.2
+  segment_aggregation:
+    min_valid_segments: 8
+    min_valid_segments_per_zone: 2
+    global_weighted_mean_weight: 0.55
+    global_weighted_median_weight: 0.45
+    global_score_weight: 0.55
+    zone_harmonic_weight: 0.45
+    zone_weights:
+    - 0.3
+    - 0.35
+    - 0.35
+  final_scoring:
+    mirror_symmetry_weight: 0.72
+    bilateral_coverage_weight: 0.1
+    consensus_centrality_weight: 0.08
+    step_06_prior_weight: 0.1
+  confidence:
+    high_min_verification_percent: 72.0
+    high_min_margin_percent: 2.0
+    medium_min_verification_percent: 60.0
+    medium_min_margin_percent: 0.8
+  drawing:
+    axis_thickness: 4
+    other_axis_thickness: 1
+    corridor_boundary_thickness: 2
+    segment_line_thickness: 1
+    font_scale: 0.62
+    background_alpha: 0.82
+step_08_multi_validate_central_ruler:
+  enabled: true
+  inherit_step_07_output: true
+  input_subdir: 07_verify_central_ruler_symmetry
+  input_metadata_subdir: metadata
+  output_subdir: 08_multi_validate_central_ruler
+  cleanup_output_on_start: true
+  candidate_limit: 10
+  selection:
+    mode: validate_step_07_winner
+    allow_candidate_override: false
+  evaluation_mask:
+    require_saved_step_07_mask: true
+    minimum_axis_inside_ratio: 0.82
+    sample_row_step_px: 4
+  segment_consistency:
+    enabled: true
+    minimum_valid_segments: 8
+    minimum_valid_segments_per_zone: 2
+    lower_quantile: 0.25
+    median_weight: 0.24
+    lower_quantile_weight: 0.26
+    zone_harmonic_weight: 0.34
+    valid_ratio_weight: 0.16
+    dispersion_scale: 0.24
+  perturbation_stability:
+    enabled: true
+    include_leave_one_segment_out: true
+    include_leave_one_zone_out: true
+    include_odd_even_subsets: true
+    minimum_segments_per_scenario: 6
+    max_mean_axis_distance_px: 5.0
+    max_tilt_difference_deg: 0.25
+    axis_sample_count: 24
+  fragment_evidence:
+    enabled: true
+    span_saturation: 0.65
+    coverage_saturation: 0.35
+    minimum_available_metrics: 3
+  candidate_validation:
+    require_step_07_valid: true
+  candidate_score:
+    symmetry_weight: 0.42
+    segment_consistency_weight: 0.25
+    perturbation_stability_weight: 0.21
+    fragment_evidence_weight: 0.12
+    missing_component_floor: 0.0001
+  confidence:
+    symmetry_weight: 0.34
+    segment_consistency_weight: 0.22
+    perturbation_stability_weight: 0.22
+    fragment_evidence_weight: 0.12
+    distinct_margin_weight: 0.1
+    distinct_margin_saturation: 0.08
+    accepted_min_percent: 82.0
+    accepted_low_confidence_min_percent: 68.0
+    manual_review_min_percent: 52.0
+  equivalence:
+    max_mean_axis_distance_px: 5.0
+    max_tilt_difference_deg: 0.25
+    sample_count: 24
+  drawing:
+    axis_thickness: 4
+    other_axis_thickness: 1
+    evaluation_mask_boundary_thickness: 2
+    font_scale: 0.6
+    background_alpha: 0.84
+step_09_measure_canting_angle:
+  enabled: true
+  inherit_step_08_output: true
+  input_subdir: 08_multi_validate_central_ruler
+  input_metadata_subdir: metadata
+  cleaned_edge_subdir: 03_edges/cleaned
+  output_subdir: 09_measure_canting_angle
+  cleanup_output_on_start: true
+  evaluation_mask:
+    prefer_step_07_evaluation_mask: true
+    require_step_07_evaluation_mask: false
+    dilate_kernel_width_ratio: 0.03
+    dilate_kernel_height_ratio: 0.01
+    dilate_iterations: 1
+    fallback_axis_half_width_ratio: 0.18
+    fallback_vertical_margin_ratio: 0.04
+  table_search:
+    primary_vertical_range_ratio:
+    - 0.68
+    - 0.96
+    fallback_vertical_range_ratio:
+    - 0.58
+    - 1.02
+    max_abs_angle_deg: 5.0
+    hough_rho_px: 1.0
+    hough_theta_deg: 0.05
+    hough_threshold: 25
+    hough_detection_scale: 0.5
+    min_line_length_ratio: 0.023
+    max_line_gap_ratio: 0.012
+    cluster_angle_tolerance_deg: 0.8
+    cluster_y_tolerance_px: 11.0
+    cluster_merge_gap_px: 7.0
+    minimum_cluster_segments: 2
+    max_segments: 700
+    max_clusters_to_refine: 6
+    minimum_total_coverage_ratio: 0.34
+    minimum_left_coverage_ratio: 0.18
+    minimum_right_coverage_ratio: 0.18
+    minimum_bilateral_balance: 0.42
+    location_center_ratio: 0.82
+    location_sigma_ratio: 0.095
+  line_refinement:
+    support_band_px: 5.0
+    max_iterations: 5
+    residual_keep_px: 7.0
+    minimum_support_pixels: 180
+    x_bin_count: 96
+    minimum_occupied_bin_ratio: 0.3
+    fit_rmse_scale_px: 4.5
+    fit_p90_scale_px: 7.0
+  table_score:
+    total_coverage_weight: 0.22
+    bilateral_coverage_weight: 0.2
+    left_right_balance_weight: 0.1
+    edge_support_weight: 0.18
+    fit_quality_weight: 0.14
+    location_prior_weight: 0.11
+    horizontal_prior_weight: 0.05
+  stability:
+    enabled: true
+    equivalent_angle_tolerance_deg: 0.22
+    equivalent_y_tolerance_px: 14.0
+    angle_std_scale_deg: 0.3
+    y_std_scale_px: 18.0
+    variants:
+    - name: default
+      override: {}
+    - name: conservative
+      override:
+        hough_threshold: 36
+        min_line_length_ratio: 0.032
+        max_line_gap_ratio: 0.009
+    - name: permissive
+      override:
+        hough_threshold: 18
+        min_line_length_ratio: 0.017
+        max_line_gap_ratio: 0.016
+    - name: narrow_vertical_band
+      override:
+        vertical_range_ratio:
+        - 0.72
+        - 0.92
+    - name: wide_vertical_band
+      override:
+        vertical_range_ratio:
+        - 0.62
+        - 1.0
+  axis_quality:
+    symmetry_weight: 0.2
+    multi_validation_weight: 0.2
+    step08_confidence_weight: 0.11
+    winner_validator_evidence_weight: 0.17
+    validator_agreement_weight: 0.11
+    ensemble_stability_weight: 0.1
+    validator_availability_weight: 0.05
+    distinct_margin_weight: 0.06
+    step07_disagreement_factor: 0.9
+    decision_factors:
+      accepted: 1.0
+      accepted_low_confidence: 0.96
+      manual_review: 0.9
+      recapture_required: 0.82
+  measurement_confidence:
+    axis_quality_weight: 0.43
+    table_quality_weight: 0.39
+    joint_stability_weight: 0.12
+    joint_margin_weight: 0.06
+    accepted_min_percent: 82.0
+    accepted_low_confidence_min_percent: 68.0
+    manual_review_min_percent: 52.0
+    reference_line_min_percent: 52.0
+    max_accepted_uncertainty_deg: 0.55
+    calibration_status: uncalibrated_estimated_measurement_confidence
+  direction:
+    neutral_threshold_deg: 0.05
+    positive_label: right
+    negative_label: left
+    neutral_label: neutral
+  drawing:
+    axis_thickness: 4
+    table_line_thickness: 4
+    normal_thickness: 2
+    support_point_radius: 1
+    font_scale: 0.62
+    comparison_panel_width: 680

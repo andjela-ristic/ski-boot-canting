@@ -1,8 +1,10 @@
-.venv
-pipeline/_pycache__
-pipeline/__pycache__/config_loader.cpython-312.pyc
+backend/.venv
+backend/pipeline/_pycache__
+backend/pipeline/__pycache__/config_loader.cpython-312.pyc
 /data/test
-scripts/visual_test_variations_save_windows.py
+backend/scripts/visual_test_variations_save_windows.py
 *.pyc
 /.vscode
 /api/.runtime
+backend\api\.runtime
+backend\api\_bench_runtime

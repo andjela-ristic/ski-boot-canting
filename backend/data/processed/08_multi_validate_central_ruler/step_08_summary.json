@@ -1,0 +1,200 @@
+[
+  {
+    "image_name": "IMG_0502.png",
+    "candidate_count": 10,
+    "final_candidate": "C02",
+    "step_07_candidate": "C02",
+    "step_07_agrees": true,
+    "symmetry_percent": 70.76581096593934,
+    "multi_validation_percent": 68.43699314128199,
+    "confidence_percent": 50.14237478621353,
+    "decision": "recapture_required",
+    "timings_sec": {
+      "analysis_total": 0.7827395999920554,
+      "process_total": 2.5403176000108942
+    },
+    "overlay_path": "data\\processed\\08_multi_validate_central_ruler\\overlay\\IMG_0502.png",
+    "comparison_path": "data\\processed\\08_multi_validate_central_ruler\\comparison\\IMG_0502.png",
+    "metadata_path": "data\\processed\\08_multi_validate_central_ruler\\metadata\\IMG_0502_multi_validation.json"
+  },
+  {
+    "image_name": "IMG_0503.png",
+    "candidate_count": 10,
+    "final_candidate": "C01",
+    "step_07_candidate": "C01",
+    "step_07_agrees": true,
+    "symmetry_percent": 75.78115966277076,
+    "multi_validation_percent": 77.46217409162081,
+    "confidence_percent": 51.3145312002695,
+    "decision": "recapture_required",
+    "timings_sec": {
+      "analysis_total": 0.8167626000067685,
+      "process_total": 2.4731548000127077
+    },
+    "overlay_path": "data\\processed\\08_multi_validate_central_ruler\\overlay\\IMG_0503.png",
+    "comparison_path": "data\\processed\\08_multi_validate_central_ruler\\comparison\\IMG_0503.png",
+    "metadata_path": "data\\processed\\08_multi_validate_central_ruler\\metadata\\IMG_0503_multi_validation.json"
+  },
+  {
+    "image_name": "IMG_0504.png",
+    "candidate_count": 10,
+    "final_candidate": "C01",
+    "step_07_candidate": "C01",
+    "step_07_agrees": true,
+    "symmetry_percent": 75.20000461741114,
+    "multi_validation_percent": 65.84834193255094,
+    "confidence_percent": 45.64449004899861,
+    "decision": "recapture_required",
+    "timings_sec": {
+      "analysis_total": 0.8385149000096135,
+      "process_total": 2.3142042999970727
+    },
+    "overlay_path": "data\\processed\\08_multi_validate_central_ruler\\overlay\\IMG_0504.png",
+    "comparison_path": "data\\processed\\08_multi_validate_central_ruler\\comparison\\IMG_0504.png",
+    "metadata_path": "data\\processed\\08_multi_validate_central_ruler\\metadata\\IMG_0504_multi_validation.json"
+  },
+  {
+    "image_name": "IMG_0505.png",
+    "candidate_count": 10,
+    "final_candidate": "C04",
+    "step_07_candidate": "C04",
+    "step_07_agrees": true,
+    "symmetry_percent": 72.02180812889941,
+    "multi_validation_percent": 75.60682782997074,
+    "confidence_percent": 61.57012780393457,
+    "decision": "manual_review",
+    "timings_sec": {
+      "analysis_total": 0.9125942999962717,
+      "process_total": 3.1526558000186924
+    },
+    "overlay_path": "data\\processed\\08_multi_validate_central_ruler\\overlay\\IMG_0505.png",
+    "comparison_path": "data\\processed\\08_multi_validate_central_ruler\\comparison\\IMG_0505.png",
+    "metadata_path": "data\\processed\\08_multi_validate_central_ruler\\metadata\\IMG_0505_multi_validation.json"
+  },
+  {
+    "image_name": "IMG_0506.png",
+    "candidate_count": 10,
+    "final_candidate": "C03",
+    "step_07_candidate": "C03",
+    "step_07_agrees": true,
+    "symmetry_percent": 71.4579197821896,
+    "multi_validation_percent": 73.85244416820224,
+    "confidence_percent": 69.76873142190028,
+    "decision": "accepted_low_confidence",
+    "timings_sec": {
+      "analysis_total": 0.8458542000153102,
+      "process_total": 2.135813799977768
+    },
+    "overlay_path": "data\\processed\\08_multi_validate_central_ruler\\overlay\\IMG_0506.png",
+    "comparison_path": "data\\processed\\08_multi_validate_central_ruler\\comparison\\IMG_0506.png",
+    "metadata_path": "data\\processed\\08_multi_validate_central_ruler\\metadata\\IMG_0506_multi_validation.json"
+  },
+  {
+    "image_name": "IMG_0507.png",
+    "candidate_count": 10,
+    "final_candidate": "C04",
+    "step_07_candidate": "C04",
+    "step_07_agrees": true,
+    "symmetry_percent": 71.302572335907,
+    "multi_validation_percent": 69.70887213985176,
+    "confidence_percent": 56.927711861065646,
+    "decision": "manual_review",
+    "timings_sec": {
+      "analysis_total": 0.6523527999815997,
+      "process_total": 1.929926799988607
+    },
+    "overlay_path": "data\\processed\\08_multi_validate_central_ruler\\overlay\\IMG_0507.png",
+    "comparison_path": "data\\processed\\08_multi_validate_central_ruler\\comparison\\IMG_0507.png",
+    "metadata_path": "data\\processed\\08_multi_validate_central_ruler\\metadata\\IMG_0507_multi_validation.json"
+  },
+  {
+    "image_name": "IMG_0508.png",
+    "candidate_count": 10,
+    "final_candidate": "C01",
+    "step_07_candidate": "C01",
+    "step_07_agrees": true,
+    "symmetry_percent": 74.04221585666801,
+    "multi_validation_percent": 76.69054134552277,
+    "confidence_percent": 68.32051017406397,
+    "decision": "accepted_low_confidence",
+    "timings_sec": {
+      "analysis_total": 0.6865073000080884,
+      "process_total": 1.9362514999811538
+    },
+    "overlay_path": "data\\processed\\08_multi_validate_central_ruler\\overlay\\IMG_0508.png",
+    "comparison_path": "data\\processed\\08_multi_validate_central_ruler\\comparison\\IMG_0508.png",
+    "metadata_path": "data\\processed\\08_multi_validate_central_ruler\\metadata\\IMG_0508_multi_validation.json"
+  },
+  {
+    "image_name": "IMG_0509.png",
+    "candidate_count": 10,
+    "final_candidate": "C01",
+    "step_07_candidate": "C01",
+    "step_07_agrees": true,
+    "symmetry_percent": 73.11638514275586,
+    "multi_validation_percent": 73.35303183719832,
+    "confidence_percent": 69.36675447944461,
+    "decision": "accepted_low_confidence",
+    "timings_sec": {
+      "analysis_total": 0.6389963999972679,
+      "process_total": 1.7924354000133462
+    },
+    "overlay_path": "data\\processed\\08_multi_validate_central_ruler\\overlay\\IMG_0509.png",
+    "comparison_path": "data\\processed\\08_multi_validate_central_ruler\\comparison\\IMG_0509.png",
+    "metadata_path": "data\\processed\\08_multi_validate_central_ruler\\metadata\\IMG_0509_multi_validation.json"
+  },
+  {
+    "image_name": "IMG_0510.png",
+    "candidate_count": 10,
+    "final_candidate": "C02",
+    "step_07_candidate": "C02",
+    "step_07_agrees": true,
+    "symmetry_percent": 73.24808341036893,
+    "multi_validation_percent": 73.22229011771229,
+    "confidence_percent": 55.032031342853685,
+    "decision": "manual_review",
+    "timings_sec": {
+      "analysis_total": 0.6204927999933716,
+      "process_total": 1.7916316000046209
+    },
+    "overlay_path": "data\\processed\\08_multi_validate_central_ruler\\overlay\\IMG_0510.png",
+    "comparison_path": "data\\processed\\08_multi_validate_central_ruler\\comparison\\IMG_0510.png",
+    "metadata_path": "data\\processed\\08_multi_validate_central_ruler\\metadata\\IMG_0510_multi_validation.json"
+  },
+  {
+    "image_name": "IMG_0511.png",
+    "candidate_count": 10,
+    "final_candidate": "C01",
+    "step_07_candidate": "C01",
+    "step_07_agrees": true,
+    "symmetry_percent": 73.32465478553935,
+    "multi_validation_percent": 69.05290603931975,
+    "confidence_percent": 60.186771344150316,
+    "decision": "manual_review",
+    "timings_sec": {
+      "analysis_total": 0.639817099989159,
+      "process_total": 1.861589800013462
+    },
+    "overlay_path": "data\\processed\\08_multi_validate_central_ruler\\overlay\\IMG_0511.png",
+    "comparison_path": "data\\processed\\08_multi_validate_central_ruler\\comparison\\IMG_0511.png",
+    "metadata_path": "data\\processed\\08_multi_validate_central_ruler\\metadata\\IMG_0511_multi_validation.json"
+  },
+  {
+    "image_name": "IMG_0512.png",
+    "candidate_count": 10,
+    "final_candidate": "C01",
+    "step_07_candidate": "C01",
+    "step_07_agrees": true,
+    "symmetry_percent": 79.12253979920382,
+    "multi_validation_percent": 76.1568787562771,
+    "confidence_percent": 56.791120509766394,
+    "decision": "manual_review",
+    "timings_sec": {
+      "analysis_total": 0.6291868999833241,
+      "process_total": 1.8229664999817032
+    },
+    "overlay_path": "data\\processed\\08_multi_validate_central_ruler\\overlay\\IMG_0512.png",
+    "comparison_path": "data\\processed\\08_multi_validate_central_ruler\\comparison\\IMG_0512.png",
+    "metadata_path": "data\\processed\\08_multi_validate_central_ruler\\metadata\\IMG_0512_multi_validation.json"
+  }
+]

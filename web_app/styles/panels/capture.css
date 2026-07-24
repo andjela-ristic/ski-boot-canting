@@ -236,6 +236,7 @@
 .advanced-settings summary {
   padding: 14px 16px;
   cursor: pointer;
+  -webkit-user-select: none;
   user-select: none;
   font-weight: 600;
   color: var(--muted);

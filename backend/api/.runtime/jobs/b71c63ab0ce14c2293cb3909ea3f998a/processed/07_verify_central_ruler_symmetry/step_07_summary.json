@@ -1,0 +1,18 @@
+[
+  {
+    "image_name": "IMG_0502.png",
+    "candidate_count": 10,
+    "winner_label": "C02",
+    "symmetry_percent": 70.76581096593934,
+    "mirror_symmetry_percent": 63.403406053139776,
+    "winner_margin_percent": 0.39774501433295484,
+    "confidence": "low",
+    "winner_tilt_deg": 1.1847502960376532,
+    "overlay_path": "api\\.runtime\\jobs\\b71c63ab0ce14c2293cb3909ea3f998a\\processed\\07_verify_central_ruler_symmetry\\overlay\\IMG_0502.png",
+    "comparison_path": "api\\.runtime\\jobs\\b71c63ab0ce14c2293cb3909ea3f998a\\processed\\07_verify_central_ruler_symmetry\\comparison\\IMG_0502.png",
+    "metadata_path": "api\\.runtime\\jobs\\b71c63ab0ce14c2293cb3909ea3f998a\\processed\\07_verify_central_ruler_symmetry\\metadata\\IMG_0502_symmetry.json",
+    "candidate_snapshot_dir": "api\\.runtime\\jobs\\b71c63ab0ce14c2293cb3909ea3f998a\\processed\\07_verify_central_ruler_symmetry\\candidate_snapshots\\IMG_0502",
+    "evaluation_mask_path": "api\\.runtime\\jobs\\b71c63ab0ce14c2293cb3909ea3f998a\\processed\\07_verify_central_ruler_symmetry\\evaluation_mask\\IMG_0502.png",
+    "evaluation_edge_path": "api\\.runtime\\jobs\\b71c63ab0ce14c2293cb3909ea3f998a\\processed\\07_verify_central_ruler_symmetry\\evaluation_edges\\IMG_0502.png"
+  }
+]

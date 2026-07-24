@@ -1,0 +1,12 @@
+source_file,output_file,width,height,processing_step,method,clahe_clip_limit,clahe_tile_grid_size,read_time_ms,processing_time_ms,write_time_ms,total_time_ms
+data\working_png\IMG_0502.png,data\processed\01_illumination_normalized\IMG_0502.png,3024,4032,01_illumination_normalization,LAB_CLAHE,2.0,16x16,270.488,204.417,533.241,1008.189
+data\working_png\IMG_0503.png,data\processed\01_illumination_normalized\IMG_0503.png,3024,4032,01_illumination_normalization,LAB_CLAHE,2.0,16x16,224.254,52.161,462.756,739.209
+data\working_png\IMG_0504.png,data\processed\01_illumination_normalized\IMG_0504.png,3024,4032,01_illumination_normalization,LAB_CLAHE,2.0,16x16,233.321,51.48,463.308,748.142
+data\working_png\IMG_0505.png,data\processed\01_illumination_normalized\IMG_0505.png,3024,4032,01_illumination_normalization,LAB_CLAHE,2.0,16x16,197.695,44.391,396.529,638.66
+data\working_png\IMG_0506.png,data\processed\01_illumination_normalized\IMG_0506.png,3024,4032,01_illumination_normalization,LAB_CLAHE,2.0,16x16,187.086,43.541,368.997,599.662
+data\working_png\IMG_0507.png,data\processed\01_illumination_normalized\IMG_0507.png,3024,4032,01_illumination_normalization,LAB_CLAHE,2.0,16x16,188.595,45.235,362.878,596.746
+data\working_png\IMG_0508.png,data\processed\01_illumination_normalized\IMG_0508.png,3024,4032,01_illumination_normalization,LAB_CLAHE,2.0,16x16,194.44,47.035,385.69,627.204
+data\working_png\IMG_0509.png,data\processed\01_illumination_normalized\IMG_0509.png,3024,4032,01_illumination_normalization,LAB_CLAHE,2.0,16x16,201.526,47.581,450.292,699.432
+data\working_png\IMG_0510.png,data\processed\01_illumination_normalized\IMG_0510.png,3024,4032,01_illumination_normalization,LAB_CLAHE,2.0,16x16,186.159,40.693,389.028,615.909
+data\working_png\IMG_0511.png,data\processed\01_illumination_normalized\IMG_0511.png,3024,4032,01_illumination_normalization,LAB_CLAHE,2.0,16x16,197.728,48.208,372.223,618.19
+data\working_png\IMG_0512.png,data\processed\01_illumination_normalized\IMG_0512.png,3024,4032,01_illumination_normalization,LAB_CLAHE,2.0,16x16,196.106,47.485,353.712,597.336

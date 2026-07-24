@@ -85,6 +85,7 @@ code {
   border-radius: var(--radius-xl);
   background: var(--panel);
   backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   box-shadow: var(--shadow);
 }
 
