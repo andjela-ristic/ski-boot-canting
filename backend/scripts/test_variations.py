@@ -12,20 +12,18 @@ import importlib.util
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if __package__ in (None, ""):
-    sys.path.insert(0, str(PROJECT_ROOT.parent))
+    sys.path.insert(0, str(PROJECT_ROOT))
 
-sys.path.append(str(PROJECT_ROOT / "pipeline"))
-
-from backend.pipeline.config_loader import load_config
-from backend.pipeline.lib.step_01_illumination_normalization import normalize_illumination_variant
-from backend.pipeline.lib.step_02_grayscale_and_blur import build_bilateral_variant, convert_to_bgr2gray
-from backend.pipeline.lib import step_03_edge_detection as step03_lib
-from backend.pipeline.lib import step_04_boot_roi_from_edges as step04_lib
-from backend.pipeline.lib import step_05_valid_hough_lines_in_roi as step05_lib
-from backend.pipeline.lib import step_06_search_central_ruler as step06_lib
-from backend.pipeline.lib import step_07_verify_central_ruler_symmetry as step07_lib
-from backend.pipeline.lib import step_08_multi_validate_central_ruler as step08_lib
-from backend.pipeline.lib import step_09_measure_canting_angle as step09_lib
+from pipeline.config_loader import load_config
+from pipeline.lib.step_01_illumination_normalization import normalize_illumination_variant
+from pipeline.lib.step_02_grayscale_and_blur import build_bilateral_variant, convert_to_bgr2gray
+from pipeline.lib import step_03_edge_detection as step03_lib
+from pipeline.lib import step_04_boot_roi_from_edges as step04_lib
+from pipeline.lib import step_05_valid_hough_lines_in_roi as step05_lib
+from pipeline.lib import step_06_search_central_ruler as step06_lib
+from pipeline.lib import step_07_verify_central_ruler_symmetry as step07_lib
+from pipeline.lib import step_08_multi_validate_central_ruler as step08_lib
+from pipeline.lib import step_09_measure_canting_angle as step09_lib
 
 CONFIG = load_config()
 PATHS_CONFIG = CONFIG["paths"]

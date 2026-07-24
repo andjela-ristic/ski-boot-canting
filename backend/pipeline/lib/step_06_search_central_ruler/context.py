@@ -12,10 +12,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-try:
-    from backend.pipeline.config_loader import load_config
-except ModuleNotFoundError:
-    from ...config_loader import load_config
+from ...config_loader import load_config
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 

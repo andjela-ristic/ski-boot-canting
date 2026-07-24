@@ -5,9 +5,9 @@ from pathlib import Path
 import sys
 
 if __package__ in (None, ""):
-    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from backend.pipeline.lib import step_05_valid_hough_lines_in_roi as step05_lib
+from pipeline.lib import step_05_valid_hough_lines_in_roi as step05_lib
 
 
 def parse_args() -> argparse.Namespace:

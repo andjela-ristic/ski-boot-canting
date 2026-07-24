@@ -5,9 +5,9 @@ from pathlib import Path
 import sys
 
 if __package__ in (None, ""):
-    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from backend.pipeline.lib import step_07_verify_central_ruler_symmetry as step07_lib
+from pipeline.lib import step_07_verify_central_ruler_symmetry as step07_lib
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Step 07: verify Step 06 central-axis candidates using segmented bidirectional mirror symmetry.")

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from backend.pipeline.config_loader import load_config
+from ...config_loader import load_config
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 

@@ -7,7 +7,7 @@ from typing import Any
 import cv2
 import numpy as np
 
-from backend.pipeline.config_loader import deep_merge_dict
+from ...config_loader import deep_merge_dict
 
 from . import context
 from .display import make_comparison_view

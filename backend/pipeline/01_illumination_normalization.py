@@ -3,9 +3,9 @@ import argparse
 from pathlib import Path
 
 if __package__ in (None, ""):
-    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from backend.pipeline.lib import step_01_illumination_normalization as step01_lib
+from pipeline.lib import step_01_illumination_normalization as step01_lib
 
 
 def parse_arguments() -> argparse.Namespace:

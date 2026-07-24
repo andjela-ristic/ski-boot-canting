@@ -5,9 +5,9 @@ from pathlib import Path
 import sys
 
 if __package__ in (None, ""):
-    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from backend.pipeline.lib import step_08_multi_validate_central_ruler as step08_lib
+from pipeline.lib import step_08_multi_validate_central_ruler as step08_lib
 
 
 def parse_args() -> argparse.Namespace:

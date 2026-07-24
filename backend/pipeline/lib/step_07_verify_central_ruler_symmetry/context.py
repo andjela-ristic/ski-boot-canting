@@ -11,19 +11,16 @@ import cv2
 import numpy as np
 
 try:
-    from backend.pipeline.config_loader import load_config
-except ModuleNotFoundError:
-    try:
-        from ...config_loader import load_config
-    except (ModuleNotFoundError, ImportError):
-        def load_config() -> dict:
-            return {
-                "paths": {
-                    "working_png_dir": "data/working_png",
-                    "processed_dir": "data/processed",
-                },
-                "display": {"max_height": 900},
-            }
+    from ...config_loader import load_config
+except (ModuleNotFoundError, ImportError):
+    def load_config() -> dict:
+        return {
+            "paths": {
+                "working_png_dir": "data/working_png",
+                "processed_dir": "data/processed",
+            },
+            "display": {"max_height": 900},
+        }
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]

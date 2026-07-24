@@ -5,9 +5,9 @@ from pathlib import Path
 import sys
 
 if __package__ in (None, ""):
-    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from backend.pipeline.lib import step_04_boot_roi_from_edges as step04_lib
+from pipeline.lib import step_04_boot_roi_from_edges as step04_lib
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Build a rough ski boot ROI mask from edge images.")
