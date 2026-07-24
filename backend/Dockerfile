@@ -14,15 +14,16 @@ RUN apt-get update \
         libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt ./requirements.txt
+COPY backend/requirements.txt ./requirements.txt
 
 RUN pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir -r requirements.txt
 
-COPY api ./api
-COPY capture_readiness ./capture_readiness
-COPY pipeline ./pipeline
-COPY config ./config
+COPY backend/api ./api
+COPY backend/capture_readiness ./capture_readiness
+COPY backend/pipeline ./pipeline
+COPY backend/config ./config
+COPY web_app ./web_app
 
 EXPOSE 8000
 

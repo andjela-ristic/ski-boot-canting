@@ -12,8 +12,8 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
-$backendRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
+$backendRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 
 function Get-ListeningConnection {
     param([int]$TargetPort)
@@ -42,6 +42,34 @@ function Wait-ForPort {
     return $null
 }
 
+function Test-OriginFrontend {
+    param([int]$TargetPort)
+
+    try {
+        $response = Invoke-WebRequest -UseBasicParsing -Uri "http://localhost:$TargetPort/" -TimeoutSec 5
+    } catch {
+        Write-Warning "Origin on port $TargetPort is reachable, but GET / could not be verified: $($_.Exception.Message)"
+        return
+    }
+
+    $contentType = [string]$response.Headers["Content-Type"]
+    $body = [string]$response.Content
+    $looksLikeHtml = $contentType -like "text/html*" -or $body.TrimStart().StartsWith("<!DOCTYPE html") -or $body.TrimStart().StartsWith("<html")
+    $looksLikeServiceIndex = $body -match '"service"\s*:\s*"ski-boot-canting-api"'
+
+    if ($looksLikeHtml) {
+        Write-Host "Verified frontend HTML at http://localhost:$TargetPort/"
+        return
+    }
+
+    if ($looksLikeServiceIndex) {
+        Write-Warning "Origin on port $TargetPort is returning the API service index JSON on GET /, not the frontend HTML."
+        return
+    }
+
+    Write-Warning "Origin on port $TargetPort responded to GET / with unexpected content-type '$contentType'."
+}
+
 $existingConnection = Get-ListeningConnection -TargetPort $Port
 
 if (-not $existingConnection) {
@@ -52,7 +80,12 @@ if (-not $existingConnection) {
             }
 
             Write-Host "Starting backend via docker compose"
-            & docker compose up --build -d
+            Push-Location $repoRoot
+            try {
+                & docker compose up --build -d
+            } finally {
+                Pop-Location
+            }
         }
         "SystemPython" {
             $pythonCommand = Get-Command $PythonPath -ErrorAction SilentlyContinue
@@ -78,6 +111,8 @@ if (-not $existingConnection) {
         throw "API not listening on port $Port within the expected timeframe."
     }
 }
+
+Test-OriginFrontend -TargetPort $Port
 
 powershell -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "start_cloudflare_tunnel.ps1") `
     -Port $Port `

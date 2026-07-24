@@ -1,8 +1,8 @@
 services:
   canting-api:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./backend/Dockerfile
     container_name: ski-boot-canting-api
     environment:
       API_HOST: 0.0.0.0
@@ -23,18 +23,15 @@ services:
     depends_on:
       - canting-api
     ports:
-      - "8080:80"
+      - "8081:80"
     restart: unless-stopped
 
   canting-tunnel:
     image: cloudflare/cloudflared:latest
     container_name: ski-boot-canting-tunnel
-    depends_on:
-      - canting-web
-    environment:
-      PORT: 80
-      TARGET_HOST: canting-web
-    command: ["sh", "/scripts/start_cloudflare_tunnel.sh"]
-    volumes:
-      - ./backend/scripts:/scripts:ro
+    command:
+      - tunnel
+      - --no-autoupdate
+      - --url
+      - http://host.docker.internal:8000
     restart: unless-stopped

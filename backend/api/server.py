@@ -25,7 +25,16 @@ from .exceptions import ApiError
 from .persistence import AnalysisRepository, NoopAnalysisRepository
 from .pipeline_runner import PipelineRunner
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+
+def _discover_repo_root() -> Path:
+    current = Path(__file__).resolve()
+    for parent in current.parents:
+        if (parent / "web_app").exists():
+            return parent
+    return current.parents[1]
+
+
+REPO_ROOT = _discover_repo_root()
 WEB_ROOT = REPO_ROOT / "web_app"
 CLIENT_DISCONNECT_ERRORS = (
     BrokenPipeError,
